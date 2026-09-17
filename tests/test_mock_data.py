@@ -2,6 +2,7 @@
 
 import copy
 import json
+from codecs import BOM_UTF8
 from datetime import date
 from decimal import Decimal
 
@@ -50,6 +51,12 @@ def test_csv_round_trip_is_reproducible_and_preserves_identifiers(tmp_path):
     generate(second)
     for path in first.iterdir():
         assert path.read_bytes() == (second / path.name).read_bytes()
+    for path in first.glob("*.csv"):
+        raw = path.read_bytes()
+        assert raw.startswith(BOM_UTF8)
+        assert not raw[len(BOM_UTF8) :].startswith(BOM_UTF8)
+        header, _ = read_csv(path)
+        assert header[0] in {"rowkey", "DT"}
     assert validate_directory(first) == []
     _, rows = read_csv(first / f"{JOURNEY_TABLE}.csv")
     account_event = next(row for row in rows if row["EVT_TYPE"] == "YWJC0002")

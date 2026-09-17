@@ -52,7 +52,8 @@ def json_exact(value) -> str:
 
 
 def write_csv(path: Path, fields: list[str], rows: list[dict]) -> None:
-    with path.open("w", encoding="utf-8", newline="") as stream:
+    # Excel uses the BOM to recognize UTF-8 when a CSV is opened directly.
+    with path.open("w", encoding="utf-8-sig", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)

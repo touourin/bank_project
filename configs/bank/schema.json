@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "kind": "bank_mock_contract",
   "description": "项目 mock 字段契约；不是银行正式业务校验规则或 OpenAPI。",
   "sources": [
@@ -17,7 +17,7 @@
     }
   ],
   "csv": {
-    "encoding": "utf-8",
+    "encoding": "utf-8-sig",
     "delimiter": ",",
     "line_terminator": "LF",
     "null": "empty cell",

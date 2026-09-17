@@ -33,7 +33,8 @@ python3 scripts/validate_mock.py --input-dir data/mock
 
 ## 格式
 
-- UTF-8、逗号分隔、LF 换行。文件第一行是列名，CSV 引号和 JSON 引号由标准 CSV 写入器转义。
+- UTF-8 **带 BOM**（`utf-8-sig`）、逗号分隔、LF 换行。BOM 用于 Excel 直接打开时识别中文编码。文件第一行是列名，CSV 引号和 JSON 引号由标准 CSV 写入器转义。
+- 程序读取 CSV 时使用 `encoding="utf-8-sig"`，避免把 BOM 读入第一个列名；项目读取器已处理。已经用错误编码打开的 Excel 窗口需要重新打开修正后的文件，添加 BOM 不会刷新现有窗口。
 - 标签列名及大小写沿用 `CCM_C_CUST_FLAG_INFO` 结构页。旅程使用结构页的大写列名 `DT,ROWKEY,EVT_CLASS,EVT_TYPE,CUST_ID,OCCUR_DT,KEY_FLAG,PROPERTIES`，而非样例页的小写表头。
 - `PROPERTIES` 是 CSV 单元格内的 JSON 对象文本。两层解析：先读 CSV，再解析该列 JSON。
 - 编号、账号、码值按字符串读取。账号带前导 `0`；Excel 中应通过“从文本/CSV”导入并将标识符列指定为文本，避免自动数值转换。

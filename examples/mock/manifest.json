@@ -1,6 +1,6 @@
 {
-  "schema_version": "1.1",
-  "schema_sha256": "5ba6b92d374bb563113fd7bd229415133320418a7a7fb2ebe264f62eae4005ed",
+  "schema_version": "1.2",
+  "schema_sha256": "3d38c4fc604d815d5204ec1d2cfeff742ca396b11b519e2e145dab66ea31f942",
   "synthetic": true,
   "seed": 20260917,
   "as_of": "2026-09-17",
@@ -9,13 +9,13 @@
       "filename": "CCM_C_CUST_FLAG_INFO.csv",
       "rows": 20,
       "columns": 155,
-      "sha256": "137b1b02f7b190af1604781e8fa94948ed2ce71a425a6e4e20d2e779a38bb2e9"
+      "sha256": "b28b42ca6116b6333216850510b0b02870e888c778c970cc5cbe905ac4c466de"
     },
     "E_CRM_C_CUST_TOUR_EVT_SUM": {
       "filename": "E_CRM_C_CUST_TOUR_EVT_SUM.csv",
       "rows": 280,
       "columns": 8,
-      "sha256": "0e5ce2ce0b94ab9c40728769cc4aaa51d3b4e8d8fb141cc19436e6615fefdb03"
+      "sha256": "f2350e81fd839b6a7f5cca0fbb85f44cff05171f0d923af21e0c9c7ffc6ec931"
     }
   },
   "event_counts": {
