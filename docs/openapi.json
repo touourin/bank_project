@@ -1,0 +1,1073 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Bank project · 工程框架",
+    "description": "仅提供工程结构、接口契约与基础设施连接。业务接口为占位，合法请求返回 HTTP 501；数据导入、抽取、消歧、建图、查询均未实现。",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Ready",
+        "operationId": "ready_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "基础设施不可用或检查超时"
+          }
+        }
+      }
+    },
+    "/api/v1/imports": {
+      "post": {
+        "tags": [
+          "pipeline · 尚未实现"
+        ],
+        "summary": "数据导入（尚未实现）",
+        "operationId": "import_records_api_v1_imports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResult"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "接口占位，业务功能尚未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/batches": {
+      "post": {
+        "tags": [
+          "pipeline · 尚未实现"
+        ],
+        "summary": "批次处理（尚未实现）",
+        "operationId": "submit_batch_api_v1_batches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractionBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResult"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "接口占位，业务功能尚未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "pipeline · 尚未实现"
+        ],
+        "summary": "运行记录（尚未实现）",
+        "operationId": "get_run_api_v1_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "dataset_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResult"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "接口占位，业务功能尚未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/graph/query": {
+      "post": {
+        "tags": [
+          "graph · 尚未实现"
+        ],
+        "summary": "图谱查询（尚未实现）",
+        "operationId": "query_graph_api_v1_graph_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQuery"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResult"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "接口占位，业务功能尚未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evidence/{evidence_id}": {
+      "get": {
+        "tags": [
+          "graph · 尚未实现"
+        ],
+        "summary": "证据查询（尚未实现）",
+        "operationId": "evidence_api_v1_evidence__evidence_id__get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "title": "Evidence Id"
+            }
+          },
+          {
+            "name": "dataset_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceResult"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "接口占位，业务功能尚未实现",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EntityCandidate": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Candidate Id"
+          },
+          "entity_type": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Entity Type"
+          },
+          "external_keys": {
+            "items": {
+              "$ref": "#/components/schemas/ExternalKey"
+            },
+            "type": "array",
+            "title": "External Keys"
+          },
+          "properties": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Properties"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 160,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Evidence Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "entity_type"
+        ],
+        "title": "EntityCandidate"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error",
+          "detail"
+        ],
+        "title": "ErrorResponse"
+      },
+      "EventCandidate": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Event Id"
+          },
+          "event_type": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Event Type"
+          },
+          "occurred_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred At"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/Participant"
+            },
+            "type": "array",
+            "title": "Participants"
+          },
+          "properties": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Properties"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 160,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Evidence Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "event_type"
+        ],
+        "title": "EventCandidate"
+      },
+      "Evidence": {
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Evidence Id"
+          },
+          "source_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Source Id"
+          },
+          "fields": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Fields"
+          },
+          "excerpt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excerpt"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "source_id"
+        ],
+        "title": "Evidence"
+      },
+      "EvidenceResult": {
+        "properties": {
+          "evidence": {
+            "$ref": "#/components/schemas/Evidence"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceRecord"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "evidence",
+          "source"
+        ],
+        "title": "EvidenceResult"
+      },
+      "ExternalKey": {
+        "properties": {
+          "source_system": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Source System"
+          },
+          "key_type": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Key Type"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_system",
+          "key_type",
+          "value"
+        ],
+        "title": "ExternalKey"
+      },
+      "ExtractionBatch": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "0.1",
+            "title": "Schema Version",
+            "default": "0.1"
+          },
+          "dataset_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Dataset Id"
+          },
+          "batch_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Batch Id"
+          },
+          "producer_version": {
+            "type": "string",
+            "title": "Producer Version"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRecord"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/EntityCandidate"
+            },
+            "type": "array",
+            "title": "Entities"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventCandidate"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "relations": {
+            "items": {
+              "$ref": "#/components/schemas/RelationCandidate"
+            },
+            "type": "array",
+            "title": "Relations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "batch_id",
+          "producer_version"
+        ],
+        "title": "ExtractionBatch"
+      },
+      "GraphEdge": {
+        "properties": {
+          "edge_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Edge Id"
+          },
+          "source_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Source Id"
+          },
+          "target_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Target Id"
+          },
+          "relation_type": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Relation Type"
+          },
+          "properties": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Properties"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 160,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Evidence Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "edge_id",
+          "source_id",
+          "target_id",
+          "relation_type"
+        ],
+        "title": "GraphEdge"
+      },
+      "GraphNode": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Node Id"
+          },
+          "node_type": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Node Type"
+          },
+          "properties": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Properties"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 160,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Evidence Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "node_id",
+          "node_type"
+        ],
+        "title": "GraphNode"
+      },
+      "GraphQuery": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Dataset Id"
+          },
+          "query_type": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Query Type"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "query_type"
+        ],
+        "title": "GraphQuery"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status",
+            "default": "ok"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "mode": {
+            "type": "string",
+            "const": "framework",
+            "title": "Mode",
+            "default": "framework"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "HealthResponse"
+      },
+      "ImportRequest": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Dataset Id"
+          },
+          "batch_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Batch Id"
+          },
+          "source_system": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Source System"
+          },
+          "source_uri": {
+            "type": "string",
+            "title": "Source Uri"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "batch_id",
+          "source_system",
+          "source_uri"
+        ],
+        "title": "ImportRequest"
+      },
+      "JsonValue": {},
+      "Participant": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Entity Id"
+          },
+          "role": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Role"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "entity_id",
+          "role"
+        ],
+        "title": "Participant"
+      },
+      "QueryResult": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Dataset Id"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id"
+        ],
+        "title": "QueryResult"
+      },
+      "ReadyResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ready",
+            "title": "Status",
+            "default": "ready"
+          },
+          "mode": {
+            "type": "string",
+            "const": "framework",
+            "title": "Mode",
+            "default": "framework"
+          },
+          "graph_backend": {
+            "type": "string",
+            "title": "Graph Backend"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_backend"
+        ],
+        "title": "ReadyResponse"
+      },
+      "RelationCandidate": {
+        "properties": {
+          "relation_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Relation Id"
+          },
+          "subject_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Subject Id"
+          },
+          "predicate": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Predicate"
+          },
+          "object_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Object Id"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 160,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Evidence Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "relation_id",
+          "subject_id",
+          "predicate",
+          "object_id"
+        ],
+        "title": "RelationCandidate"
+      },
+      "RunResult": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Run Id"
+          },
+          "dataset_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Dataset Id"
+          },
+          "batch_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Batch Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "dataset_id",
+          "batch_id",
+          "status"
+        ],
+        "title": "RunResult"
+      },
+      "SourceRecord": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Source Id"
+          },
+          "source_system": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Source System"
+          },
+          "record_key": {
+            "type": "string",
+            "title": "Record Key"
+          },
+          "locator": {
+            "type": "string",
+            "title": "Locator"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_id",
+          "source_system",
+          "record_key",
+          "locator"
+        ],
+        "title": "SourceRecord"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

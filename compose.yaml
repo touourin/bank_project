@@ -1,0 +1,41 @@
+name: bank-project
+services:
+  neo4j:
+    image: neo4j:5.26.27-community
+    environment:
+      NEO4J_AUTH: "neo4j/${BANK_NEO4J_PASSWORD:?Set BANK_NEO4J_PASSWORD in .env}"
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 256m
+    ports:
+      - "127.0.0.1:7477:7474"
+      - "127.0.0.1:7690:7687"
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:7474 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  api:
+    build: .
+    environment:
+      BANK_GRAPH_BACKEND: neo4j
+      BANK_NEO4J_URI: bolt://neo4j:7687
+      BANK_NEO4J_USER: neo4j
+      BANK_NEO4J_PASSWORD: "${BANK_NEO4J_PASSWORD:?Set BANK_NEO4J_PASSWORD in .env}"
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=4)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  neo4j-data:
