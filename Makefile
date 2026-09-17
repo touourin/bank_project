@@ -1,10 +1,18 @@
 PYTHON ?= .venv/bin/python
+MOCK_PYTHON ?= python3
 COMPOSE ?= docker compose
 .DEFAULT_GOAL := run
 
-.PHONY: run build build-cached down logs status restart local-run test lint format schema check
+.PHONY: run build build-cached down logs status restart local-run test lint format schema check mock mock-check
 check: lint test
 	$(PYTHON) scripts/export_openapi.py --check
+	$(PYTHON) scripts/validate_mock.py
+
+mock:
+	$(MOCK_PYTHON) scripts/generate_mock.py
+
+mock-check:
+	$(MOCK_PYTHON) scripts/validate_mock.py
 
 run:
 	$(COMPOSE) up -d --wait --wait-timeout 60

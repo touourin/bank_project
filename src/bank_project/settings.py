@@ -1,7 +1,7 @@
-from typing import Annotated, Literal, Self
+from typing import Annotated, Self
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, StringConstraints, model_validator
+from pydantic import AliasChoices, Field, SecretStr, StringConstraints, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 NonEmpty = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -12,16 +12,37 @@ class Settings(BaseSettings):
         env_prefix="BANK_", env_file=".env", extra="ignore", hide_input_in_errors=True
     )
 
-    graph_backend: Literal["none", "neo4j"] = "none"
+    neo4j_enabled: bool = False
     neo4j_uri: NonEmpty = "bolt://127.0.0.1:7690"
     neo4j_user: NonEmpty = "neo4j"
     neo4j_password: SecretStr | None = None
     neo4j_database: NonEmpty = "neo4j"
+
+    # Reserved for the raw-store adapter; these values do not create a MySQL connection.
+    mysql_host: NonEmpty = "127.0.0.1"
+    mysql_port: int = Field(default=3306, ge=1, le=65535)
+    mysql_database: NonEmpty = "bank_project"
+    mysql_user: NonEmpty = "bank_app"
+    mysql_password: SecretStr | None = None
+
     health_timeout_seconds: float = Field(default=2.0, gt=0, allow_inf_nan=False)
+
+    # Reject the old switch so an existing configuration cannot silently disable Neo4j.
+    legacy_graph_backend: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("BANK_GRAPH_BACKEND", "graph_backend"),
+        exclude=True,
+        repr=False,
+    )
 
     @model_validator(mode="after")
     def validate_neo4j(self) -> Self:
-        if self.graph_backend == "none":
+        if self.legacy_graph_backend is not None:
+            raise ValueError(
+                "BANK_GRAPH_BACKEND has been replaced: use BANK_NEO4J_ENABLED=false "
+                "instead of none, or BANK_NEO4J_ENABLED=true instead of neo4j; remove the old key"
+            )
+        if not self.neo4j_enabled:
             return self
         if self.neo4j_password is None or not self.neo4j_password.get_secret_value().strip():
             raise ValueError("BANK_NEO4J_PASSWORD must be set when Neo4j is enabled")

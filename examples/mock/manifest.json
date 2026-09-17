@@ -1,0 +1,119 @@
+{
+  "schema_version": "1.1",
+  "schema_sha256": "5ba6b92d374bb563113fd7bd229415133320418a7a7fb2ebe264f62eae4005ed",
+  "synthetic": true,
+  "seed": 20260917,
+  "as_of": "2026-09-17",
+  "files": {
+    "CCM_C_CUST_FLAG_INFO": {
+      "filename": "CCM_C_CUST_FLAG_INFO.csv",
+      "rows": 20,
+      "columns": 155,
+      "sha256": "137b1b02f7b190af1604781e8fa94948ed2ce71a425a6e4e20d2e779a38bb2e9"
+    },
+    "E_CRM_C_CUST_TOUR_EVT_SUM": {
+      "filename": "E_CRM_C_CUST_TOUR_EVT_SUM.csv",
+      "rows": 280,
+      "columns": 8,
+      "sha256": "0e5ce2ce0b94ab9c40728769cc4aaa51d3b4e8d8fb141cc19436e6615fefdb03"
+    }
+  },
+  "event_counts": {
+    "DSJ0001": 20,
+    "DSJ0002": 4,
+    "DSJ0003-1": 4,
+    "DSJ0004": 4,
+    "DSJ0005-1": 4,
+    "DSJ0005-2": 4,
+    "DSJ0006": 4,
+    "MOCK_CREDIT_SIGN": 8,
+    "MOCK_FX_SIGN": 8,
+    "MOCK_LC_SIGN": 8,
+    "YWJC0001": 20,
+    "YWJC0002": 24,
+    "YWJC0003-1": 6,
+    "YWJC0003-2": 6,
+    "YWJC0004-1": 8,
+    "YWJC0004-2": 4,
+    "YWJC0005": 8,
+    "YWJC0006-1": 4,
+    "YWJC0006-2": 4,
+    "YWJC0008": 4,
+    "YWJC0009-1": 8,
+    "YWJC0009-2": 20,
+    "YWJC0010": 8,
+    "YWJC0011": 8,
+    "YWJC0012": 16,
+    "YWJC0013": 16,
+    "YWJC0014": 16,
+    "YWJC0015": 8,
+    "YWJC0016": 16,
+    "YWJC0017": 4,
+    "YWJC0018": 4
+  },
+  "excluded_event_codes": [
+    "YWJC0007"
+  ],
+  "pending_bank_confirmation": [
+    {
+      "event": "外汇代客签约",
+      "official_code": null,
+      "mock_code": "MOCK_FX_SIGN",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B17:D17"
+      },
+      "reason": "正式事件码映射及属性表示待确认",
+      "mock_rows": 8
+    },
+    {
+      "event": "国内证签约",
+      "official_code": null,
+      "mock_code": "MOCK_LC_SIGN",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B18:D18"
+      },
+      "reason": "正式事件码映射及属性表示待确认",
+      "mock_rows": 8
+    },
+    {
+      "event": "授信合同签约",
+      "official_code": null,
+      "mock_code": "MOCK_CREDIT_SIGN",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B25:D25"
+      },
+      "reason": "正式事件码映射及属性表示待确认",
+      "mock_rows": 8
+    },
+    {
+      "event": "工商注册",
+      "official_code": "DSJ0001",
+      "mock_code": "DSJ0001",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B19:D19"
+      },
+      "reason": "银行样例缺失，属性表示待核验",
+      "mock_rows": 20
+    },
+    {
+      "event": "企业上市",
+      "official_code": "DSJ0004",
+      "mock_code": "DSJ0004",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B22:D22"
+      },
+      "reason": "银行样例缺失，属性表示待核验",
+      "mock_rows": 4
+    }
+  ]
+}

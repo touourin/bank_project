@@ -14,7 +14,7 @@ pytestmark = pytest.mark.anyio
 
 @pytest.fixture
 async def client():
-    app = create_app(Settings(graph_backend="none", _env_file=None))
+    app = create_app(Settings(neo4j_enabled=False, _env_file=None))
     async with (
         app.router.lifespan_context(app),
         AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client,

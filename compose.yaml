@@ -22,7 +22,7 @@ services:
   api:
     build: .
     environment:
-      BANK_GRAPH_BACKEND: neo4j
+      BANK_NEO4J_ENABLED: "true"
       BANK_NEO4J_URI: bolt://neo4j:7687
       BANK_NEO4J_USER: neo4j
       BANK_NEO4J_PASSWORD: "${BANK_NEO4J_PASSWORD:?Set BANK_NEO4J_PASSWORD in .env}"

@@ -1,0 +1,2584 @@
+{
+  "version": "1.1",
+  "kind": "bank_mock_contract",
+  "description": "项目 mock 字段契约；不是银行正式业务校验规则或 OpenAPI。",
+  "sources": [
+    {
+      "file": "上海银行数据表结构参考.xlsx",
+      "sheets": [
+        "CCM_C_CUST_FLAG_INFO",
+        "E_CRM_C_CUST_TOUR_EVT_SUM",
+        "客户旅程数据样例"
+      ]
+    },
+    {
+      "file": "营销助手数据需求.xlsx",
+      "sheet": "客户旅程"
+    }
+  ],
+  "csv": {
+    "encoding": "utf-8",
+    "delimiter": ",",
+    "line_terminator": "LF",
+    "null": "empty cell",
+    "preserve_identifiers_as_text": true,
+    "journey_column_case": "uppercase_as_structure_sheet"
+  },
+  "mock_conventions": {
+    "currency": "CNY",
+    "amount_unit": "元",
+    "ratio_range": [
+      0,
+      1
+    ],
+    "date_format": "YYYYMMDD",
+    "flags": {
+      "0": "否",
+      "1": "是"
+    },
+    "decimal_scale": 8,
+    "enum_authority": "未给码表的分类使用 MOCK 前缀占位，0/1 标志仅为本版约定。",
+    "identifiers": "合成标识不作为有效证件、统一社会信用代码或真实账号。",
+    "supplemental_properties": "新增 5 项的属性名取自需求表，属性类型、日期格式及枚举为 mock 约定，尚无银行样例核验。"
+  },
+  "decisions": [
+    "CUST_ID = cust_ind；建档 PROPERTIES.客户号 也使用同一编号。",
+    "YWJC0017、YWJC0018 分别显示为未定义1、未定义2；不映射外汇代客或国内证。",
+    "账户类型允许空字符串；复合授信申报的授信品种为非必填。",
+    "舆论属性与舆情属性视为同一字段，mock 使用舆情属性。",
+    "还款未结清保留授信品种，已结清保留贷款品种，不自动合并。",
+    "代发工资签约保留样例字段名账号，未采纳此前尚未确认的账户号改名建议；合成值不生成填充空格。",
+    "其他属性必填性未提供，验证已出现字段的类型，不把需求展示字段强制当成必填。",
+    "搁置的 5 项需求也生成测试样例；缺码的使用 MOCK_ 临时码，正式映射和缺失的银行样例仍待确认。"
+  ],
+  "pending_bank_confirmation": [
+    {
+      "event": "外汇代客签约",
+      "official_code": null,
+      "mock_code": "MOCK_FX_SIGN",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B17:D17"
+      },
+      "reason": "正式事件码映射及属性表示待确认"
+    },
+    {
+      "event": "国内证签约",
+      "official_code": null,
+      "mock_code": "MOCK_LC_SIGN",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B18:D18"
+      },
+      "reason": "正式事件码映射及属性表示待确认"
+    },
+    {
+      "event": "授信合同签约",
+      "official_code": null,
+      "mock_code": "MOCK_CREDIT_SIGN",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B25:D25"
+      },
+      "reason": "正式事件码映射及属性表示待确认"
+    },
+    {
+      "event": "工商注册",
+      "official_code": "DSJ0001",
+      "mock_code": "DSJ0001",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B19:D19"
+      },
+      "reason": "银行样例缺失，属性表示待核验"
+    },
+    {
+      "event": "企业上市",
+      "official_code": "DSJ0004",
+      "mock_code": "DSJ0004",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B22:D22"
+      },
+      "reason": "银行样例缺失，属性表示待核验"
+    }
+  ],
+  "tables": {
+    "CCM_C_CUST_FLAG_INFO": {
+      "filename": "CCM_C_CUST_FLAG_INFO.csv",
+      "grain": "每个客户一份截至 as_of 的标签快照",
+      "primary_key": [
+        "cust_ind"
+      ],
+      "columns": [
+        {
+          "name": "rowkey",
+          "sql_type": "varchar(100)",
+          "description": "ROWKEY",
+          "source_row": 2,
+          "source_primary_key": false,
+          "mock_nullable": false
+        },
+        {
+          "name": "cust_ind",
+          "sql_type": "varchar(100)",
+          "description": "客户唯一标志",
+          "source_row": 3,
+          "source_primary_key": true,
+          "mock_nullable": false
+        },
+        {
+          "name": "ecif_cust_id",
+          "sql_type": "varchar(100)",
+          "description": "ECIF客户号",
+          "source_row": 4,
+          "source_primary_key": false,
+          "mock_nullable": false
+        },
+        {
+          "name": "cust_nm",
+          "sql_type": "varchar(400)",
+          "description": "客户姓名",
+          "source_row": 5,
+          "source_primary_key": false,
+          "mock_nullable": false
+        },
+        {
+          "name": "unify_credit_code",
+          "sql_type": "varchar(50)",
+          "description": "统一社会信用代码",
+          "source_row": 6,
+          "source_primary_key": false,
+          "mock_nullable": false
+        },
+        {
+          "name": "found_dt",
+          "sql_type": "varchar(10)",
+          "description": "成立日期",
+          "source_row": 7,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "survival_status",
+          "sql_type": "varchar(100)",
+          "description": "存续状态",
+          "source_row": 8,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "opscope",
+          "sql_type": "varchar(6000)",
+          "description": "经营范围",
+          "source_row": 9,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "cert_capt_amt",
+          "sql_type": "decimal(26,8)",
+          "description": "注册资金金额",
+          "source_row": 10,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "cert_capt_ccy",
+          "sql_type": "varchar(20)",
+          "description": "注册资金币种_三位字母",
+          "source_row": 11,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "org_capt_amt",
+          "sql_type": "decimal(26,8)",
+          "description": "实收资本金额",
+          "source_row": 12,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "org_capt_ccy",
+          "sql_type": "varchar(20)",
+          "description": "实收资本币种",
+          "source_row": 13,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "hold_type",
+          "sql_type": "varchar(20)",
+          "description": "企业出资人经济成分代码",
+          "source_row": 14,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "corp_econ_type",
+          "sql_type": "varchar(20)",
+          "description": "企业经济类型",
+          "source_row": 15,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "four_commis_corp_scale",
+          "sql_type": "varchar(100)",
+          "description": "企业规模（四部委）",
+          "source_row": 16,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "cert_province",
+          "sql_type": "varchar(100)",
+          "description": "注册地省代码",
+          "source_row": 17,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "cert_city",
+          "sql_type": "varchar(100)",
+          "description": "注册地城市代码",
+          "source_row": 18,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "cert_district",
+          "sql_type": "varchar(100)",
+          "description": "注册地区县代码",
+          "source_row": 19,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "busin_addr",
+          "sql_type": "varchar(400)",
+          "description": "实际经营地址",
+          "source_row": 20,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "mec_num",
+          "sql_type": "int",
+          "description": "从业人数",
+          "source_row": 21,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "industry_cd",
+          "sql_type": "varchar(20)",
+          "description": "行业门类",
+          "source_row": 22,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "industry_big_cd",
+          "sql_type": "varchar(20)",
+          "description": "行业分类大类",
+          "source_row": 23,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "industry_mid_cd",
+          "sql_type": "varchar(20)",
+          "description": "行业分类中类",
+          "source_row": 24,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "industry_sml_cd",
+          "sql_type": "varchar(20)",
+          "description": "行业分类小类",
+          "source_row": 25,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "oprt_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "可经营客户标志",
+          "source_row": 26,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "scient_corp_ind",
+          "sql_type": "varchar(20)",
+          "description": "科技型企业标志",
+          "source_row": 27,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "soe_ind",
+          "sql_type": "varchar(1)",
+          "description": "国资企业标志",
+          "source_row": 28,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "poe_ind",
+          "sql_type": "varchar(1)",
+          "description": "民营企业标志",
+          "source_row": 29,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "cb_poe_ind",
+          "sql_type": "varchar(1)",
+          "description": "民营企业（跨境）标志",
+          "source_row": 30,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "icpe_ind",
+          "sql_type": "varchar(1)",
+          "description": "民营企业（个体工商户）标志",
+          "source_row": 31,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "gov_com_fin_ind",
+          "sql_type": "varchar(1)",
+          "description": "政府委办（财政）标志",
+          "source_row": 32,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "gov_com_chs_ind",
+          "sql_type": "varchar(1)",
+          "description": "政府委办（医保）标志",
+          "source_row": 33,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "gov_com_other_ind",
+          "sql_type": "varchar(1)",
+          "description": "政府委办（其他）标志",
+          "source_row": 34,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "ngo_ind",
+          "sql_type": "varchar(1)",
+          "description": "社会团体标志",
+          "source_row": 35,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "re_comp_ind",
+          "sql_type": "varchar(1)",
+          "description": "房地产企业标志",
+          "source_row": 36,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "fl_ind",
+          "sql_type": "varchar(1)",
+          "description": "融资租赁标志",
+          "source_row": 37,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "mainten_fund_ind",
+          "sql_type": "varchar(1)",
+          "description": "维修资金标志",
+          "source_row": 38,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "legal_rep_nm",
+          "sql_type": "varchar(400)",
+          "description": "法人姓名",
+          "source_row": 39,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "legal_rep_cust_id",
+          "sql_type": "varchar(100)",
+          "description": "法人客户编号",
+          "source_row": 40,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "act_ctrl_psn_nm",
+          "sql_type": "varchar(400)",
+          "description": "实际控制人姓名",
+          "source_row": 41,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "act_ctrl_psn_cust_id",
+          "sql_type": "varchar(100)",
+          "description": "实际控制人客户编号",
+          "source_row": 42,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "vol_manager_id",
+          "sql_type": "varchar(100)",
+          "description": "管护权客户经理编号（自动）",
+          "source_row": 43,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "vol_manager_org_id",
+          "sql_type": "varchar(100)",
+          "description": "管护权客户经理所属机构（自动）",
+          "source_row": 44,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "manu_manager_id",
+          "sql_type": "varchar(100)",
+          "description": "管护权客户经理编号（手动）",
+          "source_row": 45,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "manu_manager_org_id",
+          "sql_type": "varchar(100)",
+          "description": "管护权客户经理所属机构（手动）",
+          "source_row": 46,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "pyrl_sign_ind",
+          "sql_type": "varchar(1)",
+          "description": "代发工资签约标志",
+          "source_row": 47,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "rplymt_tax_sign_ind",
+          "sql_type": "varchar(1)",
+          "description": "代缴税费签约标志",
+          "source_row": 48,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "itnst_sign_ind",
+          "sql_type": "varchar(1)",
+          "description": "国际结算签约标志",
+          "source_row": 49,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "corp_ebnkg_sign_ind",
+          "sql_type": "varchar(1)",
+          "description": "企业网银签约标志",
+          "source_row": 50,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "mb_sign_ind",
+          "sql_type": "varchar(1)",
+          "description": "手机银行签约标志",
+          "source_row": 51,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "snd_bl_sign_ind",
+          "sql_type": "varchar(1)",
+          "description": "二代票签约客户标志",
+          "source_row": 52,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "snd_bl_cust_sign_ind",
+          "sql_type": "varchar(10)",
+          "description": "代发工资签约日期",
+          "source_row": 53,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "format": "YYYYMMDD",
+          "mock_policy": "leave_blank_until_field_meaning_confirmed"
+        },
+        {
+          "name": "pyrl_sign_dt",
+          "sql_type": "varchar(10)",
+          "description": "代缴税费签约日期",
+          "source_row": 54,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "format": "YYYYMMDD",
+          "mock_policy": "leave_blank_until_field_meaning_confirmed"
+        },
+        {
+          "name": "corp_ebnkg_sign_dt",
+          "sql_type": "varchar(10)",
+          "description": "企业网银签约日期",
+          "source_row": 55,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "mb_sign_dt",
+          "sql_type": "varchar(10)",
+          "description": "手机银行签约日期",
+          "source_row": 56,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "snd_bl_sign_dt",
+          "sql_type": "varchar(10)",
+          "description": "二代票签约日期",
+          "source_row": 57,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "agt_cnt_12m",
+          "sql_type": "int",
+          "description": "近12月代发笔数",
+          "source_row": 58,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "agt_amt_12m",
+          "sql_type": "decimal(26,8)",
+          "description": "近12月代发金额",
+          "source_row": 59,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "agt_num_12m",
+          "sql_type": "int",
+          "description": "近12月代发人数",
+          "source_row": 60,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "agt_vld_ind_12m",
+          "sql_type": "varchar(1)",
+          "description": "近12月有效代发客户标志",
+          "source_row": 61,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "corp_ebnkg_trans_y_ind",
+          "sql_type": "varchar(1)",
+          "description": "企业网银年交易标志",
+          "source_row": 62,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "corp_mb_trans_y_ind",
+          "sql_type": "varchar(1)",
+          "description": "企业手机银行年交易标志",
+          "source_row": 63,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "pyst_cust_y_ind",
+          "sql_type": "varchar(1)",
+          "description": "当年票据支付结算客户标志",
+          "source_row": 64,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "swap_corp_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "外汇企业客户标志",
+          "source_row": 65,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "cash_cst_ind",
+          "sql_type": "varchar(1)",
+          "description": "现金管理客户标志",
+          "source_row": 66,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "sk_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "司库客户标志",
+          "source_row": 67,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "forex_cust_y_ind",
+          "sql_type": "varchar(1)",
+          "description": "当年结售汇客户标志",
+          "source_row": 68,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "open_acct_dt",
+          "sql_type": "varchar(10)",
+          "description": "最早开户日期",
+          "source_row": 69,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "lvl1_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "一类户客户标志",
+          "source_row": 70,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "bsc_dep_acct_ind",
+          "sql_type": "varchar(1)",
+          "description": "基本户客户标志",
+          "source_row": 71,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "manu_settle_amt",
+          "sql_type": "decimal(26,8)",
+          "description": "近12月主动结算金额",
+          "source_row": 72,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "manu_settle_amt_avg_cnt",
+          "sql_type": "int",
+          "description": "近12个月月均主动结算笔数",
+          "source_row": 73,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "zero_dep_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "零存款客户标志",
+          "source_row": 74,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "genal_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "一般客户标志",
+          "source_row": 75,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "ptntl_cst_ind",
+          "sql_type": "varchar(1)",
+          "description": "潜力客户标志",
+          "source_row": 76,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "val_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "价值客户标志",
+          "source_row": 77,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "mediun_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "中型客户标志",
+          "source_row": 78,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "key_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "重点客户标志",
+          "source_row": 79,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "exchg_c_bal",
+          "sql_type": "decimal(26,8)",
+          "description": "本外币对公存款余额",
+          "source_row": 80,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "exchg_c_bal_yavg",
+          "sql_type": "decimal(26,8)",
+          "description": "本外币对公存款年日均",
+          "source_row": 81,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "c_exchg_cny_12m_yaug",
+          "sql_type": "decimal(26,8)",
+          "description": "近12月人民币普通企业存款年日均",
+          "source_row": 82,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "exchg_cny_dmd_12m_yaug",
+          "sql_type": "decimal(26,8)",
+          "description": "近12月人民币活期存款年日均",
+          "source_row": 83,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "crg_cst_ind",
+          "sql_type": "varchar(1)",
+          "description": "授信客户标志",
+          "source_row": 84,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "project_loan_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "科创贷款客户标志",
+          "source_row": 85,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "green_loan_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "绿色贷款客户标志",
+          "source_row": 86,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "ph_loan_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "普惠贷款客户标志",
+          "source_row": 87,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "manufacture_indu_loan_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "制造业贷款客户标志",
+          "source_row": 88,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "bill_fin_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "票据融资客户标志",
+          "source_row": 89,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "supply_core_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "供应链核心企业标志",
+          "source_row": 90,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "supply_chain_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "供应链链条企业标志",
+          "source_row": 91,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "our_bank_credit_lmt",
+          "sql_type": "decimal(26,8)",
+          "description": "我行授信额度",
+          "source_row": 92,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "our_bank_credit_bal",
+          "sql_type": "decimal(26,8)",
+          "description": "我行授信余额",
+          "source_row": 93,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "our_bank_usd_lmt",
+          "sql_type": "decimal(26,8)",
+          "description": "我行已用额度",
+          "source_row": 94,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "our_bank_avl_lmt",
+          "sql_type": "decimal(26,8)",
+          "description": "我行可用额度",
+          "source_row": 95,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "exchg_c_loan_bal",
+          "sql_type": "decimal(26,8)",
+          "description": "本外币对公贷款余额",
+          "source_row": 96,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "exchg_c_loan_yavg",
+          "sql_type": "decimal(26,8)",
+          "description": "本外币对公贷款年日均",
+          "source_row": 97,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "cny_c_loan_bal",
+          "sql_type": "decimal(26,8)",
+          "description": "人民币一般对公贷款余额",
+          "source_row": 98,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "amt_mid_i",
+          "sql_type": "decimal(26,8)",
+          "description": "中间业务收入",
+          "source_row": 99,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "eva",
+          "sql_type": "decimal(26,8)",
+          "description": "EVA",
+          "source_row": 100,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "corp_report_dt",
+          "sql_type": "varchar(10)",
+          "description": "企业最新征信报告时间",
+          "source_row": 101,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "report_crdt_amt",
+          "sql_type": "decimal(26,8)",
+          "description": "最新征信报告总授信额度",
+          "source_row": 102,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "report_crdt_bal",
+          "sql_type": "decimal(26,8)",
+          "description": "最新征信报告总授信余额",
+          "source_row": 103,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "report_crdt_our_bank_amt",
+          "sql_type": "decimal(26,8)",
+          "description": "最新征信报告我行授信额度",
+          "source_row": 104,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "report_crdt_our_bank_bal",
+          "sql_type": "decimal(26,8)",
+          "description": "最新征信报告我行授信余额",
+          "source_row": 105,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "abnormity_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "经营状态异常客户",
+          "source_row": 106,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "risk_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "预警客户标志",
+          "source_row": 107,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "aml_high_lvl_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "反洗钱较高或高等级客户",
+          "source_row": 108,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "wire_fraud_risk_ind",
+          "sql_type": "varchar(1)",
+          "description": "电诈新型违法犯罪风险标志",
+          "source_row": 109,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "veason_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "久悬客户标志",
+          "source_row": 110,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "sleep_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "休眠客户标志",
+          "source_row": 111,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "loan_overdue_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "贷款逾期客户标志",
+          "source_row": 112,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "badloan_cust_ind",
+          "sql_type": "varchar(1)",
+          "description": "不良贷款客户标志",
+          "source_row": 113,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "hhnw_tech_entp_ind",
+          "sql_type": "varchar(1)",
+          "description": "高新技术企业标志",
+          "source_row": 114,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "spldnctgdtin_sme_ind",
+          "sql_type": "varchar(1)",
+          "description": "专精特新中小企业标志",
+          "source_row": 115,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "spldnctgdtin_shpe_ind",
+          "sql_type": "varchar(1)",
+          "description": "专精特新小巨人称号标志",
+          "source_row": 116,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "st_tp_sme_ind",
+          "sql_type": "varchar(1)",
+          "description": "科技型中小企业客户标志",
+          "source_row": 117,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "invt_tp_sme_ind",
+          "sql_type": "varchar(1)",
+          "description": "创新型中小企业标志",
+          "source_row": 118,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "ctytechinvtdmtentp_ind",
+          "sql_type": "varchar(1)",
+          "description": "国家技术创新示范企业标志",
+          "source_row": 119,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "mecidyidvchpnentp_ind",
+          "sql_type": "varchar(1)",
+          "description": "制造业单项冠军企业标志",
+          "source_row": 120,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "latest_fnc_round",
+          "sql_type": "varchar(10)",
+          "description": "最新融资轮次",
+          "source_row": 121,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "latest_round_fnc_amt",
+          "sql_type": "decimal(26,8)",
+          "description": "最新轮次融资金额",
+          "source_row": 122,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "latest_round_fnc_cny",
+          "sql_type": "varchar(10)",
+          "description": "最新轮次融资币种",
+          "source_row": 123,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "latest_round_fnc_inv",
+          "sql_type": "varchar(400)",
+          "description": "最新融资轮次投资方",
+          "source_row": 124,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "ipo_ind",
+          "sql_type": "varchar(1)",
+          "description": "上市标志",
+          "source_row": 125,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "starr_market_ind",
+          "sql_type": "varchar(1)",
+          "description": "科创板上市标志",
+          "source_row": 126,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "chinext_ind",
+          "sql_type": "varchar(1)",
+          "description": "创业板上市标志",
+          "source_row": 127,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "neeq_ind",
+          "sql_type": "varchar(1)",
+          "description": "新三板上市标志",
+          "source_row": 128,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "debt_issu_corp_ind",
+          "sql_type": "varchar(1)",
+          "description": "发债企业标志",
+          "source_row": 129,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "ues_rplymt_tax_y_ind",
+          "sql_type": "varchar(1)",
+          "description": "当年使用代缴税费标志",
+          "source_row": 130,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "SH_SCI_RNG",
+          "sql_type": "VARCHAR(400)",
+          "description": "沪科积分区间",
+          "source_row": 131,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "SCIENT_REVOKE_12M_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "近1年科技资质被撤销标志",
+          "source_row": 132,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "SCIENT_COUNTERFEIT_3Y_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "近3年科技资质疑似包装标志",
+          "source_row": 133,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "SCIENT_DECLINE_LVL_3Y_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "近3年科技资质等级下降标志",
+          "source_row": 134,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "NO_SCI_TECH_ACHI_2Y_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "近2年无科技成果产出标志",
+          "source_row": 135,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "SCI_TECH_RANK_TAIL_2Y_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "近2年科技力在同省同产业排名处于尾部标志",
+          "source_row": 136,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "RESE_DEV_PAT_LOW_2Y_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "近2年独立研发专利占比低标志",
+          "source_row": 137,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "HIGH_VAL_PAT_RET_0_2Y_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "近2年高价值专利降为0标志",
+          "source_row": 138,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "PAT_LAW_BINVA_3Y_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "近3年专利涉诉被无效标志",
+          "source_row": 139,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "CST_MGRP_ID",
+          "sql_type": "VARCHAR(100)",
+          "description": "所属集团编号",
+          "source_row": 140,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "CST_MGRP_NM",
+          "sql_type": "VARCHAR(200)",
+          "description": "所属集团名称",
+          "source_row": 141,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "SETL_ACTV_ACCT_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "结算活跃户标志",
+          "source_row": 142,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "MRAQ_LOAN_CUST_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "并购贷款客户标志",
+          "source_row": 143,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "MANU_SETTLE_AMT_MON_NUM",
+          "sql_type": "INT",
+          "description": "近12个月主动结算月份数",
+          "source_row": 144,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "PYRL_MON_NUM_12M",
+          "sql_type": "INT",
+          "description": "近12个月代发月份数",
+          "source_row": 145,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "PYRL_AMT_M",
+          "sql_type": "DECIMAL(26,8)",
+          "description": "当月代发金额",
+          "source_row": 146,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "CFM_CRG_PCT",
+          "sql_type": "DECIMAL(26,8)",
+          "description": "我行授信占比",
+          "source_row": 147,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "NUM_PYRL_AMT_12M_AVG",
+          "sql_type": "DECIMAL(26,8)",
+          "description": "近12个月笔均代发金额",
+          "source_row": 148,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "LATEST_PYRL_DT",
+          "sql_type": "VARCHAR(10)",
+          "description": "最近一次代发日期",
+          "source_row": 149,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "UNION_MEC_NUM",
+          "sql_type": "INT",
+          "description": "从业人数（合并）",
+          "source_row": 150,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "UES_RPLYMT_TAX_M_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "当月使用代缴税费标志",
+          "source_row": 151,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "CORP_EBNKG_M_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "当月使用企业网银标志",
+          "source_row": 152,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "CORP_MB_M_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "当月使用企业手机银行标志",
+          "source_row": 153,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "CUST_STATUS",
+          "sql_type": "VARCHAR(20)",
+          "description": "客户状态",
+          "source_row": 154,
+          "source_primary_key": false,
+          "mock_nullable": true
+        },
+        {
+          "name": "IDYCMRC_CAN_IND",
+          "sql_type": "VARCHAR(1)",
+          "description": "工商注销客户标志",
+          "source_row": 155,
+          "source_primary_key": false,
+          "mock_nullable": true,
+          "mock_values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "dt",
+          "sql_type": "varchar(8)",
+          "description": "数据日期",
+          "source_row": 156,
+          "source_primary_key": false,
+          "mock_nullable": false,
+          "format": "YYYYMMDD"
+        }
+      ]
+    },
+    "E_CRM_C_CUST_TOUR_EVT_SUM": {
+      "filename": "E_CRM_C_CUST_TOUR_EVT_SUM.csv",
+      "grain": "每行一个事件",
+      "primary_key": [
+        "DT",
+        "ROWKEY"
+      ],
+      "columns": [
+        {
+          "name": "DT",
+          "sql_type": "VARCHAR(8)",
+          "description": "日期分区",
+          "source_primary_key": true,
+          "source_nullable": false,
+          "mock_nullable": false,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "ROWKEY",
+          "sql_type": "VARCHAR(200)",
+          "description": "技术主键",
+          "source_primary_key": true,
+          "source_nullable": null,
+          "mock_nullable": false
+        },
+        {
+          "name": "EVT_CLASS",
+          "sql_type": "VARCHAR(3)",
+          "description": "事件大类",
+          "source_primary_key": false,
+          "source_nullable": null,
+          "mock_nullable": false
+        },
+        {
+          "name": "EVT_TYPE",
+          "sql_type": "VARCHAR(20)",
+          "description": "事件类型",
+          "source_primary_key": false,
+          "source_nullable": null,
+          "mock_nullable": false
+        },
+        {
+          "name": "CUST_ID",
+          "sql_type": "VARCHAR(50)",
+          "description": "客户编号",
+          "source_primary_key": false,
+          "source_nullable": null,
+          "mock_nullable": false
+        },
+        {
+          "name": "OCCUR_DT",
+          "sql_type": "VARCHAR(8)",
+          "description": "发生日期",
+          "source_primary_key": false,
+          "source_nullable": false,
+          "mock_nullable": false,
+          "format": "YYYYMMDD"
+        },
+        {
+          "name": "KEY_FLAG",
+          "sql_type": "VARCHAR(1)",
+          "description": "是否重点事件",
+          "source_primary_key": false,
+          "source_nullable": null,
+          "mock_nullable": false
+        },
+        {
+          "name": "PROPERTIES",
+          "sql_type": "STRING",
+          "description": "事件属性",
+          "source_primary_key": false,
+          "source_nullable": null,
+          "mock_nullable": false,
+          "format": "json_object"
+        }
+      ]
+    }
+  },
+  "events": {
+    "YWJC0001": {
+      "name": "客户建档",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "建档日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "客户号": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 7
+    },
+    "YWJC0002": {
+      "name": "账户开立",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "账户分类": {
+          "type": "string",
+          "required": false
+        },
+        "账户号": {
+          "type": "string",
+          "required": false
+        },
+        "账户类型": {
+          "type": "string",
+          "required": false
+        },
+        "开户日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "开户机构": {
+          "type": "string",
+          "required": false
+        },
+        "外币账户": {
+          "type": "string",
+          "required": false
+        },
+        "FT账户": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 8
+    },
+    "YWJC0003-1": {
+      "name": "授信申报-单笔单批",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "授信品种": {
+          "type": "string",
+          "required": false
+        },
+        "申报金额": {
+          "type": "number",
+          "required": false
+        },
+        "申报模式": {
+          "type": "string",
+          "required": false
+        },
+        "授信发生方式": {
+          "type": "string",
+          "required": false
+        },
+        "申报机构": {
+          "type": "string",
+          "required": false
+        },
+        "申报日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "申报编号": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 9
+    },
+    "YWJC0003-2": {
+      "name": "授信申报-复合授信",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "申报金额": {
+          "type": "number",
+          "required": false
+        },
+        "申报模式": {
+          "type": "string",
+          "required": false
+        },
+        "授信发生方式": {
+          "type": "string",
+          "required": false
+        },
+        "申报机构": {
+          "type": "string",
+          "required": false
+        },
+        "申报日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "申报编号": {
+          "type": "string",
+          "required": false
+        },
+        "授信品种": {
+          "type": "string",
+          "required": false,
+          "decision": "用户确认非必填"
+        }
+      },
+      "source_sample_row": 10
+    },
+    "YWJC0004-1": {
+      "name": "授信批复-通过",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "批复日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "批复金额": {
+          "type": "number",
+          "required": false
+        },
+        "批复期限": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 11
+    },
+    "YWJC0004-2": {
+      "name": "授信批复-拒绝",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "批复日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        }
+      },
+      "source_sample_row": 20
+    },
+    "YWJC0005": {
+      "name": "放款支用",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "贷款到期日": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "放款金额": {
+          "type": "number",
+          "required": false
+        },
+        "币种": {
+          "type": "string",
+          "required": false
+        },
+        "贷款品种": {
+          "type": "string",
+          "required": false
+        },
+        "放款日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        }
+      },
+      "source_sample_row": 12
+    },
+    "YWJC0006-1": {
+      "name": "贷款还款-未结清",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "授信品种": {
+          "type": "string",
+          "required": false
+        },
+        "还款日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "还款金额": {
+          "type": "number",
+          "required": false
+        }
+      },
+      "source_sample_row": 21
+    },
+    "YWJC0006-2": {
+      "name": "贷款还款-结清",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "还款日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "还款金额": {
+          "type": "number",
+          "required": false
+        },
+        "贷款品种": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 13
+    },
+    "YWJC0007": {
+      "name": "授信年检",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": false,
+      "properties": {},
+      "reason_not_generated": "无属性定义或样例；不在本次补齐的 5 项搁置需求中。"
+    },
+    "YWJC0008": {
+      "name": "账户销户",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "销户经办机构": {
+          "type": "string",
+          "required": false
+        },
+        "账户号": {
+          "type": "string",
+          "required": false
+        },
+        "销户日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        }
+      },
+      "source_sample_row": 17
+    },
+    "YWJC0009-1": {
+      "name": "存款购买-定期",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "交易日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "存款产品": {
+          "type": "string",
+          "required": false
+        },
+        "存款期限": {
+          "type": "string",
+          "required": false
+        },
+        "起息日": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "到期日": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "账户号": {
+          "type": "string",
+          "required": false
+        },
+        "存款金额": {
+          "type": "number",
+          "required": false
+        },
+        "经办机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 18
+    },
+    "YWJC0009-2": {
+      "name": "存款购买-活期",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "交易日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "存款产品": {
+          "type": "string",
+          "required": false
+        },
+        "起息日": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "账户号": {
+          "type": "string",
+          "required": false
+        },
+        "存款金额": {
+          "type": "number",
+          "required": false
+        },
+        "经办机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 19
+    },
+    "YWJC0010": {
+      "name": "理财购买",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "申购日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "产品代码": {
+          "type": "string",
+          "required": false
+        },
+        "理财产品名称": {
+          "type": "string",
+          "required": false
+        },
+        "账户号": {
+          "type": "string",
+          "required": false
+        },
+        "购买金额": {
+          "type": "number",
+          "required": false
+        },
+        "经办机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 22
+    },
+    "YWJC0011": {
+      "name": "代发工资签约",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "账号": {
+          "type": "string",
+          "required": false
+        },
+        "签约日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "签约机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 14
+    },
+    "YWJC0012": {
+      "name": "代发工资",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "代发金额": {
+          "type": "number",
+          "required": false
+        },
+        "代发人数": {
+          "type": "number",
+          "required": false
+        },
+        "账户号": {
+          "type": "string",
+          "required": false
+        },
+        "代发日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "代发机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 23
+    },
+    "YWJC0013": {
+      "name": "企业网银签约",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "签约日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "经办机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 24
+    },
+    "YWJC0014": {
+      "name": "企业手机银行签约",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "签约日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "经办机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 15
+    },
+    "YWJC0015": {
+      "name": "二代票签约",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "签约日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "经办机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 16
+    },
+    "YWJC0016": {
+      "name": "代缴税费签约",
+      "event_class": "1",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "签约日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "经办机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 26
+    },
+    "DSJ0001": {
+      "name": "工商注册",
+      "event_class": "2",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "注册日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "工商注册机关": {
+          "type": "string",
+          "required": false
+        },
+        "统一社会信用代码": {
+          "type": "string",
+          "required": false
+        },
+        "注册资本": {
+          "type": "number",
+          "required": false
+        }
+      },
+      "property_definition": "requirement_names_with_mock_types",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B19:D19"
+      },
+      "confirmation_status": "pending_bank"
+    },
+    "DSJ0002": {
+      "name": "工商变更",
+      "event_class": "2",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "变更事项": {
+          "type": "string",
+          "required": false
+        },
+        "变更后内容": {
+          "type": "string",
+          "required": false
+        },
+        "日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "变更前内容": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 2
+    },
+    "DSJ0003-1": {
+      "name": "投融资事件-融资",
+      "event_class": "2",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "轮次": {
+          "type": "string",
+          "required": false
+        },
+        "日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "投资方": {
+          "type": "string",
+          "required": false
+        },
+        "投融资金额": {
+          "type": "number",
+          "required": false
+        }
+      },
+      "source_sample_row": 3
+    },
+    "DSJ0004": {
+      "name": "企业上市",
+      "event_class": "2",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "上市日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "股票板块": {
+          "type": "string",
+          "required": false
+        },
+        "股票代码": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "property_definition": "requirement_names_with_mock_types",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B22:D22"
+      },
+      "confirmation_status": "pending_bank"
+    },
+    "DSJ0005-1": {
+      "name": "招标事件",
+      "event_class": "2",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "招标金额": {
+          "type": "number",
+          "required": false
+        },
+        "标讯标题": {
+          "type": "string",
+          "required": false
+        },
+        "公示日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        }
+      },
+      "source_sample_row": 4
+    },
+    "DSJ0005-2": {
+      "name": "中标事件",
+      "event_class": "2",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "中标金额": {
+          "type": "number",
+          "required": false
+        },
+        "标讯标题": {
+          "type": "string",
+          "required": false
+        },
+        "公示日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        }
+      },
+      "source_sample_row": 5
+    },
+    "DSJ0006": {
+      "name": "企业舆情",
+      "event_class": "2",
+      "definition": "source_dictionary",
+      "generate": true,
+      "properties": {
+        "舆情标题": {
+          "type": "string",
+          "required": false
+        },
+        "媒体名称": {
+          "type": "string",
+          "required": false
+        },
+        "日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "舆情等级": {
+          "type": "string",
+          "required": false
+        },
+        "舆情属性": {
+          "type": "string",
+          "required": false,
+          "source_name": "舆论属性"
+        }
+      },
+      "source_sample_row": 6
+    },
+    "YWJC0017": {
+      "name": "未定义1",
+      "event_class": "1",
+      "definition": "user_confirmed_placeholder",
+      "generate": true,
+      "properties": {
+        "签约日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "经办机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 27
+    },
+    "YWJC0018": {
+      "name": "未定义2",
+      "event_class": "1",
+      "definition": "user_confirmed_placeholder",
+      "generate": true,
+      "properties": {
+        "签约日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "经办机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "source_sample_row": 25
+    },
+    "MOCK_FX_SIGN": {
+      "name": "外汇代客签约",
+      "event_class": "1",
+      "definition": "temporary_mock_code",
+      "generate": true,
+      "properties": {
+        "业务首次开展日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "经办机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "property_definition": "requirement_names_with_mock_types",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B17:D17"
+      },
+      "confirmation_status": "pending_bank"
+    },
+    "MOCK_LC_SIGN": {
+      "name": "国内证签约",
+      "event_class": "1",
+      "definition": "temporary_mock_code",
+      "generate": true,
+      "properties": {
+        "签约日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "经办机构": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "property_definition": "requirement_names_with_mock_types",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B18:D18"
+      },
+      "confirmation_status": "pending_bank"
+    },
+    "MOCK_CREDIT_SIGN": {
+      "name": "授信合同签约",
+      "event_class": "1",
+      "definition": "temporary_mock_code",
+      "generate": true,
+      "properties": {
+        "合同签约日期": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "授信品种": {
+          "type": "string",
+          "required": false
+        },
+        "合同金额": {
+          "type": "number",
+          "required": false
+        },
+        "币种": {
+          "type": "string",
+          "required": false
+        },
+        "合同到期日": {
+          "type": "string",
+          "required": false,
+          "format": "YYYYMMDD"
+        },
+        "合同状态": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "property_definition": "requirement_names_with_mock_types",
+      "requirement_source": {
+        "file": "营销助手数据需求.xlsx",
+        "sheet": "客户旅程",
+        "range": "B25:D25"
+      },
+      "confirmation_status": "pending_bank"
+    }
+  }
+}

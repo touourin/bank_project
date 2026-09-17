@@ -9,7 +9,7 @@ from bank_project.settings import Settings
 
 def build_services(settings: Settings) -> ApplicationServices:
     storage: HealthCheck | None = None
-    if settings.graph_backend == "neo4j":
+    if settings.neo4j_enabled:
         from bank_project.adapters.graph_store.connection import Neo4jConnection
 
         # Settings validates credentials before any infrastructure is constructed.
@@ -25,5 +25,5 @@ def build_services(settings: Settings) -> ApplicationServices:
         pipeline=Pipeline(),
         query=QueryService(),
         storage=storage,
-        graph_backend=settings.graph_backend,
+        graph_backend="neo4j" if settings.neo4j_enabled else "none",
     )
