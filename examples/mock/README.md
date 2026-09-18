@@ -5,6 +5,8 @@
 
 | 文件 | 内容 |
 | --- | --- |
+| [客户标签.xlsx](客户标签.xlsx) | 20 条客户标签；包含「数据」「字段说明」两个 page |
+| [客户旅程.xlsx](客户旅程.xlsx) | 280 条客户旅程；包含「数据」「字段说明」「事件属性说明」三个 page |
 | `CCM_C_CUST_FLAG_INFO.csv` | 155 列，每个客户一份标签快照 |
 | `E_CRM_C_CUST_TOUR_EVT_SUM.csv` | 8 列，每行一个事件，客户编号关联标签表 |
 | [字段说明.xlsx](字段说明.xlsx) | Excel 字段字典：155 个标签字段、8 个旅程字段、事件码对照和 117 项事件属性 |
@@ -30,7 +32,8 @@ python3 scripts/validate_mock.py --input-dir data/mock
 ```
 
 相同 schema、参数和脚本版本生成相同的文件字节。重新生成只替换两张 CSV 和 `manifest.json`。
-字段说明是当前样例的文档快照；`make mock` 不自动更新 Excel 和 Markdown 文档。字段定义或模拟规则变化后，需同步更新这两份说明。
+两份按表命名的 Excel 可直接查看数据，切换底部 page 即可查字段说明。客户旅程的「字段说明」页还包含事件码对照；`PROPERTIES` 内部字段在「事件属性说明」页按事件码列出。
+Excel 和字段说明均为当前样例的快照；`make mock` 不自动更新 Excel 和 Markdown 文档。重新生成 CSV 或调整字段定义、模拟规则后，需同步更新这些查阅文件。
 调整 schema 或手工修改 CSV 后，应重新生成并校验；校验器会检测文件与 manifest 不一致。
 独立脚本不启动 FastAPI、不调用 LLM、不向 Neo4j 写数据，业务接口仍为框架占位。
 
@@ -43,6 +46,7 @@ python3 scripts/validate_mock.py --input-dir data/mock
 - 编号、账号、码值按字符串读取。账号带前导 `0`；Excel 中应通过“从文本/CSV”导入并将标识符列指定为文本，避免自动数值转换。
 - 日期是 `YYYYMMDD` 字符串，包括源表允许 10 字符的日期字段。
 - SQL `DECIMAL(26,8)` 在 CSV 中写为普通十进制文本、固定 8 位小数。脚本使用 `Decimal`；JSON 金额写为数值字面量，读取示例：`json.loads(text, parse_float=Decimal)`。
+- Excel 数据页沿用相同字段和记录。编号、码值、`YYYYMMDD` 日期及 JSON 保持文本；标签金额和整数使用数值单元格，金额显示 8 位小数。当前样例已核对导出精度；程序处理仍以 CSV 为准。
 - CSV 空单元格表示未提供值；JSON 中的 `""` 表示显式空字符串，未出现的键表示未提供该属性。原始 Excel 未明确的属性必填性不由校验器擅自补齐。
 - `schema.json` 是这两个离线工具使用的字段契约配置，含 SQL 类型与 mock 约定，不是标准 JSON Schema 或 FastAPI 的 `openapi.json`。
 
