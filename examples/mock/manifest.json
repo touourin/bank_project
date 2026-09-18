@@ -1,55 +1,56 @@
 {
-  "schema_version": "1.2",
-  "schema_sha256": "3d38c4fc604d815d5204ec1d2cfeff742ca396b11b519e2e145dab66ea31f942",
+  "schema_version": "1.3",
+  "generator_version": "2.0",
+  "schema_sha256": "be535e8d7c08e086925dbb70d47d4940338db166c4e7c0c6a00f9a175c4bd1c6",
   "synthetic": true,
   "seed": 20260917,
   "as_of": "2026-09-17",
   "files": {
     "CCM_C_CUST_FLAG_INFO": {
       "filename": "CCM_C_CUST_FLAG_INFO.csv",
-      "rows": 20,
+      "rows": 1000,
       "columns": 155,
-      "sha256": "b28b42ca6116b6333216850510b0b02870e888c778c970cc5cbe905ac4c466de"
+      "sha256": "a6cf28f0f9754ddeac1cf1505ec18c903e11f357da8774f619ddfcdf8ff94eac"
     },
     "E_CRM_C_CUST_TOUR_EVT_SUM": {
       "filename": "E_CRM_C_CUST_TOUR_EVT_SUM.csv",
-      "rows": 280,
+      "rows": 16700,
       "columns": 8,
-      "sha256": "f2350e81fd839b6a7f5cca0fbb85f44cff05171f0d923af21e0c9c7ffc6ec931"
+      "sha256": "4f6dd3a5301b8f35a5501a8f5d1af92d69aff15065af11be2556181addeebf3a"
     }
   },
   "event_counts": {
-    "DSJ0001": 20,
-    "DSJ0002": 4,
-    "DSJ0003-1": 4,
-    "DSJ0004": 4,
-    "DSJ0005-1": 4,
-    "DSJ0005-2": 4,
-    "DSJ0006": 4,
-    "MOCK_CREDIT_SIGN": 8,
-    "MOCK_FX_SIGN": 8,
-    "MOCK_LC_SIGN": 8,
-    "YWJC0001": 20,
-    "YWJC0002": 24,
-    "YWJC0003-1": 6,
-    "YWJC0003-2": 6,
-    "YWJC0004-1": 8,
-    "YWJC0004-2": 4,
-    "YWJC0005": 8,
-    "YWJC0006-1": 4,
-    "YWJC0006-2": 4,
-    "YWJC0008": 4,
-    "YWJC0009-1": 8,
-    "YWJC0009-2": 20,
-    "YWJC0010": 8,
-    "YWJC0011": 8,
-    "YWJC0012": 16,
-    "YWJC0013": 16,
-    "YWJC0014": 16,
-    "YWJC0015": 8,
-    "YWJC0016": 16,
-    "YWJC0017": 4,
-    "YWJC0018": 4
+    "DSJ0001": 1000,
+    "DSJ0002": 196,
+    "DSJ0003-1": 187,
+    "DSJ0004": 11,
+    "DSJ0005-1": 185,
+    "DSJ0005-2": 180,
+    "DSJ0006": 174,
+    "MOCK_CREDIT_SIGN": 477,
+    "MOCK_FX_SIGN": 142,
+    "MOCK_LC_SIGN": 107,
+    "YWJC0001": 1000,
+    "YWJC0002": 1098,
+    "YWJC0003-1": 278,
+    "YWJC0003-2": 274,
+    "YWJC0004-1": 477,
+    "YWJC0004-2": 75,
+    "YWJC0005": 477,
+    "YWJC0006-1": 1573,
+    "YWJC0006-2": 97,
+    "YWJC0008": 98,
+    "YWJC0009-1": 920,
+    "YWJC0009-2": 961,
+    "YWJC0010": 301,
+    "YWJC0011": 483,
+    "YWJC0012": 3633,
+    "YWJC0013": 890,
+    "YWJC0014": 597,
+    "YWJC0015": 162,
+    "YWJC0016": 577,
+    "YWJC0017": 35,
+    "YWJC0018": 35
   },
   "excluded_event_codes": [
     "YWJC0007"
@@ -65,7 +66,7 @@
         "range": "B17:D17"
       },
       "reason": "正式事件码映射及属性表示待确认",
-      "mock_rows": 8
+      "mock_rows": 142
     },
     {
       "event": "国内证签约",
@@ -77,7 +78,7 @@
         "range": "B18:D18"
       },
       "reason": "正式事件码映射及属性表示待确认",
-      "mock_rows": 8
+      "mock_rows": 107
     },
     {
       "event": "授信合同签约",
@@ -89,7 +90,7 @@
         "range": "B25:D25"
       },
       "reason": "正式事件码映射及属性表示待确认",
-      "mock_rows": 8
+      "mock_rows": 477
     },
     {
       "event": "工商注册",
@@ -101,7 +102,7 @@
         "range": "B19:D19"
       },
       "reason": "银行样例缺失，属性表示待核验",
-      "mock_rows": 20
+      "mock_rows": 1000
     },
     {
       "event": "企业上市",
@@ -113,7 +114,7 @@
         "range": "B22:D22"
       },
       "reason": "银行样例缺失，属性表示待核验",
-      "mock_rows": 4
+      "mock_rows": 11
     }
   ]
 }

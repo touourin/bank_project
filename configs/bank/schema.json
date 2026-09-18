@@ -1,5 +1,5 @@
 {
-  "version": "1.2",
+  "version": "1.3",
   "kind": "bank_mock_contract",
   "description": "项目 mock 字段契约；不是银行正式业务校验规则或 OpenAPI。",
   "sources": [
@@ -39,7 +39,12 @@
     "decimal_scale": 8,
     "enum_authority": "未给码表的分类使用 MOCK 前缀占位，0/1 标志仅为本版约定。",
     "identifiers": "合成标识不作为有效证件、统一社会信用代码或真实账号。",
-    "supplemental_properties": "新增 5 项的属性名取自需求表，属性类型、日期格式及枚举为 mock 约定，尚无银行样例核验。"
+    "supplemental_properties": "新增 5 项的属性名取自需求表，属性类型、日期格式及枚举为 mock 约定，尚无银行样例核验。",
+    "population": "6 类行业、6 个地区、3 档规模；前 20 户保证场景覆盖，其余按合成权重分配，非银行实际分布。",
+    "payroll": "每客户可有连续 3 至 12 个月代发（按截至日实际发生月份）；同一组员工，人数不超过从业人数。",
+    "credit": "每客户至多一笔授信、一笔放款，可有多次还款；批复不超过申请，放款不超过额度，逐笔还款不超过余额。",
+    "deposits": "活期与尚未到期定期存款事件表示本版期末持有本金，用于对账；不提供完整资金流水。",
+    "risk_flag": "risk_cust_ind 在本版仅关联合成负面舆情，非银行正式风控口径。"
   },
   "decisions": [
     "CUST_ID = cust_ind；建档 PROPERTIES.客户号 也使用同一编号。",

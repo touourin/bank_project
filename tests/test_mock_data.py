@@ -47,8 +47,8 @@ def test_dataset_scope_and_user_decisions(dataset, schema):
 
 def test_csv_round_trip_is_reproducible_and_preserves_identifiers(tmp_path):
     first, second = tmp_path / "first", tmp_path / "second"
-    generate(first)
-    generate(second)
+    generate(first, customers=20)
+    generate(second, customers=20)
     for path in first.iterdir():
         assert path.read_bytes() == (second / path.name).read_bytes()
     for path in first.glob("*.csv"):
@@ -147,9 +147,9 @@ def test_validator_rejects_future_event_and_excluded_code(dataset, schema):
 
 
 def test_manifest_detects_modified_csv(tmp_path):
-    generate(tmp_path)
+    generate(tmp_path, customers=20)
     path = tmp_path / f"{TAG_TABLE}.csv"
-    path.write_bytes(path.read_bytes().replace("模拟客户0001".encode(), "另一个模拟名".encode()))
+    path.write_bytes(path.read_bytes().replace(b"MOCK_TAG_0001", b"MOCK_TAG_X001"))
     assert any("校验和" in e for e in validate_directory(tmp_path))
     manifest = json.loads((tmp_path / "manifest.json").read_text())
     assert manifest["synthetic"] is True
@@ -229,3 +229,47 @@ def test_confirmation_manifest_tracks_actual_coverage_and_rejects_tampering(tmp_
     pending[0]["official_code"] = pending[0]["mock_code"]
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     assert any("待银行确认" in e for e in validate_directory(tmp_path))
+
+
+def test_thousand_customer_dataset_has_varied_coherent_histories(schema, dataset):
+    from collections import Counter
+
+    large = build_dataset(schema, customers=1000, as_of=date(2026, 9, 17), seed=20260917)
+    assert validate_rows(large, schema) == []
+    tags, journeys = large[TAG_TABLE], large[JOURNEY_TABLE]
+    assert len(tags) == len({t["cust_nm"] for t in tags}) == 1000
+    assert tags[:20] == dataset[TAG_TABLE]
+    assert len({t["industry_cd"] for t in tags}) >= 5
+    assert len({t["found_dt"] for t in tags}) > 100
+    assert len(set(Counter(e["CUST_ID"] for e in journeys).values())) > 10
+    assert {t["zero_dep_cust_ind"] for t in tags} == {"0", "1"}
+    assert len({t["CFM_CRG_PCT"] for t in tags}) > 50
+    assert max(int(t["PYRL_MON_NUM_12M"]) for t in tags) == 12
+    assert all(Decimal(t["agt_num_12m"]) <= Decimal(t["mec_num"]) for t in tags)
+    other_seed = build_dataset(schema, customers=20, as_of=date(2026, 9, 17), seed=42)
+    assert other_seed != dataset
+    assert validate_rows(other_seed, schema) == []
+
+
+def test_validator_rejects_payroll_before_signing(dataset, schema):
+    payroll = event(dataset, "YWJC0012")
+    sign = next(
+        e
+        for e in dataset[JOURNEY_TABLE]
+        if e["CUST_ID"] == payroll["CUST_ID"] and e["EVT_TYPE"] == "YWJC0011"
+    )
+    sign["OCCUR_DT"] = "20260917"
+    assert any("早于该账号的代发签约" in e for e in validate_rows(dataset, schema))
+
+
+def test_validator_checks_running_repayment_balance(dataset, schema):
+    row = event(dataset, "YWJC0006-1")
+    properties = parse_properties(row["PROPERTIES"])
+    funded = next(
+        e
+        for e in dataset[JOURNEY_TABLE]
+        if e["CUST_ID"] == row["CUST_ID"] and e["EVT_TYPE"] == "YWJC0005"
+    )
+    properties["还款金额"] = parse_properties(funded["PROPERTIES"])["放款金额"] + 1
+    row["PROPERTIES"] = json_exact(properties)
+    assert any("超过当时贷款余额" in e for e in validate_rows(dataset, schema))

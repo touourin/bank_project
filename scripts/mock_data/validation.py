@@ -163,6 +163,64 @@ def validate_rows(data: dict[str, list[dict]], schema: dict) -> list[str]:
             continue
         errors.extend(f"{customer_id}: {error}" for error in _scenario_errors(tag, events))
         errors.extend(f"{customer_id}: {error}" for error in _supplement_errors(tag, events))
+        errors.extend(f"{customer_id}: {error}" for error in _timeline_errors(tag, events))
+    return errors
+
+
+def _timeline_errors(tag: dict, events: list[tuple[dict, dict]]) -> list[str]:
+    """Check chronological and balance invariants of the generated scenarios."""
+    errors = []
+    opened, closed = set(), set()
+    payroll_signed = set()
+    approved = balance = Decimal(0)
+    applied = False
+    for row, properties in sorted(
+        events, key=lambda item: (item[0]["OCCUR_DT"], item[0]["ROWKEY"])
+    ):
+        code, occurred = row["EVT_TYPE"], row["OCCUR_DT"]
+        account = properties.get("账户号")
+        if occurred < tag["found_dt"]:
+            errors.append("事件早于企业成立日期")
+        if code == "YWJC0002":
+            opened.add(account)
+        elif account and (account not in opened or account in closed):
+            errors.append("账户事件必须发生在开户后、销户前")
+        if code == "YWJC0008":
+            closed.add(account)
+        if code == "YWJC0011":
+            payroll_account = properties.get("账号")
+            if payroll_account not in opened or payroll_account in closed:
+                errors.append("代发签约账号尚未开户或已经销户")
+            payroll_signed.add(payroll_account)
+        if code == "YWJC0012" and account not in payroll_signed:
+            errors.append("代发工资早于该账号的代发签约")
+        if code in {"YWJC0003-1", "YWJC0003-2"}:
+            applied = True
+        if code in {"YWJC0004-1", "YWJC0004-2"} and not applied:
+            errors.append("授信批复早于申报")
+        if code == "YWJC0004-1":
+            approved += Decimal(properties.get("批复金额", 0) or 0)
+        if code == "YWJC0005":
+            balance += Decimal(properties.get("放款金额", 0) or 0)
+            if balance > approved:
+                errors.append("放款超过已批复额度或早于批复")
+        if code in {"YWJC0006-1", "YWJC0006-2"}:
+            amount = Decimal(properties.get("还款金额", 0) or 0)
+            balance -= amount
+            if amount <= 0 or balance < 0:
+                errors.append("还款金额非正或超过当时贷款余额")
+            if code == "YWJC0006-2" and balance != 0:
+                errors.append("结清事件后的贷款余额不为零")
+            if code == "YWJC0006-1" and balance <= 0:
+                errors.append("未结清事件后的贷款余额应为正")
+        for field in ("到期日", "合同到期日", "贷款到期日"):
+            if properties.get(field) and properties[field] < occurred:
+                errors.append(f"{field}早于对应事件日期")
+    if Decimal(tag["org_capt_amt"]) > Decimal(tag["cert_capt_amt"]):
+        errors.append("本版实收资本超过注册资本")
+    expected_zero = str(int(Decimal(tag["exchg_c_bal"]) == 0))
+    if tag["zero_dep_cust_ind"] != expected_zero:
+        errors.append("零存款标志与存款余额不一致")
     return errors
 
 
