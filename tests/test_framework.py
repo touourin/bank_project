@@ -13,8 +13,8 @@ pytestmark = pytest.mark.anyio
 
 
 @pytest.fixture
-async def client():
-    app = create_app(Settings(neo4j_enabled=False, _env_file=None))
+async def client(tmp_path):
+    app = create_app(Settings(neo4j_enabled=False, data_dir=tmp_path, _env_file=None))
     async with (
         app.router.lifespan_context(app),
         AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client,
@@ -23,7 +23,7 @@ async def client():
 
 
 async def test_framework_starts_without_database(client):
-    assert (await client.get("/health")).json()["mode"] == "framework"
+    assert (await client.get("/health")).json()["mode"] == "preparation"
     assert (await client.get("/ready")).json()["graph_backend"] == "none"
     assert (await client.get("/docs")).status_code == 200
 
@@ -31,16 +31,6 @@ async def test_framework_starts_without_database(client):
 @pytest.mark.parametrize(
     ("method", "path", "body"),
     [
-        (
-            "POST",
-            "/api/v1/imports",
-            {
-                "dataset_id": "test",
-                "batch_id": "batch",
-                "source_system": "test",
-                "source_uri": "reserved://source",
-            },
-        ),
         (
             "POST",
             "/api/v1/batches",

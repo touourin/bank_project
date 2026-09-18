@@ -1,0 +1,16 @@
+{
+  "id": "bank_customer_tags",
+  "version": "1",
+  "table": "CCM_C_CUST_FLAG_INFO",
+  "schema_ref": "../bank/schema.json",
+  "match_columns": ["cust_ind"],
+  "entities": [
+    {
+      "alias": "customer",
+      "entity_type": "customer",
+      "identity_scope": "key",
+      "keys": {"customer_id": "cust_ind"},
+      "copy_row": true
+    }
+  ]
+}

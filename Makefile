@@ -3,7 +3,7 @@ MOCK_PYTHON ?= python3
 COMPOSE ?= docker compose
 .DEFAULT_GOAL := run
 
-.PHONY: run build build-cached down logs status restart local-run test lint format schema check mock mock-check
+.PHONY: run build build-cached down logs status restart local-run test lint format schema check mock mock-check mysql-up mock-db
 check: lint test
 	$(PYTHON) scripts/export_openapi.py --check
 	$(PYTHON) scripts/validate_mock.py
@@ -13,6 +13,13 @@ mock:
 
 mock-check:
 	$(MOCK_PYTHON) scripts/validate_mock.py
+
+mysql-up:
+	$(PYTHON) scripts/prepare_local_mysql.py
+	$(COMPOSE) --profile database up -d --wait --wait-timeout 120 mysql
+
+mock-db: mysql-up
+	$(PYTHON) scripts/load_mock_mysql.py
 
 run:
 	$(COMPOSE) up -d --wait --wait-timeout 60

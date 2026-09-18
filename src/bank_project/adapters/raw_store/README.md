@@ -1,9 +1,7 @@
-# 原始数据存储预留位置
+# 本地持久化适配
 
-ports.RawStore 定义读写边界，当前没有文件系统、内存或对象存储实现。
-后续在此实现适配器并通过 bootstrap 注入 ingestion / extraction。
+FileStore 实现 RawStore、PreparationStore、DocumentCache。原文件按 SHA-256 保存；导入、转换和状态使用 dataset_id/batch_id 的哈希键。文件原子写入、同批次文件锁、读取原文件时检查摘要。
 
-MySQL 接入参数已预留在根目录 `.env.example` 和 `settings.py`：
-`BANK_MYSQL_HOST`、`BANK_MYSQL_PORT`、`BANK_MYSQL_DATABASE`、`BANK_MYSQL_USER`、`BANK_MYSQL_PASSWORD`。
-目前只读取配置并校验端口等基础格式，没有 MySQL 驱动、数据库连接、建表或数据写入；Compose 也尚未提供 MySQL 服务。
-后续由 bootstrap 将这些参数传给存储适配器，业务模块不直接读取环境变量。
+运行目录由 BANK_DATA_DIR 配置，本地默认 data/preparation，Docker 使用命名卷。服务独占此目录，不能与不可信用户共享写权限。当前适用于单节点/单副本；多副本需替换为共享事务状态和锁。
+
+MySQL 当前是 adapters/sources 中的只读来源连接器，不负责保存转换结果。

@@ -1,9 +1,31 @@
 name: bank-project
 services:
+  mysql:
+    profiles: ["database"]
+    image: mysql:8.4.11
+    environment:
+      MYSQL_DATABASE: "${BANK_MYSQL_DATABASE:-bank_project}"
+      MYSQL_USER: "${BANK_MYSQL_USER:-bank_app}"
+      MYSQL_PASSWORD: "${BANK_MYSQL_PASSWORD:-}"
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+    secrets:
+      - mysql_root_password
+    ports:
+      - "127.0.0.1:${BANK_MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql --protocol=TCP -h 127.0.0.1 -u \"$$MYSQL_USER\" \"$$MYSQL_DATABASE\" -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
   neo4j:
+    profiles: ["graph"]
     image: neo4j:5.26.27-community
     environment:
-      NEO4J_AUTH: "neo4j/${BANK_NEO4J_PASSWORD:?Set BANK_NEO4J_PASSWORD in .env}"
+      NEO4J_AUTH: "neo4j/${BANK_NEO4J_PASSWORD:-}"
       NEO4J_server_memory_heap_initial__size: 256m
       NEO4J_server_memory_heap_max__size: 512m
       NEO4J_server_memory_pagecache_size: 256m
@@ -21,16 +43,25 @@ services:
 
   api:
     build: .
+    env_file:
+      - path: .env
+        required: false
     environment:
-      BANK_NEO4J_ENABLED: "true"
+      BANK_NEO4J_ENABLED: "${BANK_NEO4J_ENABLED:-false}"
       BANK_NEO4J_URI: bolt://neo4j:7687
       BANK_NEO4J_USER: neo4j
-      BANK_NEO4J_PASSWORD: "${BANK_NEO4J_PASSWORD:?Set BANK_NEO4J_PASSWORD in .env}"
+      BANK_NEO4J_PASSWORD: "${BANK_NEO4J_PASSWORD:-}"
+      BANK_DATA_DIR: /app/data/preparation
+      BANK_IMPORT_ROOT: /app/inbox
+      BANK_MAPPING_DIR: /app/configs/mappings
+      BANK_MYSQL_HOST: "${BANK_MYSQL_DOCKER_HOST:-mysql}"
+      BANK_MYSQL_PORT: "${BANK_MYSQL_DOCKER_PORT:-3306}"
+    volumes:
+      - preparation-data:/app/data
+      - ./examples/mock:/app/inbox:ro
+      - ./configs:/app/configs:ro
     ports:
       - "127.0.0.1:8000:8000"
-    depends_on:
-      neo4j:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=4)"]
       interval: 5s
@@ -39,3 +70,9 @@ services:
 
 volumes:
   neo4j-data:
+  preparation-data:
+  mysql-data:
+
+secrets:
+  mysql_root_password:
+    file: ./data/mysql/root-password

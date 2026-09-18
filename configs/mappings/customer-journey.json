@@ -1,0 +1,38 @@
+{
+  "id": "bank_customer_journey",
+  "version": "1",
+  "table": "E_CRM_C_CUST_TOUR_EVT_SUM",
+  "schema_ref": "../bank/schema.json",
+  "match_columns": ["DT", "ROWKEY", "CUST_ID", "EVT_TYPE", "OCCUR_DT", "PROPERTIES"],
+  "entities": [
+    {
+      "alias": "customer",
+      "entity_type": "customer",
+      "identity_scope": "key",
+      "keys": {"customer_id": "CUST_ID"},
+      "properties": {"cust_ind": "CUST_ID"}
+    },
+    {
+      "alias": "account",
+      "entity_type": "account",
+      "identity_scope": "key",
+      "keys": {"account_number": "PROPERTIES.账户号"},
+      "properties": {"account_number": "PROPERTIES.账户号"},
+      "when": {"EVT_TYPE": "YWJC0002"},
+      "optional": true
+    }
+  ],
+  "event": {
+    "type_field": "EVT_TYPE",
+    "date_field": "OCCUR_DT",
+    "class_field": "EVT_CLASS",
+    "attributes_field": "PROPERTIES",
+    "participants": [
+      {"entity": "customer", "role": "customer"},
+      {"entity": "account", "role": "opened_account", "optional": true}
+    ]
+  },
+  "relations": [
+    {"subject": "customer", "predicate": "opens_account", "object": "account", "optional": true, "link_event": true}
+  ]
+}

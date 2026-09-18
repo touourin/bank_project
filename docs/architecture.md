@@ -1,56 +1,54 @@
-# 工程框架与责任边界
+# 模块边界
 
-当前交付范围仅为工程结构、模块接口和运行环境。本文中的业务链路用于说明后续实现位置，尚未执行。
-
-## 模块结构
+前两步已实现；业务来源和配置可替换。后续消歧、建图、推理、查询保持独立。
 
 ```text
 src/bank_project/
-├── api/                 # HTTP 路由、参数绑定、占位接口
-├── contracts/           # 共享 DTO 草案及错误类型
-├── ports.py             # 模块和存储接口
+├── api/                 # HTTP、上传参数、鉴权、体积限制
+├── contracts/           # 交接模型、映射配置类型、引用完整性校验
+├── ports.py             # 来源、解析、存储、模型、业务服务接口
 ├── application.py       # API 所依赖的接口集合
-├── bootstrap.py         # 统一装配点
-├── ingestion/           # 邓：数据导入，待实现
-├── extraction/          # 邓：对象、事件、关系抽取，待实现
-├── resolution/          # 晏：实体消歧，待实现
-├── graph/               # 晏：图谱构建，待实现
-├── semantics/           # 晏对接本体负责人：挂载与校验，待实现
-├── query/               # 晏：查询及证据返回，待实现
-├── review/              # 晏修正、邓抽检复测，预留
-├── pipeline/            # 共享编排入口，待实现
+├── bootstrap.py         # 唯一依赖装配点
+├── ingestion/           # 通用导入服务，不识别具体业务表
+├── extraction/          # 通用表格映射与文档抽取
+│   ├── service.py       # 状态、幂等、整体结果发布
+│   ├── structured.py    # 选择配置、组合行结果
+│   ├── mapping_rows.py  # 一行数据 → 对象、事件、关系
+│   ├── documents.py     # 切块、候选与原文证据绑定
+│   └── validation.py    # 日期、精确十进制、字段规则
+├── resolution/          # 消歧，待实现
+├── graph/               # 建图，待实现
+├── semantics/           # 语义挂载与校验，待实现
+├── query/               # 图谱查询，待实现
+├── review/              # 复核，预留
+├── pipeline/            # 后续完整流水线，预留
 └── adapters/
-    ├── graph_store/     # 仅 Neo4j 连接生命周期
-    ├── raw_store/       # 原始数据存储，预留
-    └── model_client/    # 模型 SDK，预留
+    ├── sources/         # 受限文件目录、MySQL 只读来源
+    ├── parsing/         # 通用表格与文档格式解析
+    ├── raw_store/       # 原文件、清单、结果和状态的本地持久化
+    ├── model_client/    # 可配置模型 HTTP 接口
+    ├── mappings.py     # 读取业务映射配置
+    └── graph_store/     # Neo4j 连接生命周期
 ```
-
-## 解耦原则
-
-- contracts 不依赖任何业务模块；ports 只引用 contracts。
-- 业务模块只依赖自身、contracts、ports，不直接调用其他业务模块或外部 SDK。
-- pipeline 将来通过 ports 编排步骤，当前不执行任何步骤。
-- API 只调用 ApplicationServices 中的接口，不直接读写数据库。
-- bootstrap 统一选择实现。Neo4j 和模型 SDK 放在 adapters，配置由入口注入。
-
-上述依赖方向由 tests/test_boundaries.py 检查。
-
-## 后续交接方向（未实现）
 
 ```mermaid
 flowchart LR
-    I[邓：数据接入] --> E[邓：数据抽取]
-    E --> C[ExtractionBatch 契约]
-    C --> R[晏：实体消歧]
-    R --> G[晏：图谱构建]
-    G --> S[晏与本体负责人：挂载校验]
-    S --> Q[晏：查询与证据]
+    A[文件 / MySQL 来源] --> B[SourceReader / SourceParser]
+    B --> C[ingestion: 原文件与解析快照]
+    C --> D[extraction]
+    M[configs/mappings: 业务规则] --> D
+    L[DocumentModel: 文档模型] --> D
+    D --> E[ExtractionBatch + 来源证据]
+    E -. 后续实现 .-> F[resolution / graph / semantics]
 ```
 
-模块之间传递类型化数据。ExtractionBatch 保留来源、证据、实体、事件和关系候选；不预设客户、转账等具体 schema。步骤顺序、同步或异步执行、持久化事务和重试策略留待业务开发确定。
+导入不依赖转换，转换不读取原始来源数据库。两步通过持久化的 StoredImport 交接，可以分别调用和重试。
+表格通过配置生成对象、事件和关系；没有配置时保留通用记录。客户标签、旅程的字段名和事件码只在配置中，不写进通用流程。
 
-## 后续实现必须考虑的语义边界
+业务模块只依赖自身、contracts、ports 和标准库，不导入 FastAPI、数据库驱动或模型 SDK。API 不导入业务实现；适配器不导入业务模块。tests/test_boundaries.py 自动检查。
 
-路径不能自动作为直接交易事实；名称相同不能自动代表同一实体；推理结论应与来源事实区分。正式 BFO、BO 内容和挂载方式由相关负责人提供。
+一个新业务一般新增映射 JSON；新文件格式新增 SourceParser 实现；新来源新增 SourceReader；复杂转换可替换 Extractor。所有替换在 bootstrap 装配，不修改相邻层的服务逻辑。
 
-这些是设计约束，目前没有对应算法或规则引擎。问答、MAP、报告生成也未在此工程中实现。
+FileStore 使用原子替换与每批次文件锁；它是单节点持久化方案。多副本部署应替换共享状态与锁的实现，详细限制见 preparation.md。
+
+模型抽取和确定性映射均输出候选数据。相同名称不自动合并，多个事件不合并成一条概括关系，图中路径不自动推成直接交易事实。BFO、MAP、报告等后续功能未实现。

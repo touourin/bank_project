@@ -106,3 +106,26 @@ def test_old_graph_switch_cannot_silently_disable_neo4j(tmp_path, monkeypatch, s
 def test_old_backend_value_is_not_accepted_as_boolean():
     with pytest.raises(ValidationError, match="neo4j_enabled"):
         Settings(neo4j_enabled="none", _env_file=None)
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"api_token": "too-short"},
+        {"model_enabled": True},
+        {
+            "model_enabled": True,
+            "model_name": "test",
+            "model_base_url": "https://secret:password@host/v1",
+        },
+        {"model_enabled": True, "model_name": "test", "model_base_url": "file:///private"},
+        {"mysql_source_enabled": True, "mysql_password": "secret"},
+        {"mysql_source_tables": ["orders; DROP TABLE customers"]},
+        {"max_file_bytes": 0},
+        {"max_concurrent_jobs": 0},
+        {"max_concurrent_jobs": 17},
+    ],
+)
+def test_preparation_configuration_rejects_invalid_values(values):
+    with pytest.raises(ValidationError):
+        Settings(**values, _env_file=None)

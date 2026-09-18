@@ -13,12 +13,12 @@ class ErrorResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     version: str
-    mode: Literal["framework"] = "framework"
+    mode: Literal["preparation"] = "preparation"
 
 
 class ReadyResponse(BaseModel):
     status: Literal["ready"] = "ready"
-    mode: Literal["framework"] = "framework"
+    mode: Literal["preparation"] = "preparation"
     graph_backend: str
 
 

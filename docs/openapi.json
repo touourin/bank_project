@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Bank project · 工程框架",
-    "description": "仅提供工程结构、接口契约与基础设施连接。业务接口为占位，合法请求返回 HTTP 501；数据导入、抽取、消歧、建图、查询均未实现。",
+    "title": "Bank project · 数据准备服务",
+    "description": "通用文件/表格导入与对象、事件、关系转换；两步独立调用。业务表采用可配置映射，文档采用可配置模型。结果为带来源证据的候选数据。消歧、建图、语义推理和图谱查询仍为占位，返回 HTTP 501。",
     "version": "0.1.0"
   },
   "paths": {
@@ -51,13 +51,93 @@
         }
       }
     },
+    "/api/v1/mappings": {
+      "get": {
+        "tags": [
+          "preparation · 数据导入与转换"
+        ],
+        "summary": "列出可用的表格映射配置",
+        "operationId": "list_mappings_api_v1_mappings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MappingSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Mappings Api V1 Mappings Get"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request Entity Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/imports": {
       "post": {
         "tags": [
-          "pipeline · 尚未实现"
+          "preparation · 数据导入与转换"
         ],
-        "summary": "数据导入（尚未实现）",
-        "operationId": "import_records_api_v1_imports_post",
+        "summary": "第一步：导入收件目录文件或只读 MySQL 表",
+        "operationId": "import_source_api_v1_imports_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -74,13 +154,33 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RunResult"
+                  "$ref": "#/components/schemas/IngestionReceipt"
                 }
               }
             }
           },
-          "501": {
-            "description": "接口占位，业务功能尚未实现",
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -90,14 +190,501 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/imports/upload": {
+      "post": {
+        "tags": [
+          "preparation · 数据导入与转换"
+        ],
+        "summary": "第一步：上传文件并保留原始数据",
+        "operationId": "upload_source_api_v1_imports_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_source_api_v1_imports_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestionReceipt"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request Entity Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/imports/{batch_id}": {
+      "get": {
+        "tags": [
+          "preparation · 数据导入与转换"
+        ],
+        "summary": "读取导入回执",
+        "operationId": "get_import_api_v1_imports__batch_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "title": "Batch Id"
+            }
+          },
+          {
+            "name": "dataset_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestionReceipt"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/extractions": {
+      "post": {
+        "tags": [
+          "preparation · 数据导入与转换"
+        ],
+        "summary": "第二步：按映射转换表格，或抽取文档；同步执行",
+        "operationId": "extract_source_api_v1_extractions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractionSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request Entity Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/extractions/{batch_id}/status": {
+      "get": {
+        "tags": [
+          "preparation · 数据导入与转换"
+        ],
+        "summary": "转换状态及失败原因",
+        "operationId": "extraction_status_api_v1_extractions__batch_id__status_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "title": "Batch Id"
+            }
+          },
+          {
+            "name": "dataset_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractionState"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/extractions/{batch_id}": {
+      "get": {
+        "tags": [
+          "preparation · 数据导入与转换"
+        ],
+        "summary": "读取完整候选结果及来源证据",
+        "operationId": "extraction_result_api_v1_extractions__batch_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "title": "Batch Id"
+            }
+          },
+          {
+            "name": "dataset_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractionBatch"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         }
       }
@@ -150,7 +737,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/runs/{run_id}": {
@@ -160,6 +752,11 @@
         ],
         "summary": "运行记录（尚未实现）",
         "operationId": "get_run_api_v1_runs__run_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "run_id",
@@ -266,7 +863,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/evidence/{evidence_id}": {
@@ -276,6 +878,11 @@
         ],
         "summary": "证据查询（尚未实现）",
         "operationId": "evidence_api_v1_evidence__evidence_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "evidence_id",
@@ -337,6 +944,67 @@
   },
   "components": {
     "schemas": {
+      "Body_upload_source_api_v1_imports_upload_post": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Dataset Id"
+          },
+          "batch_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Batch Id"
+          },
+          "source_system": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Source System"
+          },
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          },
+          "sheet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "batch_id",
+          "source_system",
+          "file"
+        ],
+        "title": "Body_upload_source_api_v1_imports_upload_post"
+      },
       "EntityCandidate": {
         "properties": {
           "candidate_id": {
@@ -426,6 +1094,18 @@
               }
             ],
             "title": "Occurred At"
+          },
+          "occurred_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred On"
           },
           "participants": {
             "items": {
@@ -549,9 +1229,12 @@
         "properties": {
           "schema_version": {
             "type": "string",
-            "const": "0.1",
+            "enum": [
+              "0.1",
+              "0.2"
+            ],
             "title": "Schema Version",
-            "default": "0.1"
+            "default": "0.2"
           },
           "dataset_id": {
             "type": "string",
@@ -613,6 +1296,185 @@
           "producer_version"
         ],
         "title": "ExtractionBatch"
+      },
+      "ExtractionRequest": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Dataset Id"
+          },
+          "batch_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Batch Id"
+          },
+          "mapping": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mapping"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "batch_id"
+        ],
+        "title": "ExtractionRequest"
+      },
+      "ExtractionState": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Dataset Id"
+          },
+          "batch_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Batch Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_started",
+              "running",
+              "failed",
+              "completed"
+            ],
+            "title": "Status"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExtractionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "batch_id",
+          "status"
+        ],
+        "title": "ExtractionState"
+      },
+      "ExtractionSummary": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Dataset Id"
+          },
+          "batch_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Batch Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "completed",
+            "title": "Status",
+            "default": "completed"
+          },
+          "entities": {
+            "type": "integer",
+            "title": "Entities"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events"
+          },
+          "relations": {
+            "type": "integer",
+            "title": "Relations"
+          },
+          "evidence": {
+            "type": "integer",
+            "title": "Evidence"
+          },
+          "input_digest": {
+            "type": "string",
+            "title": "Input Digest"
+          },
+          "configuration_digest": {
+            "type": "string",
+            "title": "Configuration Digest"
+          },
+          "producer_version": {
+            "type": "string",
+            "title": "Producer Version"
+          },
+          "mapping": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mapping"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Completed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "batch_id",
+          "entities",
+          "events",
+          "relations",
+          "evidence",
+          "input_digest",
+          "configuration_digest",
+          "producer_version",
+          "completed_at"
+        ],
+        "title": "ExtractionSummary"
       },
       "GraphEdge": {
         "properties": {
@@ -763,9 +1625,9 @@
           },
           "mode": {
             "type": "string",
-            "const": "framework",
+            "const": "preparation",
             "title": "Mode",
-            "default": "framework"
+            "default": "preparation"
           }
         },
         "type": "object",
@@ -797,6 +1659,32 @@
           "source_uri": {
             "type": "string",
             "title": "Source Uri"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          },
+          "sheet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet"
           }
         },
         "additionalProperties": false,
@@ -809,7 +1697,115 @@
         ],
         "title": "ImportRequest"
       },
+      "IngestionReceipt": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Dataset Id"
+          },
+          "batch_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Batch Id"
+          },
+          "source_system": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Source System"
+          },
+          "artifact": {
+            "$ref": "#/components/schemas/SourceArtifact"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          },
+          "records": {
+            "type": "integer",
+            "title": "Records"
+          },
+          "imported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Imported At"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "batch_id",
+          "source_system",
+          "artifact",
+          "filename",
+          "table",
+          "records",
+          "imported_at"
+        ],
+        "title": "IngestionReceipt"
+      },
       "JsonValue": {},
+      "MappingSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          },
+          "match_columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Match Columns"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "table",
+          "match_columns"
+        ],
+        "title": "MappingSummary"
+      },
       "Participant": {
         "properties": {
           "entity_id": {
@@ -880,9 +1876,9 @@
           },
           "mode": {
             "type": "string",
-            "const": "framework",
+            "const": "preparation",
             "title": "Mode",
-            "default": "framework"
+            "default": "preparation"
           },
           "graph_backend": {
             "type": "string",
@@ -995,6 +1991,25 @@
         ],
         "title": "RunResult"
       },
+      "SourceArtifact": {
+        "properties": {
+          "uri": {
+            "type": "string",
+            "title": "Uri"
+          },
+          "digest": {
+            "type": "string",
+            "title": "Digest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "uri",
+          "digest"
+        ],
+        "title": "SourceArtifact"
+      },
       "SourceRecord": {
         "properties": {
           "source_id": {
@@ -1016,6 +2031,16 @@
           "locator": {
             "type": "string",
             "title": "Locator"
+          },
+          "artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceArtifact"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -1067,6 +2092,12 @@
           "type"
         ],
         "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
       }
     }
   }

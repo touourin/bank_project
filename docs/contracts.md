@@ -1,49 +1,50 @@
-# 接口契约草案
+# 交接契约
 
-当前版本为 0.1 草案，仅用于模块交接和 API 文档。业务 schema、必填证据、引用完整性、身份生成、幂等及事务规则均未实现。
+ExtractionBatch 的新输出为 schema_version 0.2；保留 0.1 的输入兼容标识。0.2 增加了来源原文件引用及事件 occurred_on 日期字段。
 
-## 模块接口
+## 前两步接口
 
 | 接口 | 交接形式 |
 | --- | --- |
-| Ingestor | ImportRequest → SourceArtifact |
-| Extractor | ImportRequest + SourceArtifact → ExtractionBatch |
-| Resolver | ExtractionBatch → ResolutionResult |
-| GraphBuilder | ExtractionBatch + ResolutionResult → GraphPatch |
-| SemanticValidator | ExtractionBatch → SemanticReport |
-| GraphWriter | GraphPatch + RunResult → 无返回值 |
-| GraphReader | GraphQuery → QueryResult；按标识获取证据 |
-| RunReader | 按数据集及运行标识读取 RunResult |
-| PipelineHandler | 导入、批次处理及运行查询入口 |
-| HealthCheck | 异步基础设施就绪检查与连接关闭 |
+| SourceReader | ImportRequest → RawInput（只读，不解析） |
+| SourceParser | RawInput + ImportRequest → ParsedSource（通用行或文本块） |
+| RawStore | 原文件内容 ↔ SourceArtifact（摘要、内部地址） |
+| PreparationStore | 按 dataset_id、batch_id 加锁并保存导入、状态和完整转换结果 |
+| Ingestor | ImportRequest + 可选上传内容 → IngestionReceipt；读取回执 |
+| Extractor | ExtractionRequest → ExtractionSummary；读取状态、结果、映射清单 |
+| DocumentModel | 文本 → 类型化、带逐字证据的 DocumentExtraction |
+| DocumentCache | 按来源、模型和提示词配置摘要复用已经校验的块结果 |
 
-这些是 Python Protocol 契约，存储与业务实现均待接入。GraphReader 使用查询请求，不要求调用方加载整份图谱。
+ImportRequest 的 table、sheet 为可选信息，没有银行表名枚举。
+ExtractionRequest 的 mapping 为可选配置名称；自动匹配、显式匹配或 generic_record 回退模式见 preparation.md。
 
-## 共享模型
+ExtractionBatch 包含 sources、evidence、entities、events、relations。
+每个候选必须引用实际存在的证据；证据引用来源记录；关系端点和事件参与方必须存在。输出发布前统一校验，缺失引用或重复标识不作为成功结果交接。
 
-ExtractionBatch 包含 dataset_id、batch_id、producer_version，以及 sources、evidence、entities、events、relations。
-候选实体保留来源键；候选事件保留时间及参与角色；关系保留端点和可选事件引用。
+EntityCandidate 保留来源外部键；仅配置 identity_scope=key 时按明确标识复用对象，不按姓名或名称消歧。事件保留 event_id、类型、参与方角色、发生日期及属性，关系保留方向、谓词和可选事件引用。
 
-GraphPatch 仅描述通用节点、边、来源和证据。节点类型、关系类型、属性字段与 Neo4j 存储形式尚未确定。
-GraphQuery 的 query_type 和 parameters 也是预留字段，当前没有已支持的查询类型。
+日期精度只有天时使用 occurred_on，occurred_at 保持空。银行快照日期 DT 与发生日期 OCCUR_DT 分开保留。金额等十进制字段输出为字符串，原始字段在 Evidence.fields 和原文件中留存。
 
-ImportRequest 仅描述数据集、批次、来源系统和 source_uri；当前不会读取此 URI。
-RunResult 的状态枚举是未来接口形状，不代表已经存在任务执行或任务持久化。
-
-Pydantic 目前只负责字段类型及基础格式检查。具体字段以 src/bank_project/contracts/models.py 为准；修改草案时同时调整调用方与 docs/openapi.json。
+文档实体和事件 properties、文档证据 fields 带 review_required。逐字证据与结构校验并不等价于语义准确性验证，后续仍需消歧、校验和复核。
 
 ## HTTP 入口
 
-| 方法与路径 | 当前行为 |
+| 路径 | 行为 |
 | --- | --- |
-| GET /health | 返回进程状态、版本、framework 模式 |
-| GET /ready | 检查配置的基础设施；不可用或超时返回 503 |
-| POST /api/v1/imports | 501 尚未实现 |
-| POST /api/v1/batches | 501 尚未实现 |
-| GET /api/v1/runs/{run_id} | 501 尚未实现 |
-| POST /api/v1/graph/query | 501 尚未实现 |
-| GET /api/v1/evidence/{evidence_id} | 501 尚未实现 |
+| GET /health | 进程状态、版本、preparation 模式 |
+| GET /ready | 已启用的 Neo4j 健康检查，失败 503 |
+| GET /api/v1/mappings | 配置清单 |
+| POST /api/v1/imports | 收件目录文件或已启用 MySQL 来源导入 |
+| POST /api/v1/imports/upload | multipart 文件上传 |
+| GET /api/v1/imports/{batch_id}?dataset_id=... | 导入回执 |
+| POST /api/v1/extractions | 同步转换并返回摘要 |
+| GET /api/v1/extractions/{batch_id}/status?dataset_id=... | not_started/running/failed/completed |
+| GET /api/v1/extractions/{batch_id}?dataset_id=... | 完整候选批次 |
+| POST /api/v1/batches | 后续批次处理，501 |
+| GET /api/v1/runs/{run_id} | 后续流水线运行记录，501；前两步请用 extraction status |
+| POST /api/v1/graph/query | 图谱查询，501 |
+| GET /api/v1/evidence/{evidence_id} | 图谱侧证据查询，501；前两步的证据在 ExtractionBatch 内 |
 
-业务请求格式合法时返回 501，格式错误时由 FastAPI 返回 422；不会返回模拟成功结果。
-501 响应统一为 ErrorResponse（error、detail），OpenAPI 同步声明此结构。
-查询运行或证据需提供 dataset_id 查询参数。接口路径和响应模型是占位草案，后续按确认的需求实现。
+输入错误返回 422，数据缺失 404，冲突或同批并发 409，超限 413，依赖不可用 503。业务错误使用 ErrorResponse；FastAPI 参数绑定错误使用其标准 detail 格式。配置 API token 后业务路径需 Bearer 鉴权；健康与文档页不包含数据内容。
+
+后续 Resolver、GraphBuilder、SemanticValidator、GraphWriter、GraphReader、PipelineHandler 保持接口边界，并未在本次实现。Neo4j 适配器仍只负责连接和就绪检查。

@@ -2,7 +2,7 @@ import argparse
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Bank project framework")
+    parser = argparse.ArgumentParser(description="Bank project data preparation service")
     subparsers = parser.add_subparsers(dest="command", required=True)
     serve = subparsers.add_parser("serve")
     serve.add_argument("--host", default="127.0.0.1")

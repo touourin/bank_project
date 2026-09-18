@@ -1,5 +1,6 @@
-"""Draft handoff contracts; business rules and bank schemas are not implemented."""
+"""Handoff contracts for data preparation and reserved downstream graph stages."""
 
+from datetime import date
 from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue, StringConstraints
@@ -16,6 +17,8 @@ class ImportRequest(Model):
     batch_id: Identifier
     source_system: Identifier
     source_uri: str
+    table: Identifier | None = None
+    sheet: Identifier | None = None
 
 
 class SourceArtifact(Model):
@@ -28,6 +31,7 @@ class SourceRecord(Model):
     source_system: Identifier
     record_key: str
     locator: str
+    artifact: SourceArtifact | None = None
 
 
 class Evidence(Model):
@@ -60,6 +64,7 @@ class EventCandidate(Model):
     event_id: Identifier
     event_type: Identifier
     occurred_at: AwareDatetime | None = None
+    occurred_on: date | None = None
     participants: list[Participant] = Field(default_factory=list)
     properties: dict[str, JsonValue] = Field(default_factory=dict)
     evidence_ids: list[Identifier] = Field(default_factory=list)
@@ -75,7 +80,7 @@ class RelationCandidate(Model):
 
 
 class ExtractionBatch(Model):
-    schema_version: Literal["0.1"] = "0.1"
+    schema_version: Literal["0.1", "0.2"] = "0.2"
     dataset_id: Identifier
     batch_id: Identifier
     producer_version: str

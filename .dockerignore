@@ -4,6 +4,8 @@
 !requirements.lock
 !src/
 !src/**
+!configs/
+!configs/**
 **/__pycache__/
 **/*.py[cod]
 **/*.egg-info/
