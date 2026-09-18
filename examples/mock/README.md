@@ -7,6 +7,8 @@
 | --- | --- |
 | `CCM_C_CUST_FLAG_INFO.csv` | 155 列，每个客户一份标签快照 |
 | `E_CRM_C_CUST_TOUR_EVT_SUM.csv` | 8 列，每行一个事件，客户编号关联标签表 |
+| [字段说明.xlsx](字段说明.xlsx) | Excel 字段字典：155 个标签字段、8 个旅程字段、事件码对照和 117 项事件属性 |
+| [FIELDS.md](FIELDS.md) | 同一份字段说明的 Markdown 查阅版，可在 IDE 或 GitHub 中查看 |
 | `manifest.json` | 参数、记录数、事件覆盖、校验和与待银行确认清单 |
 | [schema.json](../../configs/bank/schema.json) | 源字段与 mock 约定的唯一配置 |
 
@@ -28,6 +30,7 @@ python3 scripts/validate_mock.py --input-dir data/mock
 ```
 
 相同 schema、参数和脚本版本生成相同的文件字节。重新生成只替换两张 CSV 和 `manifest.json`。
+字段说明是当前样例的文档快照；`make mock` 不自动更新 Excel 和 Markdown 文档。字段定义或模拟规则变化后，需同步更新这两份说明。
 调整 schema 或手工修改 CSV 后，应重新生成并校验；校验器会检测文件与 manifest 不一致。
 独立脚本不启动 FastAPI、不调用 LLM、不向 Neo4j 写数据，业务接口仍为框架占位。
 
