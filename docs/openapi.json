@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Bank project · 数据准备服务",
-    "description": "通用文件/表格导入与对象、事件、关系转换；两步独立调用。业务表采用可配置映射，文档采用可配置模型。结果为带来源证据的候选数据。消歧、建图、语义推理和图谱查询仍为占位，返回 HTTP 501。",
+    "title": "Bank project",
+    "description": "第一步：通用数据接入与暂存。第二步：按表进行本体对齐、展示映射及生成独立图谱版本。",
     "version": "0.1.0"
   },
   "paths": {
@@ -44,20 +44,184 @@
                 }
               }
             }
-          },
-          "503": {
-            "description": "基础设施不可用或检查超时"
           }
         }
       }
     },
-    "/api/v1/mappings": {
+    "/api/v1/intake/limits": {
       "get": {
         "tags": [
-          "preparation · 数据导入与转换"
+          "第一步 · 数据接入"
         ],
-        "summary": "列出可用的表格映射配置",
-        "operationId": "list_mappings_api_v1_mappings_get",
+        "summary": "Limits",
+        "operationId": "limits_api_v1_intake_limits_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Limits"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/intake/uploads": {
+      "post": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "Upload",
+        "operationId": "upload_api_v1_intake_uploads_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "title": "Filename"
+            }
+          },
+          {
+            "name": "header_row",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 1,
+              "title": "Header Row"
+            }
+          },
+          {
+            "name": "encoding",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "auto",
+                "utf-8-sig",
+                "gb18030"
+              ],
+              "type": "string",
+              "default": "auto",
+              "title": "Encoding"
+            }
+          },
+          {
+            "name": "delimiter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "auto",
+                "comma",
+                "tab",
+                "semicolon"
+              ],
+              "type": "string",
+              "default": "auto",
+              "title": "Delimiter"
+            }
+          },
+          {
+            "name": "skip_description_sheets",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Skip Description Sheets"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/BatchDetail"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IntakeJob"
+                    }
+                  ],
+                  "title": "Response Upload Api V1 Intake Uploads Post"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "文件已保存，等待后台解析",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeJob"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/intake/mysql/catalog": {
+      "post": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "Mysql Catalog",
+        "operationId": "mysql_catalog_api_v1_intake_mysql_catalog_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MysqlRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -65,664 +229,10 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/MappingSummary"
+                    "$ref": "#/components/schemas/CatalogTable"
                   },
                   "type": "array",
-                  "title": "Response List Mappings Api V1 Mappings Get"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Request Entity Too Large",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/imports": {
-      "post": {
-        "tags": [
-          "preparation · 数据导入与转换"
-        ],
-        "summary": "第一步：导入收件目录文件或只读 MySQL 表",
-        "operationId": "import_source_api_v1_imports_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ImportRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IngestionReceipt"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Request Entity Too Large",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/imports/upload": {
-      "post": {
-        "tags": [
-          "preparation · 数据导入与转换"
-        ],
-        "summary": "第一步：上传文件并保留原始数据",
-        "operationId": "upload_source_api_v1_imports_upload_post",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_upload_source_api_v1_imports_upload_post"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IngestionReceipt"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Request Entity Too Large",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/imports/{batch_id}": {
-      "get": {
-        "tags": [
-          "preparation · 数据导入与转换"
-        ],
-        "summary": "读取导入回执",
-        "operationId": "get_import_api_v1_imports__batch_id__get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "batch_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 160,
-              "title": "Batch Id"
-            }
-          },
-          {
-            "name": "dataset_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 160,
-              "title": "Dataset Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IngestionReceipt"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "413": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Request Entity Too Large"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Service Unavailable"
-          }
-        }
-      }
-    },
-    "/api/v1/extractions": {
-      "post": {
-        "tags": [
-          "preparation · 数据导入与转换"
-        ],
-        "summary": "第二步：按映射转换表格，或抽取文档；同步执行",
-        "operationId": "extract_source_api_v1_extractions_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ExtractionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExtractionSummary"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Request Entity Too Large",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/extractions/{batch_id}/status": {
-      "get": {
-        "tags": [
-          "preparation · 数据导入与转换"
-        ],
-        "summary": "转换状态及失败原因",
-        "operationId": "extraction_status_api_v1_extractions__batch_id__status_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "batch_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 160,
-              "title": "Batch Id"
-            }
-          },
-          {
-            "name": "dataset_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 160,
-              "title": "Dataset Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExtractionState"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "413": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Request Entity Too Large"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Service Unavailable"
-          }
-        }
-      }
-    },
-    "/api/v1/extractions/{batch_id}": {
-      "get": {
-        "tags": [
-          "preparation · 数据导入与转换"
-        ],
-        "summary": "读取完整候选结果及来源证据",
-        "operationId": "extraction_result_api_v1_extractions__batch_id__get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "batch_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 160,
-              "title": "Batch Id"
-            }
-          },
-          {
-            "name": "dataset_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 160,
-              "title": "Dataset Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExtractionBatch"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "413": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Request Entity Too Large"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Service Unavailable"
-          }
-        }
-      }
-    },
-    "/api/v1/batches": {
-      "post": {
-        "tags": [
-          "pipeline · 尚未实现"
-        ],
-        "summary": "批次处理（尚未实现）",
-        "operationId": "submit_batch_api_v1_batches_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ExtractionBatch"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RunResult"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "接口占位，业务功能尚未实现",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "title": "Response Mysql Catalog Api V1 Intake Mysql Catalog Post"
                 }
               }
             }
@@ -745,13 +255,578 @@
         ]
       }
     },
-    "/api/v1/runs/{run_id}": {
+    "/api/v1/intake/mysql/import": {
+      "post": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "Mysql Import",
+        "operationId": "mysql_import_api_v1_intake_mysql_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MysqlImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/BatchDetail"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IntakeJob"
+                    }
+                  ],
+                  "title": "Response Mysql Import Api V1 Intake Mysql Import Post"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeJob"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/intake/batches": {
       "get": {
         "tags": [
-          "pipeline · 尚未实现"
+          "第一步 · 数据接入"
         ],
-        "summary": "运行记录（尚未实现）",
-        "operationId": "get_run_api_v1_runs__run_id__get",
+        "summary": "Batches",
+        "operationId": "batches_api_v1_intake_batches_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/intake/batches/{batch_id}": {
+      "get": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "Batch",
+        "operationId": "batch_api_v1_intake_batches__batch_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "Delete",
+        "operationId": "delete_api_v1_intake_batches__batch_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/intake/batches/{batch_id}/tables/{table_id}": {
+      "get": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "Table",
+        "operationId": "table_api_v1_intake_batches__batch_id__tables__table_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Table Id"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TablePage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/intake/jobs": {
+      "get": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "Intake Jobs",
+        "operationId": "intake_jobs_api_v1_intake_jobs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IntakeJob"
+                  },
+                  "type": "array",
+                  "title": "Response Intake Jobs Api V1 Intake Jobs Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/intake/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "Intake Job",
+        "operationId": "intake_job_api_v1_intake_jobs__job_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeJob"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/intake/jobs/{job_id}/retry": {
+      "post": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "Retry Intake",
+        "operationId": "retry_intake_api_v1_intake_jobs__job_id__retry_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeJob"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/intake/jobs/{job_id}/cancel": {
+      "post": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "Cancel Intake",
+        "operationId": "cancel_intake_api_v1_intake_jobs__job_id__cancel_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeJob"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alignment/config": {
+      "get": {
+        "tags": [
+          "第二步 · 本体对齐与图谱生成"
+        ],
+        "summary": "Config",
+        "operationId": "config_api_v1_alignment_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/alignment/runs": {
+      "get": {
+        "tags": [
+          "第二步 · 本体对齐与图谱生成"
+        ],
+        "summary": "Runs",
+        "operationId": "runs_api_v1_alignment_runs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Run"
+                  },
+                  "type": "array",
+                  "title": "Response Runs Api V1 Alignment Runs Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "第二步 · 本体对齐与图谱生成"
+        ],
+        "summary": "Analyze",
+        "operationId": "analyze_api_v1_alignment_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/alignment/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "第二步 · 本体对齐与图谱生成"
+        ],
+        "summary": "Run",
+        "operationId": "run_api_v1_alignment_runs__run_id__get",
         "security": [
           {
             "HTTPBearer": []
@@ -764,20 +839,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 160,
+              "format": "uuid",
               "title": "Run Id"
-            }
-          },
-          {
-            "name": "dataset_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 160,
-              "title": "Dataset Id"
             }
           }
         ],
@@ -787,17 +850,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RunResult"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "接口占位，业务功能尚未实现",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/Run"
                 }
               }
             }
@@ -815,40 +868,52 @@
         }
       }
     },
-    "/api/v1/graph/query": {
-      "post": {
+    "/api/v1/alignment/runs/{run_id}/concepts": {
+      "get": {
         "tags": [
-          "graph · 尚未实现"
+          "第二步 · 本体对齐与图谱生成"
         ],
-        "summary": "图谱查询（尚未实现）",
-        "operationId": "query_graph_api_v1_graph_query_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GraphQuery"
-              }
+        "summary": "Concepts",
+        "operationId": "concepts_api_v1_alignment_runs__run_id__concepts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
             }
           },
-          "required": true
-        },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QueryResult"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "接口占位，业务功能尚未实现",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConceptDetail"
+                  },
+                  "title": "Response Concepts Api V1 Alignment Runs  Run Id  Concepts Get"
                 }
               }
             }
@@ -863,6 +928,133 @@
               }
             }
           }
+        }
+      }
+    },
+    "/api/v1/alignment/runs/{run_id}/mapping": {
+      "post": {
+        "tags": [
+          "第二步 · 本体对齐与图谱生成"
+        ],
+        "summary": "Edit Mapping",
+        "operationId": "edit_mapping_api_v1_alignment_runs__run_id__mapping_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MappingEditRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alignment/runs/{run_id}/graph": {
+      "post": {
+        "tags": [
+          "第二步 · 本体对齐与图谱生成"
+        ],
+        "summary": "Generate",
+        "operationId": "generate_api_v1_alignment_runs__run_id__graph_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alignment/graph": {
+      "get": {
+        "tags": [
+          "第二步 · 本体对齐与图谱生成"
+        ],
+        "summary": "Graph",
+        "operationId": "graph_api_v1_alignment_graph_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphPreview"
+                }
+              }
+            }
+          }
         },
         "security": [
           {
@@ -871,13 +1063,13 @@
         ]
       }
     },
-    "/api/v1/evidence/{evidence_id}": {
-      "get": {
+    "/api/v1/alignment/runs/{run_id}/template": {
+      "post": {
         "tags": [
-          "graph · 尚未实现"
+          "第二步 · 本体对齐与图谱生成"
         ],
-        "summary": "证据查询（尚未实现）",
-        "operationId": "evidence_api_v1_evidence__evidence_id__get",
+        "summary": "Save Template",
+        "operationId": "save_template_api_v1_alignment_runs__run_id__template_post",
         "security": [
           {
             "HTTPBearer": []
@@ -885,45 +1077,33 @@
         ],
         "parameters": [
           {
-            "name": "evidence_id",
+            "name": "run_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 160,
-              "title": "Evidence Id"
-            }
-          },
-          {
-            "name": "dataset_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 160,
-              "title": "Dataset Id"
+              "format": "uuid",
+              "title": "Run Id"
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphTemplate"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
+          "201": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvidenceResult"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "接口占位，业务功能尚未实现",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/Run"
                 }
               }
             }
@@ -944,420 +1124,60 @@
   },
   "components": {
     "schemas": {
-      "Body_upload_source_api_v1_imports_upload_post": {
+      "AnalyzeRequest": {
         "properties": {
-          "dataset_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Dataset Id"
-          },
-          "batch_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Batch Id"
-          },
-          "source_system": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Source System"
-          },
-          "file": {
-            "type": "string",
-            "contentMediaType": "application/octet-stream",
-            "title": "File"
-          },
-          "table": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 160,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Table"
-          },
-          "sheet": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 160,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sheet"
-          }
-        },
-        "type": "object",
-        "required": [
-          "dataset_id",
-          "batch_id",
-          "source_system",
-          "file"
-        ],
-        "title": "Body_upload_source_api_v1_imports_upload_post"
-      },
-      "EntityCandidate": {
-        "properties": {
-          "candidate_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Candidate Id"
-          },
-          "entity_type": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Entity Type"
-          },
-          "external_keys": {
+          "tables": {
             "items": {
-              "$ref": "#/components/schemas/ExternalKey"
+              "$ref": "#/components/schemas/Selection"
             },
             "type": "array",
-            "title": "External Keys"
-          },
-          "properties": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "type": "object",
-            "title": "Properties"
-          },
-          "evidence_ids": {
-            "items": {
-              "type": "string",
-              "maxLength": 160,
-              "minLength": 1
-            },
-            "type": "array",
-            "title": "Evidence Ids"
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Tables"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "candidate_id",
-          "entity_type"
+          "tables"
         ],
-        "title": "EntityCandidate"
+        "title": "AnalyzeRequest"
       },
-      "ErrorResponse": {
+      "BatchDetail": {
         "properties": {
-          "error": {
+          "id": {
             "type": "string",
-            "title": "Error"
+            "title": "Id"
           },
-          "detail": {
+          "name": {
             "type": "string",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "required": [
-          "error",
-          "detail"
-        ],
-        "title": "ErrorResponse"
-      },
-      "EventCandidate": {
-        "properties": {
-          "event_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Event Id"
+            "title": "Name"
           },
-          "event_type": {
+          "source_kind": {
             "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Event Type"
-          },
-          "occurred_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
+            "enum": [
+              "file",
+              "mysql"
             ],
-            "title": "Occurred At"
-          },
-          "occurred_on": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Occurred On"
-          },
-          "participants": {
-            "items": {
-              "$ref": "#/components/schemas/Participant"
-            },
-            "type": "array",
-            "title": "Participants"
-          },
-          "properties": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "type": "object",
-            "title": "Properties"
-          },
-          "evidence_ids": {
-            "items": {
-              "type": "string",
-              "maxLength": 160,
-              "minLength": 1
-            },
-            "type": "array",
-            "title": "Evidence Ids"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "event_id",
-          "event_type"
-        ],
-        "title": "EventCandidate"
-      },
-      "Evidence": {
-        "properties": {
-          "evidence_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Evidence Id"
-          },
-          "source_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Source Id"
-          },
-          "fields": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "type": "object",
-            "title": "Fields"
-          },
-          "excerpt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Excerpt"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "evidence_id",
-          "source_id"
-        ],
-        "title": "Evidence"
-      },
-      "EvidenceResult": {
-        "properties": {
-          "evidence": {
-            "$ref": "#/components/schemas/Evidence"
+            "title": "Source Kind"
           },
           "source": {
-            "$ref": "#/components/schemas/SourceRecord"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "evidence",
-          "source"
-        ],
-        "title": "EvidenceResult"
-      },
-      "ExternalKey": {
-        "properties": {
-          "source_system": {
             "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Source System"
+            "title": "Source"
           },
-          "key_type": {
+          "created_at": {
             "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Key Type"
+            "title": "Created At"
           },
-          "value": {
-            "type": "string",
-            "title": "Value"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "source_system",
-          "key_type",
-          "value"
-        ],
-        "title": "ExternalKey"
-      },
-      "ExtractionBatch": {
-        "properties": {
-          "schema_version": {
-            "type": "string",
-            "enum": [
-              "0.1",
-              "0.2"
-            ],
-            "title": "Schema Version",
-            "default": "0.2"
+          "table_count": {
+            "type": "integer",
+            "title": "Table Count"
           },
-          "dataset_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Dataset Id"
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
           },
-          "batch_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Batch Id"
-          },
-          "producer_version": {
-            "type": "string",
-            "title": "Producer Version"
-          },
-          "sources": {
-            "items": {
-              "$ref": "#/components/schemas/SourceRecord"
-            },
-            "type": "array",
-            "title": "Sources"
-          },
-          "evidence": {
-            "items": {
-              "$ref": "#/components/schemas/Evidence"
-            },
-            "type": "array",
-            "title": "Evidence"
-          },
-          "entities": {
-            "items": {
-              "$ref": "#/components/schemas/EntityCandidate"
-            },
-            "type": "array",
-            "title": "Entities"
-          },
-          "events": {
-            "items": {
-              "$ref": "#/components/schemas/EventCandidate"
-            },
-            "type": "array",
-            "title": "Events"
-          },
-          "relations": {
-            "items": {
-              "$ref": "#/components/schemas/RelationCandidate"
-            },
-            "type": "array",
-            "title": "Relations"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "dataset_id",
-          "batch_id",
-          "producer_version"
-        ],
-        "title": "ExtractionBatch"
-      },
-      "ExtractionRequest": {
-        "properties": {
-          "dataset_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Dataset Id"
-          },
-          "batch_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Batch Id"
-          },
-          "mapping": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 160,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Mapping"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "dataset_id",
-          "batch_id"
-        ],
-        "title": "ExtractionRequest"
-      },
-      "ExtractionState": {
-        "properties": {
-          "dataset_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Dataset Id"
-          },
-          "batch_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Batch Id"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "not_started",
-              "running",
-              "failed",
-              "completed"
-            ],
-            "title": "Status"
-          },
-          "detail": {
+          "sha256": {
             "anyOf": [
               {
                 "type": "string"
@@ -1366,86 +1186,7 @@
                 "type": "null"
               }
             ],
-            "title": "Detail"
-          },
-          "summary": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ExtractionSummary"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "dataset_id",
-          "batch_id",
-          "status"
-        ],
-        "title": "ExtractionState"
-      },
-      "ExtractionSummary": {
-        "properties": {
-          "dataset_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Dataset Id"
-          },
-          "batch_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Batch Id"
-          },
-          "status": {
-            "type": "string",
-            "const": "completed",
-            "title": "Status",
-            "default": "completed"
-          },
-          "entities": {
-            "type": "integer",
-            "title": "Entities"
-          },
-          "events": {
-            "type": "integer",
-            "title": "Events"
-          },
-          "relations": {
-            "type": "integer",
-            "title": "Relations"
-          },
-          "evidence": {
-            "type": "integer",
-            "title": "Evidence"
-          },
-          "input_digest": {
-            "type": "string",
-            "title": "Input Digest"
-          },
-          "configuration_digest": {
-            "type": "string",
-            "title": "Configuration Digest"
-          },
-          "producer_version": {
-            "type": "string",
-            "title": "Producer Version"
-          },
-          "mapping": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Mapping"
+            "title": "Sha256"
           },
           "warnings": {
             "items": {
@@ -1454,149 +1195,562 @@
             "type": "array",
             "title": "Warnings"
           },
-          "completed_at": {
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/TableInfo"
+            },
+            "type": "array",
+            "title": "Tables"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "source_kind",
+          "source",
+          "created_at",
+          "table_count",
+          "row_count",
+          "tables"
+        ],
+        "title": "BatchDetail"
+      },
+      "BatchInfo": {
+        "properties": {
+          "id": {
             "type": "string",
-            "format": "date-time",
-            "title": "Completed At"
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "file",
+              "mysql"
+            ],
+            "title": "Source Kind"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "table_count": {
+            "type": "integer",
+            "title": "Table Count"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "source_kind",
+          "source",
+          "created_at",
+          "table_count",
+          "row_count"
+        ],
+        "title": "BatchInfo"
+      },
+      "BatchPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BatchInfo"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "BatchPage"
+      },
+      "CatalogTable": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "estimated_rows": {
+            "type": "integer",
+            "title": "Estimated Rows"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "dataset_id",
-          "batch_id",
-          "entities",
-          "events",
-          "relations",
-          "evidence",
-          "input_digest",
-          "configuration_digest",
-          "producer_version",
-          "completed_at"
+          "name",
+          "comment",
+          "estimated_rows"
         ],
-        "title": "ExtractionSummary"
+        "title": "CatalogTable"
+      },
+      "Column": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "data_type": {
+            "type": "string",
+            "title": "Data Type",
+            "default": "text"
+          },
+          "type_origin": {
+            "type": "string",
+            "enum": [
+              "observed",
+              "declared"
+            ],
+            "title": "Type Origin",
+            "default": "observed"
+          },
+          "nullable": {
+            "type": "boolean",
+            "title": "Nullable",
+            "default": true
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment",
+            "default": ""
+          },
+          "primary_key": {
+            "type": "boolean",
+            "title": "Primary Key",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "Column"
+      },
+      "ColumnMapping": {
+        "properties": {
+          "column": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Column"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "primary_key",
+              "foreign_key",
+              "attribute",
+              "ignore"
+            ],
+            "title": "Role",
+            "default": "attribute"
+          },
+          "semantic": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Semantic",
+            "default": ""
+          },
+          "concept_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Reason",
+            "default": ""
+          },
+          "property_key": {
+            "type": "string",
+            "title": "Property Key"
+          },
+          "concept_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "column",
+          "property_key"
+        ],
+        "title": "ColumnMapping"
+      },
+      "ConceptDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "parents": {
+            "items": {
+              "$ref": "#/components/schemas/ConceptRef"
+            },
+            "type": "array",
+            "title": "Parents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ConceptDetail"
+      },
+      "ConceptRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ConceptRef"
+      },
+      "DataRow": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "values": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "values"
+        ],
+        "title": "DataRow"
+      },
+      "ForeignKey": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "target_schema": {
+            "type": "string",
+            "title": "Target Schema"
+          },
+          "target_table": {
+            "type": "string",
+            "title": "Target Table"
+          },
+          "target_columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Columns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "columns",
+          "target_schema",
+          "target_table",
+          "target_columns"
+        ],
+        "title": "ForeignKey"
       },
       "GraphEdge": {
         "properties": {
-          "edge_id": {
+          "source": {
             "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Edge Id"
+            "title": "Source"
           },
-          "source_id": {
+          "target": {
             "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Source Id"
+            "title": "Target"
           },
-          "target_id": {
+          "relation_id": {
             "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Target Id"
+            "title": "Relation Id"
           },
-          "relation_type": {
+          "origin": {
             "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Relation Type"
+            "enum": [
+              "declared",
+              "candidate",
+              "confirmed"
+            ],
+            "title": "Origin"
           },
-          "properties": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "type": "object",
-            "title": "Properties"
-          },
-          "evidence_ids": {
-            "items": {
-              "type": "string",
-              "maxLength": 160,
-              "minLength": 1
-            },
-            "type": "array",
-            "title": "Evidence Ids"
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
-          "edge_id",
-          "source_id",
-          "target_id",
-          "relation_type"
+          "source",
+          "target",
+          "relation_id",
+          "origin"
         ],
         "title": "GraphEdge"
       },
       "GraphNode": {
         "properties": {
-          "node_id": {
+          "id": {
             "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Node Id"
+            "title": "Id"
           },
-          "node_type": {
+          "name": {
             "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Node Type"
+            "title": "Name"
           },
-          "properties": {
+          "table_id": {
+            "type": "string",
+            "title": "Table Id"
+          },
+          "table_name": {
+            "type": "string",
+            "title": "Table Name"
+          },
+          "source_row": {
+            "type": "integer",
+            "title": "Source Row"
+          },
+          "concept_id": {
+            "type": "string",
+            "title": "Concept Id"
+          },
+          "concept_name": {
+            "type": "string",
+            "title": "Concept Name"
+          },
+          "fields": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "type": "object",
-            "title": "Properties"
-          },
-          "evidence_ids": {
-            "items": {
-              "type": "string",
-              "maxLength": 160,
-              "minLength": 1
-            },
-            "type": "array",
-            "title": "Evidence Ids"
+            "title": "Fields"
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
-          "node_id",
-          "node_type"
+          "id",
+          "name",
+          "table_id",
+          "table_name",
+          "source_row",
+          "concept_id",
+          "concept_name",
+          "fields"
         ],
         "title": "GraphNode"
       },
-      "GraphQuery": {
+      "GraphPreview": {
         "properties": {
-          "dataset_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Dataset Id"
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GraphSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
-          "query_type": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Query Type"
-          },
-          "parameters": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
             },
-            "type": "object",
-            "title": "Parameters"
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "type": "object",
+        "title": "GraphPreview"
+      },
+      "GraphSummary": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "revision": {
+            "type": "string",
+            "title": "Revision"
+          },
+          "node_count": {
+            "type": "integer",
+            "title": "Node Count"
+          },
+          "edge_count": {
+            "type": "integer",
+            "title": "Edge Count"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "run_id",
+          "revision",
+          "node_count",
+          "edge_count",
+          "created_at"
+        ],
+        "title": "GraphSummary"
+      },
+      "GraphTemplate": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateNode"
+            },
+            "type": "array",
+            "maxItems": 120,
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateEdge"
+            },
+            "type": "array",
+            "maxItems": 240,
+            "title": "Edges"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed",
+            "default": false
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Note",
+            "default": ""
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": [
-          "dataset_id",
-          "query_type"
-        ],
-        "title": "GraphQuery"
+        "title": "GraphTemplate"
       },
       "HTTPValidationError": {
         "properties": {
@@ -1621,110 +1775,51 @@
           },
           "version": {
             "type": "string",
-            "title": "Version"
-          },
-          "mode": {
-            "type": "string",
-            "const": "preparation",
-            "title": "Mode",
-            "default": "preparation"
+            "title": "Version",
+            "default": "0.1.0"
           }
         },
         "type": "object",
-        "required": [
-          "version"
-        ],
         "title": "HealthResponse"
       },
-      "ImportRequest": {
+      "IntakeJob": {
         "properties": {
-          "dataset_id": {
+          "id": {
             "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Dataset Id"
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "rows_done": {
+            "type": "integer",
+            "title": "Rows Done"
+          },
+          "attempt": {
+            "type": "integer",
+            "title": "Attempt"
           },
           "batch_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Batch Id"
-          },
-          "source_system": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Source System"
-          },
-          "source_uri": {
-            "type": "string",
-            "title": "Source Uri"
-          },
-          "table": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 160,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Table"
-          },
-          "sheet": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 160,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sheet"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "dataset_id",
-          "batch_id",
-          "source_system",
-          "source_uri"
-        ],
-        "title": "ImportRequest"
-      },
-      "IngestionReceipt": {
-        "properties": {
-          "dataset_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Dataset Id"
-          },
-          "batch_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Batch Id"
-          },
-          "source_system": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Source System"
-          },
-          "artifact": {
-            "$ref": "#/components/schemas/SourceArtifact"
-          },
-          "filename": {
-            "type": "string",
-            "title": "Filename"
-          },
-          "table": {
             "anyOf": [
               {
                 "type": "string"
@@ -1733,16 +1828,205 @@
                 "type": "null"
               }
             ],
-            "title": "Table"
+            "title": "Batch Id"
           },
-          "records": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "status",
+          "name",
+          "size_bytes",
+          "rows_done",
+          "attempt",
+          "batch_id",
+          "error"
+        ],
+        "title": "IntakeJob"
+      },
+      "Limits": {
+        "properties": {
+          "max_upload_bytes": {
             "type": "integer",
-            "title": "Records"
+            "title": "Max Upload Bytes",
+            "default": 20971520
           },
-          "imported_at": {
+          "max_expanded_bytes": {
+            "type": "integer",
+            "title": "Max Expanded Bytes",
+            "default": 104857600
+          },
+          "max_tables": {
+            "type": "integer",
+            "title": "Max Tables",
+            "default": 30
+          },
+          "max_rows": {
+            "type": "integer",
+            "title": "Max Rows",
+            "default": 50000
+          },
+          "max_columns": {
+            "type": "integer",
+            "title": "Max Columns",
+            "default": 512
+          },
+          "max_cells": {
+            "type": "integer",
+            "title": "Max Cells",
+            "default": 2000000
+          },
+          "max_cell_chars": {
+            "type": "integer",
+            "title": "Max Cell Chars",
+            "default": 100000
+          }
+        },
+        "type": "object",
+        "title": "Limits"
+      },
+      "MappingEdit": {
+        "properties": {
+          "created_at": {
             "type": "string",
-            "format": "date-time",
-            "title": "Imported At"
+            "title": "Created At"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConceptRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConceptDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created_at",
+          "reason"
+        ],
+        "title": "MappingEdit"
+      },
+      "MappingEditRequest": {
+        "properties": {
+          "table_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Table Id"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "concept_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "table_id",
+          "concept_id",
+          "reason"
+        ],
+        "title": "MappingEditRequest"
+      },
+      "MappingResult": {
+        "properties": {
+          "template": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GraphTemplate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "type": "string",
+            "title": "Revision"
+          },
+          "snapshot_sha256": {
+            "type": "string",
+            "title": "Snapshot Sha256"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/TableMapping"
+            },
+            "type": "array",
+            "title": "Tables"
+          },
+          "relations": {
+            "items": {
+              "$ref": "#/components/schemas/RelationMapping"
+            },
+            "type": "array",
+            "title": "Relations"
           },
           "warnings": {
             "items": {
@@ -1752,223 +2036,26 @@
             "title": "Warnings"
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
-          "dataset_id",
-          "batch_id",
-          "source_system",
-          "artifact",
-          "filename",
-          "table",
-          "records",
-          "imported_at"
+          "revision",
+          "snapshot_sha256",
+          "tables",
+          "relations"
         ],
-        "title": "IngestionReceipt"
+        "title": "MappingResult"
       },
-      "JsonValue": {},
-      "MappingSummary": {
+      "MatchStep": {
         "properties": {
-          "id": {
+          "key": {
             "type": "string",
-            "title": "Id"
-          },
-          "version": {
-            "type": "string",
-            "title": "Version"
-          },
-          "table": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "enum": [
+              "meaning",
+              "recall",
+              "selection",
+              "validation"
             ],
-            "title": "Table"
-          },
-          "match_columns": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Match Columns"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "id",
-          "version",
-          "table",
-          "match_columns"
-        ],
-        "title": "MappingSummary"
-      },
-      "Participant": {
-        "properties": {
-          "entity_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Entity Id"
-          },
-          "role": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Role"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "entity_id",
-          "role"
-        ],
-        "title": "Participant"
-      },
-      "QueryResult": {
-        "properties": {
-          "dataset_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Dataset Id"
-          },
-          "nodes": {
-            "items": {
-              "$ref": "#/components/schemas/GraphNode"
-            },
-            "type": "array",
-            "title": "Nodes"
-          },
-          "edges": {
-            "items": {
-              "$ref": "#/components/schemas/GraphEdge"
-            },
-            "type": "array",
-            "title": "Edges"
-          },
-          "evidence": {
-            "items": {
-              "$ref": "#/components/schemas/Evidence"
-            },
-            "type": "array",
-            "title": "Evidence"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "dataset_id"
-        ],
-        "title": "QueryResult"
-      },
-      "ReadyResponse": {
-        "properties": {
-          "status": {
-            "type": "string",
-            "const": "ready",
-            "title": "Status",
-            "default": "ready"
-          },
-          "mode": {
-            "type": "string",
-            "const": "preparation",
-            "title": "Mode",
-            "default": "preparation"
-          },
-          "graph_backend": {
-            "type": "string",
-            "title": "Graph Backend"
-          }
-        },
-        "type": "object",
-        "required": [
-          "graph_backend"
-        ],
-        "title": "ReadyResponse"
-      },
-      "RelationCandidate": {
-        "properties": {
-          "relation_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Relation Id"
-          },
-          "subject_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Subject Id"
-          },
-          "predicate": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Predicate"
-          },
-          "object_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Object Id"
-          },
-          "event_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 160,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Event Id"
-          },
-          "evidence_ids": {
-            "items": {
-              "type": "string",
-              "maxLength": 160,
-              "minLength": 1
-            },
-            "type": "array",
-            "title": "Evidence Ids"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "relation_id",
-          "subject_id",
-          "predicate",
-          "object_id"
-        ],
-        "title": "RelationCandidate"
-      },
-      "RunResult": {
-        "properties": {
-          "run_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Run Id"
-          },
-          "dataset_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Dataset Id"
-          },
-          "batch_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Batch Id"
+            "title": "Key"
           },
           "status": {
             "type": "string",
@@ -1976,66 +2063,209 @@
               "pending",
               "running",
               "completed",
-              "failed"
+              "failed",
+              "skipped"
             ],
-            "title": "Status"
+            "title": "Status",
+            "default": "pending"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
-          "run_id",
-          "dataset_id",
-          "batch_id",
-          "status"
+          "key"
         ],
-        "title": "RunResult"
+        "title": "MatchStep"
       },
-      "SourceArtifact": {
+      "MatchTrace": {
         "properties": {
-          "uri": {
+          "method": {
             "type": "string",
-            "title": "Uri"
+            "enum": [
+              "model",
+              "retrieve"
+            ],
+            "title": "Method",
+            "default": "model"
           },
-          "digest": {
-            "type": "string",
-            "title": "Digest"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "uri",
-          "digest"
-        ],
-        "title": "SourceArtifact"
-      },
-      "SourceRecord": {
-        "properties": {
-          "source_id": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Source Id"
+          "retrievals": {
+            "items": {
+              "$ref": "#/components/schemas/RetrievalTrace"
+            },
+            "type": "array",
+            "title": "Retrievals"
           },
-          "source_system": {
-            "type": "string",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Source System"
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/MatchStep"
+            },
+            "type": "array",
+            "title": "Steps"
           },
-          "record_key": {
-            "type": "string",
-            "title": "Record Key"
+          "sample_rows": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Sample Rows"
           },
-          "locator": {
-            "type": "string",
-            "title": "Locator"
-          },
-          "artifact": {
+          "meaning": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SourceArtifact"
+                "$ref": "#/components/schemas/TableMeaning"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ConceptDetail"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "attribute_candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ConceptDetail"
+            },
+            "type": "array",
+            "title": "Attribute Candidates"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConceptDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "selection_reason": {
+            "type": "string",
+            "title": "Selection Reason",
+            "default": ""
+          },
+          "selection_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Confidence"
+          },
+          "verification": {
+            "type": "string",
+            "title": "Verification",
+            "default": "none"
+          },
+          "selection_attempts": {
+            "type": "integer",
+            "title": "Selection Attempts",
+            "default": 0
+          },
+          "confidence_threshold": {
+            "type": "number",
+            "title": "Confidence Threshold"
+          }
+        },
+        "type": "object",
+        "required": [
+          "confidence_threshold"
+        ],
+        "title": "MatchTrace"
+      },
+      "MysqlConnection": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "default": 3306
+          },
+          "database": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Database"
+          },
+          "user": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "User"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 4096,
+            "format": "password",
+            "title": "Password",
+            "default": "",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "host",
+          "database",
+          "user"
+        ],
+        "title": "MysqlConnection"
+      },
+      "MysqlImport": {
+        "properties": {
+          "connection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MysqlConnection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tables": {
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Tables"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tables"
+        ],
+        "title": "MysqlImport"
+      },
+      "MysqlRequest": {
+        "properties": {
+          "connection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MysqlConnection"
               },
               {
                 "type": "null"
@@ -2045,13 +2275,736 @@
         },
         "additionalProperties": false,
         "type": "object",
+        "title": "MysqlRequest"
+      },
+      "ReadyResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ready",
+            "title": "Status",
+            "default": "ready"
+          }
+        },
+        "type": "object",
+        "title": "ReadyResponse"
+      },
+      "RelationMapping": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "source_table_id": {
+            "type": "string",
+            "title": "Source Table Id"
+          },
+          "target_table_id": {
+            "type": "string",
+            "title": "Target Table Id"
+          },
+          "source_columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Columns"
+          },
+          "target_columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Columns"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "declared",
+              "candidate"
+            ],
+            "title": "Origin"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "skipped"
+            ],
+            "title": "Status"
+          },
+          "matched_rows": {
+            "type": "integer",
+            "title": "Matched Rows",
+            "default": 0
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
         "required": [
-          "source_id",
-          "source_system",
-          "record_key",
-          "locator"
+          "id",
+          "source_table_id",
+          "target_table_id",
+          "source_columns",
+          "target_columns",
+          "origin",
+          "reason",
+          "status"
         ],
-        "title": "SourceRecord"
+        "title": "RelationMapping"
+      },
+      "RetrievalTrace": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "enum": [
+              "table",
+              "column",
+              "entity"
+            ],
+            "title": "Target"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "matched",
+              "review",
+              "unmatched",
+              "unavailable",
+              "mismatch"
+            ],
+            "title": "Status"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ScoredConcept"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScoredConcept"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confident": {
+            "type": "boolean",
+            "title": "Confident",
+            "default": false
+          },
+          "match_method": {
+            "type": "string",
+            "title": "Match Method",
+            "default": "none"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "name",
+          "query",
+          "status"
+        ],
+        "title": "RetrievalTrace"
+      },
+      "Run": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "analyzing",
+              "ready",
+              "failed"
+            ],
+            "title": "Status",
+            "default": "analyzing"
+          },
+          "progress": {
+            "type": "string",
+            "title": "Progress",
+            "default": "等待分析"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MappingResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "graph_status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "building",
+              "ready",
+              "failed"
+            ],
+            "title": "Graph Status",
+            "default": "none"
+          },
+          "graph_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Error"
+          },
+          "graph_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Version"
+          },
+          "based_on_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Based On Run Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "title": "Run"
+      },
+      "ScoredConcept": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "parents": {
+            "items": {
+              "$ref": "#/components/schemas/ConceptRef"
+            },
+            "type": "array",
+            "title": "Parents"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ScoredConcept"
+      },
+      "Selection": {
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Batch Id"
+          },
+          "table_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Table Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "batch_id",
+          "table_id"
+        ],
+        "title": "Selection"
+      },
+      "TableInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/Column"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "foreign_keys": {
+            "items": {
+              "$ref": "#/components/schemas/ForeignKey"
+            },
+            "type": "array",
+            "title": "Foreign Keys"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "row_count",
+          "columns"
+        ],
+        "title": "TableInfo"
+      },
+      "TableMapping": {
+        "properties": {
+          "table_id": {
+            "type": "string",
+            "title": "Table Id"
+          },
+          "batch_id": {
+            "type": "string",
+            "title": "Batch Id"
+          },
+          "table_name": {
+            "type": "string",
+            "title": "Table Name"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "concept_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Id"
+          },
+          "concept_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Name"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence",
+            "default": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "mapped",
+              "review",
+              "unmatched",
+              "failed"
+            ],
+            "title": "Status",
+            "default": "unmatched"
+          },
+          "verification": {
+            "type": "string",
+            "enum": [
+              "local_catalog",
+              "verified",
+              "mismatch",
+              "unavailable",
+              "none",
+              "manual"
+            ],
+            "title": "Verification",
+            "default": "none"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnMapping"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "trace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchTrace"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "structure_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Structure Notes"
+          },
+          "manual_edits": {
+            "items": {
+              "$ref": "#/components/schemas/MappingEdit"
+            },
+            "type": "array",
+            "title": "Manual Edits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "table_id",
+          "batch_id",
+          "table_name",
+          "row_count"
+        ],
+        "title": "TableMapping"
+      },
+      "TableMeaning": {
+        "properties": {
+          "meaning": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Meaning"
+          },
+          "search_terms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Search Terms"
+          },
+          "attribute_terms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Attribute Terms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "meaning",
+          "search_terms"
+        ],
+        "title": "TableMeaning"
+      },
+      "TablePage": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/Column"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "foreign_keys": {
+            "items": {
+              "$ref": "#/components/schemas/ForeignKey"
+            },
+            "type": "array",
+            "title": "Foreign Keys"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/DataRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "row_count",
+          "columns",
+          "rows",
+          "offset",
+          "limit"
+        ],
+        "title": "TablePage"
+      },
+      "TemplateEdge": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_:.-]+$",
+            "title": "Id"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Target"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "same_row",
+              "join"
+            ],
+            "title": "Mode",
+            "default": "same_row"
+          },
+          "source_columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Source Columns"
+          },
+          "target_columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Columns"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "source",
+          "target",
+          "name",
+          "reason"
+        ],
+        "title": "TemplateEdge"
+      },
+      "TemplateNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_:.-]+$",
+            "title": "Id"
+          },
+          "table_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_:.-]+$",
+            "title": "Table Id"
+          },
+          "concept_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Concept Id"
+          },
+          "concept_name": {
+            "type": "string",
+            "title": "Concept Name",
+            "default": ""
+          },
+          "identity_scope": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Identity Scope"
+          },
+          "key_columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Key Columns"
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateProperty"
+            },
+            "type": "array",
+            "maxItems": 2048,
+            "title": "Properties"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "table_id",
+          "concept_id",
+          "identity_scope"
+        ],
+        "title": "TemplateNode"
+      },
+      "TemplateProperty": {
+        "properties": {
+          "column": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Column"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "column",
+          "name"
+        ],
+        "title": "TemplateProperty"
       },
       "ValidationError": {
         "properties": {

@@ -1,0 +1,144 @@
+:root {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--text);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+button {
+  font: inherit;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+.app-shell {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+.topbar {
+  min-height: 80px;
+  padding: 20px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 19px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.brand svg {
+  color: var(--accent);
+}
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--subtle);
+}
+.status i[data-connected="true"] {
+  background: var(--accent);
+}
+.eyebrow {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 3px;
+}
+h1 {
+  margin: 18px 0;
+  font-size: clamp(28px, 5vw, 38px);
+  font-weight: 600;
+  letter-spacing: -1px;
+}
+.description {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.8;
+}
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+footer {
+  padding: 22px 40px;
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
+.token-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 40px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.health-error {
+  width: calc(100% - 40px);
+  margin: 20px auto 0;
+}
+@media (max-width: 540px) {
+  .topbar {
+    padding: 16px;
+    gap: 10px;
+  }
+  .brand {
+    font-size: 16px;
+    gap: 8px;
+  }
+  .topbar-actions {
+    gap: 8px;
+  }
+  .status {
+    font-size: 11px;
+    gap: 5px;
+  }
+  footer {
+    padding-inline: 20px;
+  }
+  .token-bar {
+    padding: 16px;
+  }
+}

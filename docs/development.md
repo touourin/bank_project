@@ -1,22 +1,29 @@
-# 两人共同开发
+# 本地开发
 
-邓王璘维护通用 ingestion、extraction 和来源/模型适配；晏子怡从 resolution、graph、query 继续实现。业务特定规则放在 configs/mappings，共享 contracts 与 ports 变更需要双方对齐。
+Python 3.12+，Node.js 24。默认推荐使用 Docker Compose 启动。
 
-## 扩展方式
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -c requirements.lock -e '.[dev,mock]'
+npm --prefix frontend ci
+```
 
-1. 普通新表先增加映射配置，参考 docs/preparation.md 的非银行订单示例。
-2. 新格式、来源、存储或模型先定义/复用 ports，具体 SDK 放 adapters。
-3. 业务模块通过构造参数接收接口，不能导入相邻业务模块的实现。
-4. bootstrap 负责装配；API 只调用 ApplicationServices 中的接口。
-5. 为真实行为补充测试，尤其来源保留、稳定标识、类型和失败边界。
+使用 MySQL 模式时先运行 `make staging-up`，然后分别在三个终端运行：
 
-文件导入和转换为独立同步操作；耗时调用在 HTTP 工作线程执行，健康检查保持异步响应。不要把进程内临时任务列表当持久任务队列。
+```bash
+make local-run
+make local-worker
+make frontend-dev
+```
 
-## 检查
+后端为 8000，前端为 5173。若同端口 Docker 服务正在运行，先用 `docker compose stop api intake-worker frontend` 停止对应服务，或为本地服务指定其他端口。
 
-- make check：静态检查、测试、OpenAPI 一致性、离线 mock 校验。
-- make test：接口、通用映射、两份完整 mock 的 CSV/XLSX、模型协议、来源、持久化及异常处理。
-- make schema：接口变更后导出 OpenAPI，不启动服务或读取密钥。
-- make build / make run：默认启动独立 API；Neo4j 使用 graph profile。
+```bash
+make check             # Python 格式、测试、OpenAPI 和最终 mock 校验
+make frontend-check    # 前端格式、TypeScript 构建、浏览器检查
+make schema            # 更新离线接口说明
+```
 
-测试中的模型通过 HTTP MockTransport 验证协议和错误行为，MySQL 使用驱动替身验证只读 SQL、白名单和类型保留。真实供应商模型与银行数据库仍需配置后联调。禁止把模板密钥、原始银行数据、运行结果放入版本控制；data/ 已忽略。
+浏览器检查使用独立 8011/5174 端口及本机 Chrome。浏览器测试后端不读取本地 .env；默认不会连接数据库或调用模型。显式设置 `BANK_TEST_MYSQL=1` 的存储集成测试必须将 `BANK_STAGING_MYSQL_*` 指向以 `_test` 结尾的独立测试库；禁止连接实际工作暂存库，避免测试任务被工作 worker 领取。源 mock 测试需要本地 `data/schema-review/normalized-source-schema.json`，缺失时跳过该组测试。
+
+业务逻辑重置前的源码快照位于本机 `/Users/ourin/project/_backups/`。Git 历史未改写，当前改动尚未提交。

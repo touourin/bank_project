@@ -1,49 +1,36 @@
 PYTHON ?= .venv/bin/python
-MOCK_PYTHON ?= python3
 COMPOSE ?= docker compose
 .DEFAULT_GOAL := run
 
-.PHONY: run build build-cached down logs status restart local-run test lint format schema check mock mock-check mysql-up mock-db
-check: lint test
-	$(PYTHON) scripts/export_openapi.py --check
-	$(PYTHON) scripts/validate_mock.py
-
-mock:
-	$(MOCK_PYTHON) scripts/generate_mock.py
-
-mock-check:
-	$(MOCK_PYTHON) scripts/validate_mock.py
-
-mysql-up:
-	$(PYTHON) scripts/prepare_local_mysql.py
-	$(COMPOSE) --profile database up -d --wait --wait-timeout 120 mysql
-
-mock-db: mysql-up
-	$(PYTHON) scripts/load_mock_mysql.py
+.PHONY: run build down logs status restart local-run local-worker staging-up test lint format schema check mock mock-check mysql-up mock-db frontend-dev frontend-check ontology-up ontology-down
 
 run:
-	$(COMPOSE) up -d --wait --wait-timeout 60
+	$(COMPOSE) up -d --wait --wait-timeout 120 api intake-worker frontend
 
 build:
-	$(COMPOSE) build api
-
-build-cached:
-	DOCKER_BUILDKIT=0 docker build --pull=false -t bank-project-api .
+	$(COMPOSE) build api intake-worker frontend
 
 down:
 	$(COMPOSE) down
 
 logs:
-	$(COMPOSE) logs -f --tail 100
+	$(COMPOSE) logs -f --tail 100 api intake-worker frontend
 
 status:
 	$(COMPOSE) ps
 
 restart:
-	$(COMPOSE) restart api
+	$(COMPOSE) restart api intake-worker frontend
 
 local-run:
 	$(PYTHON) -m bank_project serve --reload
+
+local-worker:
+	$(PYTHON) -m bank_project.intake.worker
+
+check: lint test
+	$(PYTHON) scripts/export_openapi.py --check
+	$(PYTHON) scripts/validate_mock.py
 
 test:
 	$(PYTHON) -m pytest
@@ -58,3 +45,35 @@ format:
 
 schema:
 	$(PYTHON) scripts/export_openapi.py
+
+mock:
+	$(PYTHON) scripts/generate_mock.py
+
+mock-check:
+	$(PYTHON) scripts/validate_mock.py
+
+mysql-up:
+	$(PYTHON) scripts/prepare_local_mysql.py
+	$(COMPOSE) up -d --wait --wait-timeout 120 mysql
+
+staging-up: mysql-up
+	$(PYTHON) scripts/setup_staging.py
+
+mock-db: mysql-up
+	$(PYTHON) scripts/load_mock_mysql.py
+
+frontend-dev:
+	npm --prefix frontend run dev
+
+frontend-check:
+	npm --prefix frontend run format:check
+	npm --prefix frontend run build
+	npm --prefix frontend test
+
+ONTOLOGY_COMPOSE = $(COMPOSE) --env-file .env.ontology -f compose.ontology.yaml
+ontology-up:
+	$(PYTHON) scripts/prepare_local_ontology.py
+	$(ONTOLOGY_COMPOSE) up -d --wait --wait-timeout 120
+
+ontology-down:
+	$(ONTOLOGY_COMPOSE) down

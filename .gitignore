@@ -13,4 +13,14 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.ontology.example
 data/
+node_modules/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+outputs/
+
+# Large generated fixture; retain locally and reproduce from source mock scripts.
+/examples/mock/交易流水.xlsx

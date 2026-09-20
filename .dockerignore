@@ -1,11 +1,8 @@
-# Only these files are required to build the API image.
 **
 !pyproject.toml
 !requirements.lock
 !src/
 !src/**
-!configs/
-!configs/**
 **/__pycache__/
 **/*.py[cod]
 **/*.egg-info/

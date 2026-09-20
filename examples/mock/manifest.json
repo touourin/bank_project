@@ -10,13 +10,13 @@
       "filename": "CCM_C_CUST_FLAG_INFO.csv",
       "rows": 1000,
       "columns": 155,
-      "sha256": "a6cf28f0f9754ddeac1cf1505ec18c903e11f357da8774f619ddfcdf8ff94eac"
+      "sha256": "73bfd521d40586dee2416b5e30bc1312943b7f841d8fdbb2c30bc30da6ace89d"
     },
     "E_CRM_C_CUST_TOUR_EVT_SUM": {
       "filename": "E_CRM_C_CUST_TOUR_EVT_SUM.csv",
       "rows": 16700,
       "columns": 8,
-      "sha256": "4f6dd3a5301b8f35a5501a8f5d1af92d69aff15065af11be2556181addeebf3a"
+      "sha256": "33f880dfd005de0f5f5ca14745e94ad4a3e90860ac87ab86804cdb199a00f934"
     }
   },
   "event_counts": {
@@ -116,5 +116,607 @@
       "reason": "银行样例缺失，属性表示待核验",
       "mock_rows": 11
     }
-  ]
+  ],
+  "semantic_revision": "2026-09-19",
+  "column_merge_revision": {
+    "date": "2026-09-20",
+    "filename": "工商.xlsx",
+    "rows": 8324,
+    "columns": 287,
+    "sha256": "b6c88885888709d952e55a00d4909b3c726bdc7082728602074aa5f89371d8b2",
+    "merged_fields": [
+      "AGECLEAN",
+      "FOCUSNUMBER",
+      "EXECMONEY",
+      "REGCAP",
+      "SUBCONAM"
+    ],
+    "values_preserved": true,
+    "status": "historical; current workbook layout and hash are in source_table_layout_revision"
+  },
+  "source_table_layout_revision": {
+    "date": "2026-09-20",
+    "layout": "one_source_table_per_sheet",
+    "source_table_location": "worksheet_name",
+    "source_row_column": "source_row",
+    "description_sheets": [
+      "目录说明",
+      "数据说明"
+    ],
+    "database_updated": false,
+    "files": {
+      "征信": {
+        "filename": "征信.xlsx",
+        "rows": 21619,
+        "data_sheets": 98,
+        "sha256": "aba43825722a96e9ae664102005195b0534c707b2cf039d57488cdaffcbade8e",
+        "business_columns_min": 5,
+        "business_columns_max": 96,
+        "all_cell_values_and_types_verified": true,
+        "field_definitions_verified": true,
+        "tables": {
+          "PBCPC_PA01AB_REPORTHEADER": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "PBCPC_PA01C_OTHERID": {
+            "rows": 100,
+            "business_columns": 7
+          },
+          "PBCPC_PA01DE_ATTENTION": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "PBCPC_PB01A_BASICIDENTITY": {
+            "rows": 100,
+            "business_columns": 13
+          },
+          "PBCPC_PB01B_MOBILE": {
+            "rows": 100,
+            "business_columns": 7
+          },
+          "PBCPC_PB02_SPOUSE": {
+            "rows": 100,
+            "business_columns": 10
+          },
+          "PBCPC_PB03_RESIDENCE": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "PBCPC_PB04_PROFESSIONAL": {
+            "rows": 100,
+            "business_columns": 15
+          },
+          "PBCPC_PC01_CREDITSCORE": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "PBCPC_PC02A_CREDITSUMMARYCUE": {
+            "rows": 100,
+            "business_columns": 10
+          },
+          "PBCPC_PC02B_ASSUREERREPAYSUM": {
+            "rows": 100,
+            "business_columns": 10
+          },
+          "PBCPC_PC02C_FELLBACKDEBTSUM": {
+            "rows": 100,
+            "business_columns": 6
+          },
+          "PBCPC_PC02D_OVERDUESUM": {
+            "rows": 100,
+            "business_columns": 10
+          },
+          "PBCPC_PC02E_NONREVOLINGSUM": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "PBCPC_PC02F_REVOLINGSUBSUM": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "PBCPC_PC02G_REVOLINGSUM": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "PBCPC_PC02H_LOANCARDSUM": {
+            "rows": 100,
+            "business_columns": 11
+          },
+          "PBCPC_PC02I_STANDARDSUM": {
+            "rows": 100,
+            "business_columns": 11
+          },
+          "PBCPC_PC02K_GUARANTEESUM": {
+            "rows": 100,
+            "business_columns": 10
+          },
+          "PBCPC_PC03_TELPAYMENTSUM": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "PBCPC_PC04_PUBLICINFOSUM": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "PBCPC_PC05AB_QUERYRECOREDSUM": {
+            "rows": 100,
+            "business_columns": 16
+          },
+          "PBCPC_PD02AZ_FACILITYAGTSUM": {
+            "rows": 100,
+            "business_columns": 21
+          },
+          "PBCPC_PD01ABC_PERFORMANC": {
+            "rows": 100,
+            "business_columns": 56
+          },
+          "PBCPC_PD01D_LATEST24MONTH": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "PBCPC_PD01E_LATEST5YEAR": {
+            "rows": 100,
+            "business_columns": 11
+          },
+          "PBCPC_PD01F_SPECIALTRADE": {
+            "rows": 100,
+            "business_columns": 11
+          },
+          "PBCPC_PD01G_SPECIALEVENT": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "PBCPC_PD01H_LARGESTAGE": {
+            "rows": 100,
+            "business_columns": 10
+          },
+          "PBCPC_PD01Z_DISSENTINFO": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "PBCPC_PD03AZ_GUARANTEE": {
+            "rows": 100,
+            "business_columns": 24
+          },
+          "PBCPC_PE01AZ_TELPAYMENT": {
+            "rows": 100,
+            "business_columns": 16
+          },
+          "PBCPC_PF01AZ_TAXARREAR": {
+            "rows": 100,
+            "business_columns": 11
+          },
+          "PBCPC_PF02AZ_CIVILJUDGEMENT": {
+            "rows": 100,
+            "business_columns": 16
+          },
+          "PBCPC_PF03AZ_FORCEEXECUTION": {
+            "rows": 100,
+            "business_columns": 18
+          },
+          "PBCPC_PF04AZ_ADMINPUNISHMENT": {
+            "rows": 100,
+            "business_columns": 14
+          },
+          "PBCPC_PF05AZ_ACCFUND": {
+            "rows": 100,
+            "business_columns": 18
+          },
+          "PBCPC_PF06AZ_SALVATION": {
+            "rows": 100,
+            "business_columns": 15
+          },
+          "PBCPC_PF07AZ_COMPETENCE": {
+            "rows": 100,
+            "business_columns": 15
+          },
+          "PBCPC_PF08AZ_ADMINAWARD": {
+            "rows": 100,
+            "business_columns": 12
+          },
+          "PBCPC_PG01_DISSENTINFO": {
+            "rows": 100,
+            "business_columns": 10
+          },
+          "PBCPC_PH01_RECORDDETAIL": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "PBCEC_EA01AB_REPORTHEADER": {
+            "rows": 1010,
+            "business_columns": 5
+          },
+          "PBCEC_EA01C_IDENTITYINFO": {
+            "rows": 1010,
+            "business_columns": 6
+          },
+          "PBCEC_EA01DE_DISSENTANDRATE": {
+            "rows": 1010,
+            "business_columns": 6
+          },
+          "PBCEC_EB01A_CREDITCUE": {
+            "rows": 1010,
+            "business_columns": 14
+          },
+          "PBCEC_EB01B_NONCREDITCUE": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "PBCEC_EB02A_SUMUNSETTLED": {
+            "rows": 100,
+            "business_columns": 17
+          },
+          "PBCEC_EB02B_SUMSETTLED": {
+            "rows": 100,
+            "business_columns": 13
+          },
+          "PBCEC_EB02C_DEBTHISTORY": {
+            "rows": 100,
+            "business_columns": 15
+          },
+          "PBCEC_EB03A_SUMUNSETTLED": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "PBCEC_EB03B_SUMSETTLED": {
+            "rows": 100,
+            "business_columns": 7
+          },
+          "PBCEC_EB04_FACILITYAGTSUM": {
+            "rows": 1010,
+            "business_columns": 10
+          },
+          "PBCEC_EB05A_CREDITSUM": {
+            "rows": 100,
+            "business_columns": 13
+          },
+          "PBCEC_EB05B_GUARANTEESUM": {
+            "rows": 100,
+            "business_columns": 10
+          },
+          "PBCEC_EC01_BASICIDENTITY": {
+            "rows": 1010,
+            "business_columns": 12
+          },
+          "PBCEC_EC02_CONTRIBUTIVE": {
+            "rows": 1002,
+            "business_columns": 12
+          },
+          "PBCEC_EC03_SENIOREXECUTIVE": {
+            "rows": 1010,
+            "business_columns": 9
+          },
+          "PBCEC_EC04_SUPERORG": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "PBCEC_EC05_ACTUALCONTROLLER": {
+            "rows": 1002,
+            "business_columns": 9
+          },
+          "PBCEC_ED01A_BASICLOANACCT": {
+            "rows": 1469,
+            "business_columns": 23
+          },
+          "PBCEC_ED01B_REPAYMENT": {
+            "rows": 1469,
+            "business_columns": 19
+          },
+          "PBCEC_ED01C_SPECIALTRADE": {
+            "rows": 53,
+            "business_columns": 10
+          },
+          "PBCEC_ED02_DISCOUNT": {
+            "rows": 100,
+            "business_columns": 14
+          },
+          "PBCEC_ED03_DEBITINTEREST": {
+            "rows": 100,
+            "business_columns": 11
+          },
+          "PBCEC_ED04AB_GUARANTEEDETAIL": {
+            "rows": 53,
+            "business_columns": 24
+          },
+          "PBCEC_ED05_GUARANTEESUBORG": {
+            "rows": 100,
+            "business_columns": 16
+          },
+          "PBCEC_ED06_FACILITYAGREEMENT": {
+            "rows": 1469,
+            "business_columns": 16
+          },
+          "PBCEC_ED07_REPAYMENTLOANACCT": {
+            "rows": 100,
+            "business_columns": 27
+          },
+          "PBCEC_ED08_REPAYMENTDISCOUNT": {
+            "rows": 100,
+            "business_columns": 16
+          },
+          "PBCEC_ED09_GUARANTEE": {
+            "rows": 100,
+            "business_columns": 14
+          },
+          "PBCEC_EE01AB_UTILITIESFEES": {
+            "rows": 100,
+            "business_columns": 15
+          },
+          "PBCEC_EF01_TAXINFO": {
+            "rows": 100,
+            "business_columns": 7
+          },
+          "PBCEC_EF02_CIVILJUDGEMENT": {
+            "rows": 100,
+            "business_columns": 15
+          },
+          "PBCEC_EF03_FORCEEXECUTION": {
+            "rows": 100,
+            "business_columns": 14
+          },
+          "PBCEC_EF04_ADMINPUNISHMENT": {
+            "rows": 100,
+            "business_columns": 12
+          },
+          "PBCEC_EF05AB_ACCFUND": {
+            "rows": 100,
+            "business_columns": 18
+          },
+          "PBCEC_EF06_PERMITINFO": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "PBCEC_EF07_APPROVEINFO": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "PBCEC_EF08_QUALIFICATIONS": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "PBCEC_EF09_REWARDINFO": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "PBCEC_EF10_PATENTINFO": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "PBCEC_EF11_QUARANTINE": {
+            "rows": 100,
+            "business_columns": 7
+          },
+          "PBCEC_EF12_EXEMPTION": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "PBCEC_EF13_SUPERVISION": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "PBCEC_EF14_FINANCEINFO": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "PBCEC_EG01AB_DEBTINFO2002": {
+            "rows": 100,
+            "business_columns": 96
+          },
+          "PBCEC_EG02AB_DEBTINFO2007": {
+            "rows": 100,
+            "business_columns": 69
+          },
+          "PBCEC_EG03AB_PROFITINFO2002": {
+            "rows": 100,
+            "business_columns": 73
+          },
+          "PBCEC_EG04AB_PROFITINFO2007": {
+            "rows": 100,
+            "business_columns": 28
+          },
+          "PBCEC_EG05AB_CASHINFO2002": {
+            "rows": 100,
+            "business_columns": 66
+          },
+          "PBCEC_EG06AB_CASHINFO2007": {
+            "rows": 100,
+            "business_columns": 72
+          },
+          "PBCEC_EG07AB_DEBTSYINFO1997": {
+            "rows": 8,
+            "business_columns": 59
+          },
+          "PBCEC_EG08AB_DEBTSYINFO2013": {
+            "rows": 8,
+            "business_columns": 56
+          },
+          "PBCEC_EG09AB_INEX1997": {
+            "rows": 8,
+            "business_columns": 47
+          },
+          "PBCEC_EG10AB_INEX2013": {
+            "rows": 8,
+            "business_columns": 34
+          },
+          "PBCEC_EH01_RATINGINFO": {
+            "rows": 100,
+            "business_columns": 7
+          },
+          "PBCEC_EI01_DISSENTINFO": {
+            "rows": 100,
+            "business_columns": 8
+          }
+        }
+      },
+      "工商": {
+        "filename": "工商.xlsx",
+        "rows": 8324,
+        "data_sheets": 39,
+        "sha256": "a7151fc91eb3a313756326182033e5754347a4b16847ab364d422b2dd4e8e39c",
+        "business_columns_min": 8,
+        "business_columns_max": 46,
+        "all_cell_values_and_types_verified": true,
+        "field_definitions_verified": true,
+        "tables": {
+          "VW_GSGR_PUNISHBREAK": {
+            "rows": 100,
+            "business_columns": 24
+          },
+          "VW_GSGR_PERSONCASEINFO": {
+            "rows": 100,
+            "business_columns": 20
+          },
+          "VW_GSGR_PUNISHED": {
+            "rows": 100,
+            "business_columns": 16
+          },
+          "VW_GSGR_RYPOSFR": {
+            "rows": 100,
+            "business_columns": 15
+          },
+          "VW_GSGR_RYPOSPER": {
+            "rows": 100,
+            "business_columns": 16
+          },
+          "VW_GSGR_RYPOSSHA": {
+            "rows": 100,
+            "business_columns": 19
+          },
+          "T_SAIC_ALTER": {
+            "rows": 100,
+            "business_columns": 9
+          },
+          "T_SAIC_TRADEMARK": {
+            "rows": 100,
+            "business_columns": 24
+          },
+          "T_SAIC_STOCKPAWNREV": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "T_SAIC_STOCKPAWNALT": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "T_SAIC_STOCKPAWN": {
+            "rows": 100,
+            "business_columns": 15
+          },
+          "T_SAIC_SHARESFROST": {
+            "rows": 100,
+            "business_columns": 14
+          },
+          "T_SAIC_SHAREHOLDER": {
+            "rows": 1014,
+            "business_columns": 17
+          },
+          "T_SAIC_PUNISHED": {
+            "rows": 100,
+            "business_columns": 18
+          },
+          "T_SAIC_PUNISHBREAK": {
+            "rows": 100,
+            "business_columns": 27
+          },
+          "T_SAIC_ORGBASIC": {
+            "rows": 1002,
+            "business_columns": 9
+          },
+          "T_SAIC_ORGDETAIL": {
+            "rows": 1002,
+            "business_columns": 16
+          },
+          "T_SAIC_PERSON": {
+            "rows": 1002,
+            "business_columns": 10
+          },
+          "T_SAIC_MORTGAGEREG": {
+            "rows": 100,
+            "business_columns": 15
+          },
+          "T_SAIC_MORTGAGEPER": {
+            "rows": 100,
+            "business_columns": 10
+          },
+          "T_SAIC_MORTGAGEPAWN": {
+            "rows": 100,
+            "business_columns": 10
+          },
+          "T_SAIC_MORTGAGEDEBT": {
+            "rows": 100,
+            "business_columns": 12
+          },
+          "T_SAIC_MORTGAGECAN": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "T_SAIC_MORTGAGEBASIC": {
+            "rows": 100,
+            "business_columns": 11
+          },
+          "T_SAIC_MORTGAGEALT": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "T_SAIC_LIQUIDATION": {
+            "rows": 2,
+            "business_columns": 14
+          },
+          "T_SAIC_FRPOSITION": {
+            "rows": 100,
+            "business_columns": 21
+          },
+          "T_SAIC_FRINV": {
+            "rows": 100,
+            "business_columns": 23
+          },
+          "T_SAIC_FILIATION": {
+            "rows": 100,
+            "business_columns": 14
+          },
+          "T_SAIC_EXCEPTIONLIST": {
+            "rows": 100,
+            "business_columns": 12
+          },
+          "T_SAIC_ENTINV": {
+            "rows": 100,
+            "business_columns": 23
+          },
+          "T_SAIC_ENTCASEBASEINFO": {
+            "rows": 100,
+            "business_columns": 14
+          },
+          "T_SAIC_BREAKLAW": {
+            "rows": 100,
+            "business_columns": 13
+          },
+          "T_SAIC_BASIC": {
+            "rows": 1002,
+            "business_columns": 46
+          },
+          "ENT_RISK_WARNING_SIGNAL": {
+            "rows": 100,
+            "business_columns": 8
+          },
+          "T_SAIC_JUDICIALAID": {
+            "rows": 100,
+            "business_columns": 13
+          },
+          "T_SAIC_JUDICIALAIDALTER": {
+            "rows": 100,
+            "business_columns": 23
+          },
+          "T_SAIC_JUDICIALAIDDETAIL": {
+            "rows": 100,
+            "business_columns": 32
+          },
+          "T_SAIC_LISTEDSHAREHOLDER": {
+            "rows": 100,
+            "business_columns": 20
+          }
+        }
+      }
+    }
+  }
 }

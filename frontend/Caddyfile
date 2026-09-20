@@ -1,0 +1,25 @@
+{
+    admin off
+    auto_https off
+}
+
+:8080 {
+    @api path /api/* /health /ready /docs /openapi.json
+    handle @api {
+        reverse_proxy api:8000
+    }
+
+    handle {
+        root * /srv
+        header {
+            X-Content-Type-Options nosniff
+            Referrer-Policy same-origin
+            X-Frame-Options DENY
+            Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+            Cache-Control no-cache
+            -Server
+        }
+        try_files {path} /index.html
+        file_server
+    }
+}

@@ -1,0 +1,209 @@
+import { useState } from "react";
+import { Input, Select, Space, Tag } from "antd";
+import { DataTable } from "../../ui/DataTable";
+import { PagePagination } from "../../ui/PagePagination";
+import { ConceptLabel } from "./ConceptLabel";
+import type { RetrievalTrace, Run, TableMapping } from "./types";
+
+export const matchStatus = {
+  matched: "已匹配",
+  review: "待确认",
+  unmatched: "无候选",
+  unavailable: "检索失败",
+  mismatch: "版本不一致",
+};
+const targets = { table: "整表", column: "字段", entity: "实体分组" };
+const methods: Record<string, string> = {
+  exact: "精确匹配",
+  fuzzy: "模糊匹配",
+  vector: "向量匹配",
+  none: "未命中",
+};
+const titles = {
+  meaning: "理解表与字段含义",
+  recall: "retrieve 检索节点",
+  selection: "确定匹配建议",
+  validation: "校验字段与来源",
+};
+
+export function RetrievalProcess({
+  table,
+  runStatus,
+}: {
+  table: TableMapping;
+  runStatus: Run["status"];
+}) {
+  const trace = table.trace!;
+  const [query, setQuery] = useState("");
+  const [pending, setPending] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const matches = (trace.retrievals ?? []).filter(
+    (m) =>
+      (!pending || m.status !== "matched") &&
+      `${m.name} ${m.query} ${m.selected?.name ?? ""}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+  );
+  const page = matches.slice(offset, offset + 20);
+  return (
+    <div
+      className="matching-process"
+      aria-label={`${table.table_name} 匹配过程`}
+    >
+      <ol className="match-stages">
+        {trace.steps.map((step, index) => {
+          const interrupted =
+            runStatus === "failed" &&
+            ["running", "pending"].includes(step.status);
+          const status = interrupted ? "failed" : step.status;
+          return (
+            <li className={`match-stage match-stage-${status}`} key={step.key}>
+              <span className="stage-number">{index + 1}</span>
+              <div className="stage-body">
+                <h4>{titles[step.key]}</h4>
+                <p
+                  className="hint"
+                  role={status === "running" ? "status" : undefined}
+                >
+                  {interrupted
+                    ? "任务中断，保留已记录结果"
+                    : step.detail || "等待前序步骤完成"}
+                </p>
+                {step.key === "meaning" && trace.meaning && (
+                  <>
+                    <p>{trace.meaning.meaning}</p>
+                    <p className="hint">
+                      共 {table.row_count.toLocaleString()} 行 · 样例源行号{" "}
+                      {trace.sample_rows.join("、")} · 仅解释字段及分组，节点由
+                      retrieve 匹配。
+                    </p>
+                  </>
+                )}
+                {step.key === "selection" && trace.selected && (
+                  <div className="selected-concept">
+                    <ConceptLabel concept={trace.selected} parents />
+                    <span>
+                      原检索得分{" "}
+                      {trace.selection_confidence?.toFixed(3) ?? "未提供"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="hint">
+        自动采用要求：版本一致、节点存在、接口标记有把握且得分 ≥{" "}
+        {trace.confidence_threshold.toFixed(3)}
+        。得分不是正确概率。原检索记录会保留，人工修改请到“字段映射”或图模板中操作。
+      </p>
+      <Space wrap>
+        <Input.Search
+          aria-label="筛选检索记录"
+          placeholder="搜索字段、检索词或节点"
+          allowClear
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOffset(0);
+          }}
+        />
+        <Select
+          aria-label="筛选匹配状态"
+          value={pending ? "pending" : "all"}
+          onChange={(value) => {
+            setPending(value === "pending");
+            setOffset(0);
+          }}
+          options={[
+            { value: "all", label: "全部匹配" },
+            { value: "pending", label: "仅待处理" },
+          ]}
+        />
+      </Space>
+      <DataTable<RetrievalTrace>
+        label="retrieve 匹配记录"
+        rowKey={(row) => `${row.target}:${row.name}`}
+        dataSource={page}
+        columns={[
+          {
+            title: "对象",
+            width: 160,
+            render: (_, m) => (
+              <>
+                <Tag>{targets[m.target]}</Tag>
+                {m.name}
+              </>
+            ),
+          },
+          { title: "检索词", dataIndex: "query", width: 180 },
+          {
+            title: "接口建议节点",
+            width: 260,
+            render: (_, m) =>
+              m.selected ? (
+                <ConceptLabel concept={m.selected} parents />
+              ) : (
+                "未命中"
+              ),
+          },
+          {
+            title: "原始得分",
+            width: 100,
+            render: (_, m) => m.selected?.score?.toFixed(3) ?? "—",
+          },
+          {
+            title: "匹配方式",
+            width: 110,
+            render: (_, m) => methods[m.match_method] || m.match_method,
+          },
+          {
+            title: "状态",
+            width: 100,
+            fixed: "right",
+            render: (_, m) => (
+              <Tag color={m.status === "matched" ? "green" : "orange"}>
+                {matchStatus[m.status]}
+              </Tag>
+            ),
+          },
+        ]}
+        expandable={{
+          expandedRowRender: (m) => (
+            <>
+              <p>
+                {m.detail} · 接口标记：{m.confident ? "有把握" : "无把握"}
+              </p>
+              <DataTable
+                label={`${m.name} 的检索候选`}
+                rowKey="id"
+                dataSource={m.candidates}
+                columns={[
+                  {
+                    title: "候选节点",
+                    render: (_, node) => (
+                      <ConceptLabel concept={node} parents />
+                    ),
+                  },
+                  {
+                    title: "得分",
+                    width: 100,
+                    render: (_, node) => node.score?.toFixed(3) ?? "未提供",
+                  },
+                ]}
+              />
+            </>
+          ),
+        }}
+      />
+      <PagePagination
+        offset={offset}
+        pageSize={20}
+        total={matches.length}
+        onChange={setOffset}
+        unit="项检索"
+      />
+    </div>
+  );
+}

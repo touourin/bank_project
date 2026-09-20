@@ -1,70 +1,43 @@
-# MySQL 中的客户标签与旅程
+# 数据库与暂存配置
 
-数据库：`bank_project`。当前写入的是最终合成数据，不是银行真实数据。
+## 两套 MySQL 配置
 
-已在本地 Docker MySQL 8.4.11 实际建表并导入：全量逐字段比对通过，没有无法关联客户的旅程；重复运行新增 0 条。还验证了第二张表发生内容冲突时，第一张表本次新增记录一并回滚。通过运行中的 API 完成 MySQL 来源导入与两套业务映射转换，结果保存在 mysql-demo 数据集。完整工程回归为 158 项通过。
+| 用途 | 配置前缀 | 默认库/账号 | 授权 |
+| --- | --- | --- | --- |
+| 外部源 | `BANK_MYSQL_*` | `bank_project` / `bank_app`（本地 mock） | 应用只读事务；银行应额外使用数据库只读账号 |
+| 内部暂存 | `BANK_STAGING_MYSQL_*` | `bank_staging` / `bank_staging` | 仅自己的库内建表和读写 |
 
-| 表名 | 含义 | 行数 | 字段数 | 主键 | 原始表名 |
-| --- | --- | ---: | ---: | --- | --- |
-| customer_tags | 客户标签快照 | 1,000 | 155 | cust_ind | CCM_C_CUST_FLAG_INFO |
-| customer_journey_events | 客户旅程事件 | 16,700 | 8 | DT + ROWKEY | E_CRM_C_CUST_TOUR_EVT_SUM |
-
-客户关联：`customer_journey_events.CUST_ID = customer_tags.cust_ind`。标签是当前一份快照，不是标签历史表。两张表是来源业务数据；原始文件、转换任务和候选结果仍由既有准备服务存储。
-
-## 连接与查看
-
-本机数据库客户端连接 `127.0.0.1:3306`，数据库 `bank_project`，用户 `bank_app`，密码查看本机 `.env` 中的 `BANK_MYSQL_PASSWORD`。端口和账号可通过同一配置文件修改。Docker API 通过 `mysql:3306` 访问；连接外部数据库时配置 BANK_MYSQL_DOCKER_HOST/PORT。
-
-```sql
-SELECT cust_ind, cust_nm, dt FROM customer_tags LIMIT 10;
-
-SELECT t.cust_nm, e.EVT_TYPE, e.OCCUR_DT, e.PROPERTIES
-FROM customer_journey_events e
-JOIN customer_tags t ON t.cust_ind = e.CUST_ID
-ORDER BY e.CUST_ID, e.OCCUR_DT, e.ROWKEY
-LIMIT 20;
-
-SHOW FULL COLUMNS FROM customer_tags;
-SHOW FULL COLUMNS FROM customer_journey_events;
-```
-
-每个字段都保留中文 COMMENT。客户号、账号和 YYYYMMDD 日期保留文本；金额使用 DECIMAL(26,8)，不会经 float 转换。CSV 空值写入 SQL NULL；主键和银行已明确非空的字段限制非空，不把 mock 必填假设直接当成银行规则。
-
-PROPERTIES 使用 LONGTEXT 保留 JSON 原文，并加 JSON 对象合法性 CHECK。这样嵌套金额不会因数据库 JSON 数值存储而改变精度；需要精确金额计算时，应将明确字段提取为 DECIMAL，不通过浮点计算。表使用 utf8mb4 和区分大小写的 collation。
-
-## 启动与重复导入
+源适配器绝不接收内部写库连接；暂存组件不读取源配置。源账号不能与内部账号同名。源可以是远程银行库，内部依然是本地 Docker MySQL，两者互不覆盖。
 
 ```bash
-make mock-db   # 准备本地凭据、启动独立 MySQL、校验并导入两份最终 mock
+make staging-up  # 准备本地 MySQL 和独立暂存账号，密码写入忽略的 .env
+make build
+make run         # API + intake-worker + frontend
+make mock-db     # 可选：显式装载两张最终 mock 到源库，不是启动必需步骤
 ```
 
-已有数据库且连接参数已配置时，单独执行：
+初始化脚本保留现有暂存密码和已配置接入限额。它只在本地 Docker MySQL 中创建 `bank_staging`；自建其他暂存服务时由管理员配置 schema/账号。`BANK_STAGING_MYSQL_HOST` 是本地 Python 连接地址；Compose 对 API 和 worker 使用服务名 `mysql:3306`。外部源在 Docker 内由 `BANK_MYSQL_DOCKER_HOST/PORT` 决定。
+
+## 持久化与迁移
+
+- `mysql-data`：原有源数据、内部批次、行、接入任务、关联索引和临时图模板实例。
+- `intake-data`：上传原件、外部凭据加密密钥、分析运行记录 SQLite。
+- `neo4j-data`：业务图谱版本；独立本体库见 [ontology.md](ontology.md)。
+
+迁移旧 `intake/batches.sqlite3` 时先做 SQLite 一致性备份，再执行：
 
 ```bash
-.venv/bin/python scripts/load_mock_mysql.py
+.venv/bin/python scripts/migrate_staging.py /absolute/path/to/batches-backup.sqlite3
 ```
 
-同主键且内容相同的记录跳过；同主键但内容不同则停止，本次两张表的写入一起回滚。额外的已有记录保留；不执行 DELETE、TRUNCATE、DROP 或自动修改已有表结构。建表 DDL 会独立提交；若导入失败，可能保留空表，但不会提交半批数据。
+保留批次 ID、表 ID、源行号和字段值，已迁移的完整批次跳过；不删除或改写原库。若上一次迁移中断留下不完整批次，需先由 worker 清理失败尝试再重试。迁移期间应停止新增接入，或切换前重新备份并补迁新批次。
 
-字段来自 `configs/bank/schema.json`，可查看 `database/mysql/schema.sql`。更新字段契约后可运行 `scripts/load_mock_mysql.py --write-schema` 重新导出 SQL；此命令不连接数据库。已有表结构变更需要明确的迁移，不能靠重跑导入覆盖。
+分析记录仍用同一 `BANK_DATA_DIR/alignment/runs.sqlite3` 保存小体量配置、过程、版本及租约。新分析只存暂存表引用和少量样本；历史内嵌输入快照仍能读取。不要单独清空分析序号而继续使用原 Neo4j 发布状态。多副本 API / Kubernetes 扩容前还需迁移该任务存储，当前标准部署是单 API 加独立接入 worker。
 
-持久化数据在 Docker 命名卷 `bank-project_mysql-data`。普通停止或重建容器不清除数据；不要使用 `docker compose down -v` 删除数据卷。随机 root 密码保存在已忽略的 `data/mysql/root-password`，通过 Docker secret 只挂载到数据库容器；应用凭据保存在已忽略的 `.env`。已有卷首次创建后，改配置文件不会自动更改数据库账号密码。
+## 业务 Neo4j
 
-## 通过现有接口读取
-
-`.env` 设置 BANK_MYSQL_SOURCE_ENABLED=true，BANK_MYSQL_SOURCE_TABLES 为 `["customer_tags","customer_journey_events"]`，然后重新创建 API 容器。若希望 `make run` 同时启动数据库，设置 COMPOSE_PROFILES=database；同时使用图数据库时为 database,graph。
-
-第一步请求示例：
-
-```json
-{
-  "dataset_id": "mysql-demo",
-  "batch_id": "tags-001",
-  "source_system": "bank",
-  "source_uri": "mysql:customer_tags"
-}
+```bash
+docker compose --profile graph up -d --wait neo4j
 ```
 
-旅程使用 `mysql:customer_journey_events` 和新的 batch_id。第二步调用现有 `/api/v1/extractions`；字段映射按列名匹配，改表名不需要修改通用导入、转换代码。
-
-本地 bank_app 是开发用账号，具备本数据库建表和导入权限；API 的来源适配器使用只读事务。部署到真实银行环境时应为 API 单独配置只读账号，建表和数据装载由独立运维账号执行。
+浏览器 7477，Bolt 7690。按模板分批写隔离版本，计数/所有权确认后原子切换当前指针，失败不替换已发布图。历史和失败图版本暂不自动删除。模型和 Neo4j 不参与第一步接入；内部 MySQL 是标准模式的启动依赖，`/ready` 会检查它。

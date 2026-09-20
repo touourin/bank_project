@@ -183,6 +183,10 @@ def _timeline_errors(tag: dict, events: list[tuple[dict, dict]]) -> list[str]:
             errors.append("事件早于企业成立日期")
         if code == "YWJC0002":
             opened.add(account)
+        elif code == "YWJC0009-1" and account and properties.get("存款产品", "").startswith("单位"):
+            # A term-deposit placement opens its own product subaccount; its
+            # lifetime is also verified against the source account master.
+            opened.add(account)
         elif account and (account not in opened or account in closed):
             errors.append("账户事件必须发生在开户后、销户前")
         if code == "YWJC0008":

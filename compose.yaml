@@ -1,7 +1,19 @@
 name: bank-project
 services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:5173:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   mysql:
-    profiles: ["database"]
     image: mysql:8.4.11
     environment:
       MYSQL_DATABASE: "${BANK_MYSQL_DATABASE:-bank_project}"
@@ -43,6 +55,9 @@ services:
 
   api:
     build: .
+    depends_on:
+      mysql:
+        condition: service_healthy
     env_file:
       - path: .env
         required: false
@@ -51,15 +66,21 @@ services:
       BANK_NEO4J_URI: bolt://neo4j:7687
       BANK_NEO4J_USER: neo4j
       BANK_NEO4J_PASSWORD: "${BANK_NEO4J_PASSWORD:-}"
-      BANK_DATA_DIR: /app/data/preparation
+      BANK_ONTOLOGY_SNAPSHOT: /app/ontology/snapshot.json
+      BANK_DATA_DIR: /app/intake-data
       BANK_IMPORT_ROOT: /app/inbox
       BANK_MAPPING_DIR: /app/configs/mappings
       BANK_MYSQL_HOST: "${BANK_MYSQL_DOCKER_HOST:-mysql}"
       BANK_MYSQL_PORT: "${BANK_MYSQL_DOCKER_PORT:-3306}"
+      BANK_STAGING_BACKEND: mysql
+      BANK_STAGING_MYSQL_HOST: mysql
+      BANK_STAGING_MYSQL_PORT: 3306
     volumes:
+      - intake-data:/app/intake-data
       - preparation-data:/app/data
       - ./examples/mock:/app/inbox:ro
       - ./configs:/app/configs:ro
+      - ./data/ontology:/app/ontology:ro
     ports:
       - "127.0.0.1:8000:8000"
     healthcheck:
@@ -68,7 +89,28 @@ services:
       timeout: 5s
       retries: 10
 
+
+  intake-worker:
+    build: .
+    command: ["python", "-m", "bank_project.intake.worker"]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    env_file: .env
+    environment:
+      BANK_STAGING_BACKEND: mysql
+      BANK_STAGING_MYSQL_HOST: mysql
+      BANK_STAGING_MYSQL_PORT: 3306
+      BANK_MYSQL_HOST: "${BANK_MYSQL_DOCKER_HOST:-mysql}"
+      BANK_MYSQL_PORT: "${BANK_MYSQL_DOCKER_PORT:-3306}"
+      BANK_DATA_DIR: /app/intake-data
+    volumes:
+      - intake-data:/app/intake-data
+    depends_on:
+      mysql:
+        condition: service_healthy
+
 volumes:
+  intake-data:
   neo4j-data:
   preparation-data:
   mysql-data:

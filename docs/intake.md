@@ -1,0 +1,44 @@
+# 第一步：数据接入
+
+只接收、校验与暂存；不调用模型、不匹配本体、不写图谱。入口为首页和 `/api/v1/intake`。
+
+## 文件
+
+支持 `.xlsx` / `.csv`，多文件逐个上传、独立成批，每个 Excel Sheet 是一张表。上传流直接写磁盘并计算 SHA-256，返回 HTTP 202 和任务 ID；独立 worker 解析并分批写 MySQL。整批通过校验才可见，文件内任何表失败都不会发布半个批次。相同文件再次上传会形成新批次，不覆盖历史。
+
+表头默认第 1 行，可选择 1–100。空白/重复表头、超出表头的值、超限内容明确报错。空 Sheet 跳过；默认跳过名为 README 或以“说明”结尾的说明页，可关闭。
+
+CSV 严格尝试 UTF-8（含 BOM），再尝试 GB18030；支持手选编码和分隔符。文本的前导零、金额小数尾零、空串、空格和引号内换行原样保留。类型推断仅为提示。Excel 流式解析 worksheet XML，共享字符串用临时 SQLite 索引，不把整个工作簿装入内存；日期转 ISO 字符串，数字保留底层数值文本。显示格式不会用于补零，Excel 保存时已丢失的精度无法恢复。公式和错误单元格拒绝接入，定位到表/行/列；不执行宏或外部链接。
+
+## 外部 MySQL
+
+页面可使用 `BANK_MYSQL_*` 或输入自定义连接，先列普通基表再选择。仅接受校验过的表名，不接受任意 SQL。读取使用只读事务和流式游标，包含字段类型、注释及声明的主外键；金额保留十进制文本，NULL 和空串分开，二进制编码为 `0x` 十六进制。InnoDB 数据读取使用一致性快照；非事务表及并发 DDL 不保证快照一致。
+
+外部凭据只用于只读来源连接；后台任务需要的凭据使用本地 Fernet 密钥加密后入队，不返回给浏览器。密钥位于 `BANK_DATA_DIR/staging/credentials.key`，与上传文件共用受保护的持久卷；备份时保护该密钥。内部 MySQL 写入只使用 `BANK_STAGING_MYSQL_*`，不允许与源账号同名。银行源账号还应由数据库管理员授予只读权限。
+
+## 任务、恢复与保留
+
+- `queued → running → completed / failed / cancelled`，默认一个 worker 串行处理，API 仍可响应。
+- 写入每批最多 250 行或约 1 MiB；单行最多 2 MiB。按行数和字节双重控制，避免宽表突破内存预算。
+- worker 每 10 秒心跳；90 秒失联后任务失败。解析异常、取消、重试均有所有权校验，旧处理进程不能发布新尝试的结果。
+- 失败或取消可重试：文件从保留原件重新解析，MySQL 源重新读取一个快照。当前不是文件字节断点续传或从第 N 行续跑。
+- 未完成批次不可用于分析；失败尝试由 worker 小批清理。上传原件保留用于重试和审计，不自动按保留期删除。突然退出的未入队原件可能保留，需结合磁盘监控清理。
+- 删除已完成批次为隐藏处理；历史分析引用的不可变快照继续保留，不修改外部源或 mock 文件。当前没有永久删除/保留期管理界面。
+
+默认限制：512 MiB 上传、8 GiB 解压、单表 200 万行、单批 30 表/2 亿单元格、单表 2048 列、单元格 10 万字符。超限明确拒绝，不截断。大小/解压/行数/单元格上限分别由 `BANK_INTAKE_MAX_UPLOAD_MB`、`BANK_INTAKE_MAX_EXPANDED_MB`、`BANK_INTAKE_MAX_ROWS`、`BANK_INTAKE_MAX_CELLS` 配置。每个 API 进程最多两个并发上传，队列最多 50 个待处理/运行任务；上传盘余量低于 1 GiB 拒绝继续。MySQL、Neo4j 和 Docker 磁盘仍需独立容量监控。
+
+`BANK_STAGING_BACKEND=sqlite` 是小数据兼容模式：同步 HTTP 201，20 MiB/5 万行上限，无后台接入和新图模板编译。Docker 标准模式固定 MySQL。
+
+## 接口
+
+- `GET /limits`：当前限制。
+- `POST /uploads?filename=...`：`application/octet-stream`，返回 202 接入任务。
+- `POST /mysql/catalog`：connection=null 使用源配置；否则传自定义连接。
+- `POST /mysql/import`：connection 和 tables，返回 202 接入任务。
+- `GET /jobs`、`GET /jobs/{id}`：任务进度；列表最近 30 条。
+- `POST /jobs/{id}/retry`、`POST /jobs/{id}/cancel`。
+- `GET /batches`、`GET /batches/{id}`：批次清单和结构。
+- `GET /batches/{id}/tables/{table_id}?offset=0&limit=50`：最多 100 行预览；按行位置索引读取。
+- `DELETE /batches/{id}`：从接入清单隐藏。
+
+所有值通过 API 表示为字符串或 null；不让 JavaScript 浮点数改变编号或金额。来源行号为 Excel 工作表行、CSV 逻辑记录或 MySQL 本次读取序号。设置 `BANK_API_TOKEN` 后要求 Bearer；前端只在页面内存保存 token，接口禁止跨站来源请求。Compose 只监听回环地址，当前无多用户分权。

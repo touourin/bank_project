@@ -1,0 +1,25 @@
+name: bank-ontology
+
+services:
+  neo4j:
+    image: neo4j:5.26.27-community
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: "neo4j/${BANK_ONTOLOGY_PASSWORD:?Prepare .env.ontology first}"
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 256m
+    ports:
+      - "127.0.0.1:7478:7474"
+      - "127.0.0.1:7691:7687"
+    volumes:
+      - ontology-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:7474 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+volumes:
+  ontology-data:
