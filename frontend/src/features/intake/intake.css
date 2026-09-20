@@ -374,3 +374,16 @@
 .intake-job-row p {
   margin: 6px 0 0;
 }
+
+.batch-lifecycle-toolbar {
+  padding: 16px 24px;
+}
+
+@media (max-width: 540px) {
+  .detail-panel .ui-panel-heading {
+    flex-wrap: wrap;
+  }
+  .detail-panel .ui-panel-heading > div:first-child {
+    flex-basis: 100%;
+  }
+}

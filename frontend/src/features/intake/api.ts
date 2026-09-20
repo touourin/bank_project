@@ -2,6 +2,7 @@ import { request as httpRequest, jsonBody as json } from "../../api/request";
 export { errorMessage } from "../../api/request";
 import type {
   BatchDetail,
+  BatchReferences,
   IntakeJob,
   BatchPage,
   CatalogTable,
@@ -20,24 +21,48 @@ export const intakeApi = {
     request<IntakeJob>(`/jobs/${id}/${action}`, token, { method: "POST" }),
   limits: (token: string, signal: AbortSignal) =>
     request<IntakeLimits>("/limits", token, { signal }),
-  batches: (token: string, offset: number, signal: AbortSignal) =>
-    request<BatchPage>(`/batches?offset=${offset}&limit=10`, token, { signal }),
-  batch: (token: string, id: string, signal: AbortSignal) =>
-    request<BatchDetail>(`/batches/${id}`, token, { signal }),
+  batches: (
+    token: string,
+    offset: number,
+    signal: AbortSignal,
+    removed = false,
+  ) =>
+    request<BatchPage>(
+      `/batches?offset=${offset}&limit=10&removed=${removed}`,
+      token,
+      { signal },
+    ),
+  batch: (token: string, id: string, signal: AbortSignal, removed = false) =>
+    request<BatchDetail>(
+      `/batches/${id}${removed ? "?removed=true" : ""}`,
+      token,
+      { signal },
+    ),
   table: (
     token: string,
     batchId: string,
     tableId: string,
     offset: number,
     signal: AbortSignal,
+    removed = false,
   ) =>
     request<TablePage>(
-      `/batches/${batchId}/tables/${tableId}?offset=${offset}&limit=25`,
+      `/batches/${batchId}/tables/${tableId}?offset=${offset}&limit=25&removed=${removed}`,
       token,
       { signal },
     ),
   remove: (token: string, id: string) =>
     request<void>(`/batches/${id}`, token, { method: "DELETE" }),
+  restore: (token: string, id: string) =>
+    request<BatchDetail>(`/batches/${id}/restore`, token, { method: "POST" }),
+  references: (token: string, id: string, signal: AbortSignal) =>
+    request<BatchReferences>(`/batches/${id}/references`, token, { signal }),
+  purge: (token: string, id: string) =>
+    request<{ status: "purging" | "deleted" }>(
+      `/batches/${id}/permanent`,
+      token,
+      { method: "DELETE" },
+    ),
   upload: (
     token: string,
     file: File,

@@ -9,6 +9,7 @@ from neo4j.exceptions import Neo4jError, ServiceUnavailable, SessionExpired
 
 from bank_project.settings import Settings
 
+from .browsing import GraphBrowser
 from .models import AlignmentError, GraphEdge, GraphNode, GraphPreview, GraphSummary, Run
 from .relations import join_keys
 
@@ -111,6 +112,7 @@ def chunks(items, size=200):
 class VersionedGraph:
     def __init__(self, settings: Settings, staging=None, index=None):
         self.settings, self.staging, self.index = settings, staging, index
+        self.browser = GraphBrowser(self)
 
     @property
     def configured(self):

@@ -34,6 +34,7 @@ class IntakeJob(BaseModel):
     attempt: int
     batch_id: str | None
     error: str | None
+    batch_removed: bool = False
 
 
 class Column(BaseModel):
@@ -72,6 +73,17 @@ class BatchInfo(BaseModel):
     row_count: int
     sha256: str | None = None
     warnings: list[str] = Field(default_factory=list)
+    removed: bool = False
+    purging: bool = False
+
+
+class BatchReferences(BaseModel):
+    count: int
+    run_ids: list[str]
+
+
+class PurgeResult(BaseModel):
+    status: Literal["purging", "deleted"]
 
 
 class BatchDetail(BatchInfo):

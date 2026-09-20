@@ -16,7 +16,11 @@ class BodyLimitMiddleware:
         limit = (
             scope["app"].state.intake.limits.max_upload_bytes
             if path == "/api/v1/intake/uploads"
-            else (1024 * 1024 if path.endswith("/template") else 64 * 1024)
+            else (
+                1024 * 1024
+                if path.endswith(("/template", "/template/default", "/graph"))
+                else 64 * 1024
+            )
         )
         if path == "/api/v1/intake/uploads":
             from bank_project.intake.models import IntakeError

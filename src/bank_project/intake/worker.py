@@ -92,6 +92,14 @@ def main():
     stopping = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stopping.set())
     signal.signal(signal.SIGINT, lambda *_: stopping.set())
+    from bank_project.staging.cleanup import BatchCleanup
+
+    cleanup = threading.Thread(
+        target=BatchCleanup(database, settings.data_dir / "uploads").run,
+        args=(stopping,),
+        daemon=True,
+    )
+    cleanup.start()
     while not stopping.is_set():
         try:
             job = jobs.claim()
@@ -104,6 +112,7 @@ def main():
         except Exception as exc:
             logger.warning("Intake worker waiting (%s)", type(exc).__name__)
             stopping.wait(5)
+    cleanup.join(timeout=20)
 
 
 if __name__ == "__main__":

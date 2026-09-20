@@ -10,6 +10,7 @@ export function ConfirmDialog({
   onClose,
   confirmLabel = "确认",
   danger = false,
+  disabled = false,
 }: {
   title: string;
   children: ReactNode;
@@ -17,12 +18,13 @@ export function ConfirmDialog({
   onClose: () => void;
   confirmLabel?: string;
   danger?: boolean;
+  disabled?: boolean;
 }) {
   const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function confirm() {
-    if (inFlight.current) return;
+    if (inFlight.current || disabled) return;
     inFlight.current = true;
     setBusy(true);
     setError("");
@@ -43,7 +45,12 @@ export function ConfirmDialog({
       centered
       okText={confirmLabel}
       cancelText="取消"
-      okButtonProps={{ danger, "aria-label": confirmLabel, "aria-busy": busy }}
+      okButtonProps={{
+        danger,
+        disabled,
+        "aria-label": confirmLabel,
+        "aria-busy": busy,
+      }}
       confirmLoading={busy}
       cancelButtonProps={{ disabled: busy }}
       closable={busy ? false : { "aria-label": "关闭" }}

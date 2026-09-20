@@ -3,6 +3,7 @@ import { Input, Select, Space, Tag } from "antd";
 import { DataTable } from "../../ui/DataTable";
 import { PagePagination } from "../../ui/PagePagination";
 import { ConceptLabel } from "./ConceptLabel";
+import { ColumnHandling } from "./ColumnHandling";
 import type { RetrievalTrace, Run, TableMapping } from "./types";
 
 export const matchStatus = {
@@ -34,6 +35,9 @@ export function RetrievalProcess({
   runStatus: Run["status"];
 }) {
   const trace = table.trace!;
+  const columns = new Map(
+    table.columns.map((column) => [column.column, column]),
+  );
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState(false);
   const [offset, setOffset] = useState(0);
@@ -98,6 +102,10 @@ export function RetrievalProcess({
         {trace.confidence_threshold.toFixed(3)}
         。得分不是正确概率。原检索记录会保留，人工修改请到“字段映射”或图模板中操作。
       </p>
+      <p className="hint">
+        字段未匹配时使用“默认属性”，保留原字段名和原值，该字段无需逐项确认。
+        整表和实体分组仍需要有效的本体节点。最终写入范围以生成方案为准。
+      </p>
       <Space wrap>
         <Input.Search
           aria-label="筛选检索记录"
@@ -159,14 +167,23 @@ export function RetrievalProcess({
             render: (_, m) => methods[m.match_method] || m.match_method,
           },
           {
-            title: "状态",
-            width: 100,
+            title: "原检索 / 当前处理",
+            width: 160,
             fixed: "right",
-            render: (_, m) => (
-              <Tag color={m.status === "matched" ? "green" : "orange"}>
-                {matchStatus[m.status]}
-              </Tag>
-            ),
+            render: (_, m) => {
+              const column =
+                m.target === "column" ? columns.get(m.name) : undefined;
+              return (
+                <div>
+                  <Tag color={m.status === "matched" ? "green" : "orange"}>
+                    {matchStatus[m.status]}
+                  </Tag>
+                  {column && runStatus === "ready" && (
+                    <ColumnHandling column={column} />
+                  )}
+                </div>
+              );
+            },
           },
         ]}
         expandable={{

@@ -31,6 +31,12 @@ export interface BatchInfo {
   row_count: number;
   warnings: string[];
   sha256: string | null;
+  removed: boolean;
+  purging: boolean;
+}
+export interface BatchReferences {
+  count: number;
+  run_ids: string[];
 }
 export interface BatchDetail extends BatchInfo {
   tables: TableInfo[];
@@ -76,4 +82,5 @@ export interface IntakeJob {
   attempt: number;
   batch_id: string | null;
   error: string | null;
+  batch_removed: boolean;
 }

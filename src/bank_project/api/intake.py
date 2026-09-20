@@ -11,9 +11,11 @@ from bank_project.api.security import authorize
 from bank_project.intake.models import (
     BatchDetail,
     BatchPage,
+    BatchReferences,
     IntakeError,
     IntakeJob,
     Limits,
+    PurgeResult,
     TablePage,
 )
 from bank_project.intake.mysql import CatalogTable, MysqlImport, MysqlRequest
@@ -124,13 +126,14 @@ def batches(
     intake: Service,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    removed: bool = False,
 ):
-    return intake.store.list(offset, limit)
+    return intake.store.list(offset, limit, removed=removed)
 
 
 @router.get("/batches/{batch_id}", response_model=BatchDetail)
-def batch(batch_id: UUID, intake: Service):
-    return intake.store.get(str(batch_id))
+def batch(batch_id: UUID, intake: Service, removed: bool = False):
+    return intake.store.get(str(batch_id), include_deleted=removed)
 
 
 @router.get("/batches/{batch_id}/tables/{table_id}", response_model=TablePage)
@@ -140,14 +143,32 @@ def table(
     intake: Service,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    removed: bool = False,
 ):
-    return intake.store.preview(str(batch_id), str(table_id), offset, limit)
+    return intake.store.preview(
+        str(batch_id), str(table_id), offset, limit, include_deleted=removed
+    )
 
 
 @router.delete("/batches/{batch_id}", status_code=204)
-def delete(batch_id: UUID, intake: Service):
-    intake.store.delete(str(batch_id))
+def delete(batch_id: UUID, request: Request):
+    request.app.state.batch_lifecycle.remove(str(batch_id))
     return Response(status_code=204)
+
+
+@router.post("/batches/{batch_id}/restore", response_model=BatchDetail)
+def restore(batch_id: UUID, request: Request):
+    return request.app.state.batch_lifecycle.restore(str(batch_id))
+
+
+@router.get("/batches/{batch_id}/references", response_model=BatchReferences)
+def references(batch_id: UUID, request: Request):
+    return request.app.state.batch_lifecycle.references(str(batch_id))
+
+
+@router.delete("/batches/{batch_id}/permanent", response_model=PurgeResult, status_code=202)
+def purge(batch_id: UUID, request: Request):
+    return request.app.state.batch_lifecycle.purge(str(batch_id))
 
 
 @router.get("/jobs", response_model=list[IntakeJob])

@@ -5,6 +5,7 @@ import json
 import logging
 from uuid import uuid4
 
+from bank_project.alignment.display import display_name
 from bank_project.alignment.models import AlignmentError, GraphNode
 
 from .keys import encoded_key
@@ -135,17 +136,9 @@ class TemplateCompiler:
                     for p in node.properties
                     if row.values[positions[p.column]] is not None
                 }
-                name = next(
-                    (
-                        v
-                        for k, v in fields.items()
-                        if any(term in k.lower() for term in ("姓名", "名称", "name")) and v
-                    ),
-                    None,
-                )
                 item = GraphNode(
                     id=key_id,
-                    name=(name or str(values[0]))[:200],
+                    name=display_name(fields, node.concept_name, row.number),
                     table_id=source.table.id,
                     table_name=source.table.name,
                     source_row=row.number,

@@ -26,6 +26,7 @@ def revise_mapping(
     result = original.model_copy(deep=True)
     if result.template:
         result.template.confirmed = False
+        result.template.mode = "custom"
     table = next((t for t in result.tables if t.table_id == request.table_id), None)
     if table is None:
         raise AlignmentError("所选表不属于该分析任务")

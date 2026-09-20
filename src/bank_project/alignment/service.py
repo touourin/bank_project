@@ -54,18 +54,27 @@ class AlignmentService:
             await self.analyzer.retriever.check_revision(catalog.revision)
         except RetrievalFailure as exc:
             raise AlignmentError(exc.detail, 503) from exc
-        sources = await asyncio.to_thread(self.sources.read, selections)
-        run, sequence, owner = await asyncio.to_thread(self.store.create, sources)
+        sources = []
+
+        def read_sources():
+            sources.extend(self.sources.read(selections))
+            return sources
+
+        run, sequence, owner = await asyncio.to_thread(self.store.create_from, read_sources)
         self._spawn(run, sequence, owner, "analyze", sources, catalog)
         return run
 
-    async def generate(self, run_id):
+    async def generate(self, run_id, template=None):
         if not self.graph.configured:
             raise AlignmentError("请先配置业务 Neo4j，再生成图谱", 503)
-        current = await asyncio.to_thread(self.store.get, run_id)
-        if current.result and current.result.template and not current.result.template.confirmed:
-            raise AlignmentError("请先核对并确认图模板，再生成图谱", 409)
-        run, sequence, owner = await asyncio.to_thread(self.store.start_graph, run_id)
+        if template is not None:
+            result = await asyncio.to_thread(self._approved_result, run_id, template)
+        else:
+            result = None
+            current = await asyncio.to_thread(self.store.get, run_id)
+            if current.result and current.result.template and not current.result.template.confirmed:
+                raise AlignmentError("请先整体采纳生成方案", 409)
+        run, sequence, owner = await asyncio.to_thread(self.store.start_graph, run_id, result)
         self._spawn(run, sequence, owner, "graph")
         return run
 
@@ -90,13 +99,22 @@ class AlignmentService:
         return self.store.revise(run_id, result)
 
     def save_template(self, run_id, template):
+        return self.store.revise(run_id, self._approved_result(run_id, template))
+
+    def default_template(self, run_id, current):
+        from .presets import row_record_template
+
+        run, catalog = self._editable_catalog(run_id)
+        return row_record_template(self.store.sources(run_id), run.result.tables, current, catalog)
+
+    def _approved_result(self, run_id, template):
         from .templates import validate_template
 
         run, catalog = self._editable_catalog(run_id)
         sources = self.store.sources(run_id)
         result = run.result.model_copy(deep=True)
         result.template = validate_template(template, sources, catalog)
-        return self.store.revise(run_id, result)
+        return result
 
     def _spawn(self, *args):
         task = asyncio.create_task(self._execute(*args))

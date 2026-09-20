@@ -37,7 +37,8 @@ export function IntakeJobs({
             job.status === "completed" &&
             previous &&
             previous !== "completed" &&
-            job.batch_id
+            job.batch_id &&
+            !job.batch_removed
           ) {
             const batch = await intakeApi.batch(token, job.batch_id, signal);
             saved.current(batch);
@@ -105,28 +106,30 @@ export function IntakeJobs({
                       : "processing"
                 }
               >
-                {labels[job.status]}
+                {job.batch_removed ? "数据已移除" : labels[job.status]}
               </Tag>
-              {job.status === "completed" && job.batch_id && (
-                <Button
-                  size="small"
-                  onClick={async () => {
-                    try {
-                      saved.current(
-                        await intakeApi.batch(
-                          token,
-                          job.batch_id!,
-                          new AbortController().signal,
-                        ),
-                      );
-                    } catch (reason) {
-                      setError(errorMessage(reason));
-                    }
-                  }}
-                >
-                  查看数据
-                </Button>
-              )}
+              {job.status === "completed" &&
+                job.batch_id &&
+                !job.batch_removed && (
+                  <Button
+                    size="small"
+                    onClick={async () => {
+                      try {
+                        saved.current(
+                          await intakeApi.batch(
+                            token,
+                            job.batch_id!,
+                            new AbortController().signal,
+                          ),
+                        );
+                      } catch (reason) {
+                        setError(errorMessage(reason));
+                      }
+                    }}
+                  >
+                    查看数据
+                  </Button>
+                )}
               {["failed", "cancelled"].includes(job.status) && (
                 <Button
                   size="small"

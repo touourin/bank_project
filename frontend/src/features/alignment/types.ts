@@ -81,6 +81,7 @@ export interface TableMapping {
   table_id: string;
   batch_id: string;
   table_name: string;
+  source_name?: string;
   row_count: number;
   concept_id: string | null;
   concept_name: string | null;
@@ -126,7 +127,7 @@ export interface Run {
   graph_version: string | null;
   based_on_run_id?: string | null;
 }
-export interface GraphNode {
+export interface GraphNodeBrief {
   id: string;
   name: string;
   table_id: string;
@@ -134,6 +135,8 @@ export interface GraphNode {
   source_row: number;
   concept_id: string;
   concept_name: string;
+}
+export interface GraphNode extends GraphNodeBrief {
   fields: Record<string, string | null>;
 }
 export interface GraphPreview {
@@ -151,7 +154,26 @@ export interface GraphPreview {
     target: string;
     relation_id: string;
     origin: string;
+    name?: string;
   }[];
+}
+
+export interface GraphGroup {
+  concept_id: string;
+  concept_name: string;
+  count: number;
+}
+export interface GraphOverview {
+  summary: GraphPreview["summary"];
+  groups: GraphGroup[];
+}
+export interface GraphPage {
+  nodes: GraphNodeBrief[];
+  edges: GraphPreview["edges"];
+  total: number;
+  next_cursor: string | null;
+  anchor: GraphNodeBrief | null;
+  edges_truncated: boolean;
 }
 
 export interface TemplateNode {
@@ -159,11 +181,14 @@ export interface TemplateNode {
   table_id: string;
   concept_id: string;
   concept_name: string;
+  retrieval_target?: "table" | "entity" | null;
+  retrieval_name?: string | null;
   identity_scope: string;
   key_columns: string[];
   properties: { column: string; name: string }[];
 }
 export interface GraphTemplate {
+  mode?: "suggested" | "row_records" | "custom";
   nodes: TemplateNode[];
   edges: {
     id: string;

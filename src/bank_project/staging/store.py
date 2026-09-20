@@ -87,21 +87,29 @@ class MysqlBatchStore:
                 writer.finish(table.columns, table.warnings)
             return writer.publish(parsed.warnings)
 
-    def list(self, offset, limit):
+    def list(self, offset, limit, *, removed=False):
         with self.database.connect() as db:
-            db.execute("SELECT COUNT(*) FROM intake_batches WHERE state='ready' AND deleted=FALSE")
+            db.execute(
+                "SELECT COUNT(*) FROM intake_batches WHERE state IN ('ready','purging') AND deleted=%s",
+                (removed,),
+            )
             total = db.fetchone()[0]
             db.execute(
-                "SELECT metadata FROM intake_batches WHERE state='ready' AND deleted=FALSE ORDER BY created_at DESC,id DESC LIMIT %s OFFSET %s",
-                (limit, offset),
+                "SELECT metadata,state FROM intake_batches WHERE state IN ('ready','purging') AND deleted=%s ORDER BY created_at DESC,id DESC LIMIT %s OFFSET %s",
+                (removed, limit, offset),
             )
-            items = [BatchInfo.model_validate_json(r[0]) for r in db.fetchall()]
+            items = [
+                BatchInfo.model_validate_json(r[0]).model_copy(
+                    update={"removed": removed, "purging": r[1] == "purging"}
+                )
+                for r in db.fetchall()
+            ]
         return BatchPage(items=items, total=total, offset=offset, limit=limit)
 
     def get(self, batch_id, *, include_deleted=False):
         with self.database.connect() as db:
             db.execute(
-                "SELECT metadata,deleted FROM intake_batches WHERE id=%s AND state='ready'",
+                "SELECT metadata,deleted,state FROM intake_batches WHERE id=%s AND state IN ('ready','purging')",
                 (batch_id,),
             )
             row = db.fetchone()
@@ -112,7 +120,7 @@ class MysqlBatchStore:
                 (batch_id,),
             )
             return BatchDetail(
-                **json.loads(row[0]),
+                **(json.loads(row[0]) | {"removed": bool(row[1]), "purging": row[2] == "purging"}),
                 tables=[TableInfo.model_validate_json(r[0]) for r in db.fetchall()],
             )
 
@@ -150,8 +158,10 @@ class MysqlBatchStore:
                 for r in db.fetchall()
             ]
 
-    def preview(self, batch_id, table_id, offset, limit):
-        batch = self.get(batch_id)
+    def preview(self, batch_id, table_id, offset, limit, *, include_deleted=False):
+        batch = self.get(batch_id, include_deleted=include_deleted)
+        if batch.purging:
+            raise IntakeError("数据正在彻底删除，无法预览", status=409)
         table = next((t for t in batch.tables if t.id == table_id), None)
         if table is None:
             raise IntakeError("数据表不存在或不属于该批次", status=404)
@@ -168,6 +178,27 @@ class MysqlBatchStore:
         # Logical deletion keeps immutable data available to historical mapping versions.
         with self.database.connect() as db:
             db.execute("UPDATE intake_batches SET deleted=TRUE WHERE id=%s", (batch_id,))
+
+    def restore(self, batch_id):
+        with self.database.connect() as db:
+            db.execute("SELECT state FROM intake_batches WHERE id=%s FOR UPDATE", (batch_id,))
+            row = db.fetchone()
+            if row is None:
+                raise IntakeError("批次不存在或已被删除", status=404)
+            if row[0] != "ready":
+                raise IntakeError("数据正在清理，无法恢复", status=409)
+            db.execute("UPDATE intake_batches SET deleted=FALSE WHERE id=%s", (batch_id,))
+
+    def purge(self, batch_id):
+        with self.database.connect() as db:
+            db.execute(
+                "SELECT state,deleted FROM intake_batches WHERE id=%s FOR UPDATE", (batch_id,)
+            )
+            row = db.fetchone()
+            if not row or not row[1] or row[0] not in {"ready", "purging"}:
+                raise IntakeError("请先移除数据，再彻底删除", status=409)
+            db.execute("UPDATE intake_batches SET state='purging' WHERE id=%s", (batch_id,))
+        return "purging"
 
 
 class BatchWriter:

@@ -32,7 +32,7 @@ class StagedSources:
             for selection in selections:
                 record = db.execute(
                     "SELECT b.metadata, t.metadata FROM tables t JOIN batches b ON b.id=t.batch_id "
-                    "WHERE t.id=? AND b.id=?",
+                    "WHERE t.id=? AND b.id=? AND b.deleted=0",
                     (str(selection.table_id), str(selection.batch_id)),
                 ).fetchone()
                 if record is None:

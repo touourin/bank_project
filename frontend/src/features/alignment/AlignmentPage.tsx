@@ -10,11 +10,11 @@ import { GraphPanel } from "./GraphPanel";
 import { GenerationRules } from "./GenerationRules";
 import { GenerationPanel } from "./GenerationPanel";
 import { RunOverview } from "./RunOverview";
-import { generationPlan } from "./workflow";
+import { generationPlan, tableLabel } from "./workflow";
 import { MappingResults } from "./MappingResults";
 import { SourcePicker } from "./SourcePicker";
 import { useRun } from "./useRun";
-import type { Selection } from "./types";
+import type { GraphTemplate, Selection } from "./types";
 import "./alignment.css";
 
 export function AlignmentPage({ token }: { token: string }) {
@@ -44,6 +44,10 @@ export function AlignmentPage({ token }: { token: string }) {
   const [confirm, setConfirm] = useState(false);
   const [templateDirty, setTemplateDirty] = useState(false);
   const [rulesSaving, setRulesSaving] = useState(false);
+  const [draft, setDraft] = useState<{
+    runId: string;
+    template: GraphTemplate;
+  }>();
   useEffect(() => setTemplateDirty(false), [runId]);
   const inFlight = useRef(false);
   const { run, error: runError } = useRun(token, runId, revision);
@@ -52,7 +56,14 @@ export function AlignmentPage({ token }: { token: string }) {
     rulesSaving ||
     run?.status === "analyzing" ||
     run?.graph_status === "building";
-  const plan = run?.result ? generationPlan(run.result) : null;
+  const result = run?.result
+    ? {
+        ...run.result,
+        template:
+          draft?.runId === run.id ? draft.template : run.result.template,
+      }
+    : null;
+  const plan = result ? generationPlan(result) : null;
   const refresh = () => {
     setRevision((value) => value + 1);
     history.refresh();
@@ -95,7 +106,7 @@ export function AlignmentPage({ token }: { token: string }) {
           <p className="eyebrow">DATA WORKSPACE / STEP 02</p>
           <h1>本体对齐与图谱生成</h1>
           <p className="description">
-            把数据表变成业务对象：先核对匹配和生成规则，再生成可追溯的图谱。
+            把数据表变成业务对象：自动给出匹配方案，整体采纳后生成可追溯的图谱。
           </p>
         </div>
         <span className="step-badge">
@@ -113,8 +124,8 @@ export function AlignmentPage({ token }: { token: string }) {
         <li>
           <span>2</span>
           <div>
-            <strong>核对匹配与规则</strong>
-            <small>确认对象、身份字段和关系</small>
+            <strong>查看匹配方案</strong>
+            <small>自动预填，按需修改</small>
           </div>
         </li>
         <li>
@@ -184,7 +195,9 @@ export function AlignmentPage({ token }: { token: string }) {
                 分析所选 {selections.length} 张表
               </Button>
               {templateDirty && (
-                <p className="hint">请先确认生成规则或撤销未保存修改。</p>
+                <p className="hint">
+                  可整体采纳方案并生成，或保存、撤销修改后切换任务。
+                </p>
               )}
               {error && <ErrorNotice message={error} />}
             </Panel>
@@ -219,6 +232,10 @@ export function AlignmentPage({ token }: { token: string }) {
                 run={run}
                 token={token}
                 onDirty={setTemplateDirty}
+                locked={Boolean(busy) || confirm}
+                onDraft={(template) =>
+                  setDraft(template ? { runId: run.id, template } : undefined)
+                }
                 onSaving={setRulesSaving}
                 onSaved={(updated) => {
                   setRunId(updated.id);
@@ -229,6 +246,7 @@ export function AlignmentPage({ token }: { token: string }) {
             {run?.status === "ready" && run.result && (
               <GenerationPanel
                 run={run}
+                result={result!}
                 dirty={templateDirty}
                 busy={Boolean(busy)}
                 configured={config.data.graph_configured}
@@ -240,6 +258,8 @@ export function AlignmentPage({ token }: { token: string }) {
               <ErrorNotice message={graph.error} onRetry={graph.refresh} />
             ) : graph.data ? (
               <GraphPanel
+                key={graph.data.summary?.version ?? "empty"}
+                token={token}
                 graph={graph.data}
                 selectedRunId={run?.id}
                 onRefresh={graph.refresh}
@@ -252,12 +272,24 @@ export function AlignmentPage({ token }: { token: string }) {
       )}
       {confirm && run && plan && (
         <ConfirmDialog
-          title="生成图谱版本"
-          confirmLabel="开始生成"
+          title="采纳匹配方案并生成图谱"
+          confirmLabel="采纳并开始生成"
           onClose={() => setConfirm(false)}
           onConfirm={async () => {
-            await alignmentApi.generate(token, run.id);
-            refresh();
+            setSubmitting(true);
+            try {
+              const updated = await alignmentApi.generate(
+                token,
+                run.id,
+                result?.template ?? undefined,
+              );
+              setRunId(updated.id);
+              setDraft(undefined);
+              setTemplateDirty(false);
+              refresh();
+            } finally {
+              setSubmitting(false);
+            }
           }}
         >
           <p>
@@ -267,7 +299,7 @@ export function AlignmentPage({ token }: { token: string }) {
           <ul>
             {plan.included.map((table) => (
               <li key={table.table_id}>
-                {table.table_name} · {table.row_count.toLocaleString()} 行
+                {tableLabel(table)} · {table.row_count.toLocaleString()} 行
               </li>
             ))}
           </ul>
@@ -276,13 +308,16 @@ export function AlignmentPage({ token }: { token: string }) {
             条。
           </p>
           <p>
+            {plan.suggestedNodes > 0 &&
+              `包含 ${plan.suggestedNodes} 个低分或未验证的对象建议；采纳后仍保留原始得分与依据。`}
+            普通字段未匹配时保留原始属性，无需逐项确认。
+          </p>
+          <p>
             实际节点与关系数量在生成后统计。
             {plan.relationRules === 0 && "当前未配置关系，将只生成节点。"}
           </p>
           {plan.excluded.length > 0 && (
-            <p>
-              不参与生成：{plan.excluded.map((t) => t.table_name).join("、")}。
-            </p>
+            <p>不参与生成：{plan.excluded.map(tableLabel).join("、")}。</p>
           )}
           <p>
             按确认的规则识别对象并检查属性冲突。新图生成成功后切换当前版本，旧版本保留。

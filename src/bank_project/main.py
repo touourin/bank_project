@@ -22,6 +22,7 @@ from bank_project.api.alignment import router as alignment_router
 from bank_project.api.body_limit import BodyLimitMiddleware
 from bank_project.api.health import router as health_router
 from bank_project.api.intake import router as intake_router
+from bank_project.intake.lifecycle import BatchLifecycle
 from bank_project.intake.models import IntakeError
 from bank_project.intake.mysql import MysqlConnection, MysqlSource
 from bank_project.intake.service import IntakeService
@@ -84,6 +85,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ),
             VersionedGraph(config, batch_store if database else None, key_index),
         )
+        app.state.batch_lifecycle = BatchLifecycle(batch_store, app.state.alignment.store)
         try:
             yield
         finally:

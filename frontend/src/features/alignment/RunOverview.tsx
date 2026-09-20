@@ -1,7 +1,7 @@
 import { Alert, Button, Select, Tag } from "antd";
 import { Panel } from "../../ui/Panel";
 import { EmptyState, ErrorNotice, LoadingState } from "../../ui/Feedback";
-import { sameSources, taskStatus } from "./workflow";
+import { sameSources, taskStatus, tableLabel } from "./workflow";
 import type { Run, Selection } from "./types";
 
 export function RunOverview({
@@ -49,7 +49,7 @@ export function RunOverview({
           onChange={onSelect}
           options={tasks.map((item) => ({
             value: item.id,
-            label: `${new Date(item.created_at).toLocaleString()} · ${item.id.slice(0, 8)}${item.based_on_run_id ? " · 人工调整版" : ""}`,
+            label: `${new Date(item.created_at).toLocaleString()} · ${item.id.slice(0, 8)}${item.based_on_run_id ? " · 方案版本" : ""}`,
           }))}
         />
       )}
@@ -99,7 +99,7 @@ export function RunOverview({
                   return (
                     <li key={table.table_id}>
                       <div className="task-source-detail">
-                        <span>{table.table_name}</span>
+                        <span>{tableLabel(table)}</span>
                         {table.status === "failed" ? (
                           <span className="task-source-error">
                             分析失败：{table.reason}
@@ -138,13 +138,12 @@ export function RunOverview({
           )}
           {run.based_on_run_id && (
             <p className="hint">
-              人工调整版 · 来源任务 {run.based_on_run_id.slice(0, 8)} ·
-              原任务保留
+              方案版本 · 来源任务 {run.based_on_run_id.slice(0, 8)} · 原任务保留
             </p>
           )}
           {dirty && (
             <p className="hint">
-              生成规则有未保存修改。请先确认规则或撤销修改，再切换任务。
+              方案有未保存修改。可整体采纳并生成，或保存、撤销修改后切换任务。
             </p>
           )}
         </>

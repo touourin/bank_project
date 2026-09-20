@@ -354,6 +354,16 @@
               "default": 20,
               "title": "Limit"
             }
+          },
+          {
+            "name": "removed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Removed"
+            }
           }
         ],
         "responses": {
@@ -401,6 +411,16 @@
               "type": "string",
               "format": "uuid",
               "title": "Batch Id"
+            }
+          },
+          {
+            "name": "removed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Removed"
             }
           }
         ],
@@ -522,6 +542,16 @@
               "default": 50,
               "title": "Limit"
             }
+          },
+          {
+            "name": "removed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Removed"
+            }
           }
         ],
         "responses": {
@@ -531,6 +561,150 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TablePage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/intake/batches/{batch_id}/restore": {
+      "post": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "Restore",
+        "operationId": "restore_api_v1_intake_batches__batch_id__restore_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/intake/batches/{batch_id}/references": {
+      "get": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "References",
+        "operationId": "references_api_v1_intake_batches__batch_id__references_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchReferences"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/intake/batches/{batch_id}/permanent": {
+      "delete": {
+        "tags": [
+          "第一步 · 数据接入"
+        ],
+        "summary": "Purge",
+        "operationId": "purge_api_v1_intake_batches__batch_id__permanent_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgeResult"
                 }
               }
             }
@@ -1013,6 +1187,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/GraphTemplate"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
             "description": "Successful Response",
@@ -1063,6 +1254,193 @@
         ]
       }
     },
+    "/api/v1/alignment/graph/overview": {
+      "get": {
+        "tags": [
+          "第二步 · 本体对齐与图谱生成"
+        ],
+        "summary": "Graph Overview",
+        "operationId": "graph_overview_api_v1_alignment_graph_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphOverview"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/alignment/graph/{version}/nodes": {
+      "get": {
+        "tags": [
+          "第二步 · 本体对齐与图谱生成"
+        ],
+        "summary": "Graph Page",
+        "operationId": "graph_page_api_v1_alignment_graph__version__nodes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version"
+            }
+          },
+          {
+            "name": "concept",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Concept"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "After"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "focus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Focus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alignment/graph/{version}/nodes/{node_id}": {
+      "get": {
+        "tags": [
+          "第二步 · 本体对齐与图谱生成"
+        ],
+        "summary": "Graph Detail",
+        "operationId": "graph_detail_api_v1_alignment_graph__version__nodes__node_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphNode"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/alignment/runs/{run_id}/template": {
       "post": {
         "tags": [
@@ -1104,6 +1482,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alignment/runs/{run_id}/template/default": {
+      "post": {
+        "tags": [
+          "第二步 · 本体对齐与图谱生成"
+        ],
+        "summary": "Default Template",
+        "operationId": "default_template_api_v1_alignment_runs__run_id__template_default_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphTemplate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphTemplate"
                 }
               }
             }
@@ -1195,6 +1631,16 @@
             "type": "array",
             "title": "Warnings"
           },
+          "removed": {
+            "type": "boolean",
+            "title": "Removed",
+            "default": false
+          },
+          "purging": {
+            "type": "boolean",
+            "title": "Purging",
+            "default": false
+          },
           "tables": {
             "items": {
               "$ref": "#/components/schemas/TableInfo"
@@ -1267,6 +1713,16 @@
             },
             "type": "array",
             "title": "Warnings"
+          },
+          "removed": {
+            "type": "boolean",
+            "title": "Removed",
+            "default": false
+          },
+          "purging": {
+            "type": "boolean",
+            "title": "Purging",
+            "default": false
           }
         },
         "type": "object",
@@ -1311,6 +1767,27 @@
           "limit"
         ],
         "title": "BatchPage"
+      },
+      "BatchReferences": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Run Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "run_ids"
+        ],
+        "title": "BatchReferences"
       },
       "CatalogTable": {
         "properties": {
@@ -1592,6 +2069,29 @@
         ],
         "title": "GraphEdge"
       },
+      "GraphGroup": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "title": "Concept Id"
+          },
+          "concept_name": {
+            "type": "string",
+            "title": "Concept Name"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "concept_id",
+          "concept_name",
+          "count"
+        ],
+        "title": "GraphGroup"
+      },
       "GraphNode": {
         "properties": {
           "id": {
@@ -1649,6 +2149,123 @@
           "fields"
         ],
         "title": "GraphNode"
+      },
+      "GraphNodeBrief": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "table_id": {
+            "type": "string",
+            "title": "Table Id"
+          },
+          "table_name": {
+            "type": "string",
+            "title": "Table Name"
+          },
+          "source_row": {
+            "type": "integer",
+            "title": "Source Row"
+          },
+          "concept_id": {
+            "type": "string",
+            "title": "Concept Id"
+          },
+          "concept_name": {
+            "type": "string",
+            "title": "Concept Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "table_id",
+          "table_name",
+          "source_row",
+          "concept_id",
+          "concept_name"
+        ],
+        "title": "GraphNodeBrief"
+      },
+      "GraphOverview": {
+        "properties": {
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GraphSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/GraphGroup"
+            },
+            "type": "array",
+            "title": "Groups"
+          }
+        },
+        "type": "object",
+        "title": "GraphOverview"
+      },
+      "GraphPage": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNodeBrief"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "anchor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GraphNodeBrief"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "edges_truncated": {
+            "type": "boolean",
+            "title": "Edges Truncated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "GraphPage"
       },
       "GraphPreview": {
         "properties": {
@@ -1740,6 +2357,16 @@
             "type": "boolean",
             "title": "Confirmed",
             "default": false
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "suggested",
+              "row_records",
+              "custom"
+            ],
+            "title": "Mode",
+            "default": "suggested"
           },
           "note": {
             "type": "string",
@@ -1840,6 +2467,11 @@
               }
             ],
             "title": "Error"
+          },
+          "batch_removed": {
+            "type": "boolean",
+            "title": "Batch Removed",
+            "default": false
           }
         },
         "type": "object",
@@ -2277,6 +2909,23 @@
         "type": "object",
         "title": "MysqlRequest"
       },
+      "PurgeResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "purging",
+              "deleted"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "PurgeResult"
+      },
       "ReadyResponse": {
         "properties": {
           "status": {
@@ -2649,6 +3298,11 @@
             "type": "string",
             "title": "Table Name"
           },
+          "source_name": {
+            "type": "string",
+            "title": "Source Name",
+            "default": ""
+          },
           "row_count": {
             "type": "integer",
             "title": "Row Count"
@@ -2949,6 +3603,33 @@
             "type": "string",
             "title": "Concept Name",
             "default": ""
+          },
+          "retrieval_target": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "table",
+                  "entity"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieval Target"
+          },
+          "retrieval_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieval Name"
           },
           "identity_scope": {
             "type": "string",

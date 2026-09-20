@@ -4,6 +4,8 @@ import json
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from pymysql.err import OperationalError
+
 from bank_project.intake.models import IntakeError
 
 from .store import dumps
@@ -19,7 +21,15 @@ class IntakeJobs:
                 options JSON NOT NULL, digest CHAR(64) NOT NULL, size BIGINT NOT NULL,
                 rows_done BIGINT NOT NULL DEFAULT 0, attempt INT NOT NULL DEFAULT 0,
                 owner CHAR(36) NULL, heartbeat DOUBLE NULL, batch_id CHAR(36) NULL,
-                error TEXT NULL, INDEX job_queue(state,created_at)) ENGINE=InnoDB""")
+                error TEXT NULL, INDEX job_queue(state,created_at), INDEX job_batch(batch_id)) ENGINE=InnoDB""")
+            # Cleanup locks only the owning job, even when the queue has a long history.
+            db.execute("SHOW INDEX FROM intake_jobs WHERE Key_name='job_batch'")
+            if not db.fetchone():
+                try:
+                    db.execute("ALTER TABLE intake_jobs ADD INDEX job_batch(batch_id)")
+                except OperationalError as exc:
+                    if exc.args[0] != 1061:  # Another API/worker may have created the index.
+                        raise
             db.execute(
                 "CREATE TABLE IF NOT EXISTS intake_queue_guard (id INT PRIMARY KEY) ENGINE=InnoDB"
             )
@@ -46,7 +56,8 @@ class IntakeJobs:
     def get(self, key):
         with self.database.connect() as db:
             db.execute(
-                "SELECT id,created_at,state,name,size,rows_done,attempt,batch_id,error FROM intake_jobs WHERE id=%s",
+                "SELECT j.id,j.created_at,j.state,j.name,j.size,j.rows_done,j.attempt,j.batch_id,j.error,"
+                "COALESCE(b.deleted,FALSE) FROM intake_jobs j LEFT JOIN intake_batches b ON b.id=j.batch_id WHERE j.id=%s",
                 (key,),
             )
             row = db.fetchone()
@@ -64,6 +75,7 @@ class IntakeJobs:
                     "attempt",
                     "batch_id",
                     "error",
+                    "batch_removed",
                 ),
                 row,
                 strict=True,
@@ -74,7 +86,14 @@ class IntakeJobs:
         with self.database.connect() as db:
             db.execute("SELECT id FROM intake_jobs ORDER BY created_at DESC LIMIT 30")
             keys = [row[0] for row in db.fetchall()]
-        return [self.get(key) for key in keys]
+        result = []
+        for key in keys:
+            try:
+                result.append(self.get(key))
+            except IntakeError as exc:
+                if exc.status != 404:
+                    raise
+        return result
 
     def retry(self, key):
         with self.database.connect() as db:

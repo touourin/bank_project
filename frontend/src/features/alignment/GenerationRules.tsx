@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Alert, Button, Checkbox, Collapse, Select, Tag } from "antd";
+import { Alert, Button, Collapse, Select, Tag } from "antd";
 import { Panel } from "../../ui/Panel";
 import { ErrorNotice } from "../../ui/Feedback";
 import { errorMessage } from "../../api/request";
 import { alignmentApi } from "./api";
 import { AdvancedTemplateEditor } from "./AdvancedTemplateEditor";
+import { tableLabel, nodeMatch } from "./workflow";
 import type { GraphTemplate, Run } from "./types";
 
 export function GenerationRules({
@@ -13,27 +14,32 @@ export function GenerationRules({
   onSaved,
   onDirty,
   onSaving,
+  onDraft,
+  locked,
 }: {
   run: Run;
   token: string;
   onSaved: (run: Run) => void;
   onDirty: (dirty: boolean) => void;
   onSaving: (saving: boolean) => void;
+  onDraft: (draft: GraphTemplate | undefined) => void;
+  locked: boolean;
 }) {
   const [draft, setDraft] = useState(run.result!.template!);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [reviewed, setReviewed] = useState(draft.confirmed);
   const [edited, setEdited] = useState(false);
+  const [beforeDefault, setBeforeDefault] = useState<GraphTemplate>();
+  const isDefault = draft.mode === "row_records";
   const tables = run.result!.tables;
-  const disabled = busy || run.graph_status === "building";
+  const disabled = locked || busy || run.graph_status === "building";
   const splitTables = tables.filter(
     (t) => draft.nodes.filter((n) => n.table_id === t.table_id).length > 1,
   );
   const notes = [
     ...new Set(
       tables.flatMap((t) =>
-        (t.structure_notes ?? []).map((note) => `${t.table_name}：${note}`),
+        (t.structure_notes ?? []).map((note) => `${tableLabel(t)}：${note}`),
       ),
     ),
   ];
@@ -45,52 +51,125 @@ export function GenerationRules({
   );
   const requiresReview =
     notes.length > 0 || splitTables.length > 0 || groupingDetected;
-  const update = (value: Partial<GraphTemplate>) => {
+  const replace = (value: GraphTemplate) => {
     onDirty(true);
     setEdited(true);
-    setReviewed(false);
-    setDraft({ ...draft, ...value, confirmed: false });
+    const next = { ...value, confirmed: false };
+    setDraft(next);
+    onDraft(next);
   };
+  const update = (value: Partial<GraphTemplate>) =>
+    replace({ ...draft, ...value, mode: "custom" });
   const nodeLabel = (id: string) => {
     const node = draft.nodes.find((n) => n.id === id);
     const table = tables.find((t) => t.table_id === node?.table_id);
-    return `${node?.concept_name || node?.concept_id || id}（${table?.table_name || "未知表"}）`;
+    return `${node?.concept_name || node?.concept_id || id}（${table ? tableLabel(table) : "未知表"}）`;
   };
 
   return (
     <Panel
-      title="确认生成规则"
+      title="生成方案"
       eyebrow="核对 2 / 2"
       padded
-      description="确认一行代表什么对象、用哪个编号识别，以及哪些字段写成属性。普通表核对下面的规则即可。"
+      description="已预填对象类型、身份字段和属性。可以直接整体采纳，也可以按需修改，无需逐项确认。"
       actions={
         <Tag color={draft.confirmed ? "success" : "warning"}>
-          {draft.confirmed ? "规则已确认" : "待确认"}
+          {isDefault
+            ? "默认方案"
+            : draft.mode === "custom"
+              ? "自定义方案"
+              : draft.confirmed
+                ? "方案已采纳"
+                : "自动建议"}
         </Tag>
       }
     >
-      {requiresReview && (
+      <div className="rule-save">
+        <Button
+          disabled={disabled || isDefault}
+          onClick={async () => {
+            setBusy(true);
+            onSaving(true);
+            setError("");
+            try {
+              const next = await alignmentApi.defaultTemplate(
+                token,
+                run.id,
+                draft,
+              );
+              setBeforeDefault(draft);
+              replace(next);
+            } catch (reason) {
+              setError(errorMessage(reason));
+            } finally {
+              setBusy(false);
+              onSaving(false);
+            }
+          }}
+        >
+          使用默认方案
+        </Button>
+        {beforeDefault && (
+          <Button
+            disabled={disabled}
+            onClick={() => {
+              replace(beforeDefault);
+              setBeforeDefault(undefined);
+            }}
+          >
+            恢复之前方案
+          </Button>
+        )}
+        <span className="hint">
+          默认按一行一条记录生成，保留全部字段，不拆分、不合并、不建立关系。
+        </span>
+      </div>
+      {isDefault && (
+        <Alert
+          type="info"
+          showIcon
+          title={
+            draft.nodes.length
+              ? "已使用默认方案，可直接采纳并生成"
+              : "默认方案缺少对象类型，请先补充本体候选"
+          }
+          description="每张表使用一个对象类型；按来源行区分记录，无需选择身份字段。沿用现有本体候选，低分提示仍保留。确认下面的对象类型后即可生成，也可以继续调整。"
+        />
+      )}
+      {isDefault && requiresReview && (
+        <details className="rule-properties">
+          <summary>查看原始分组建议（默认方案未采用）</summary>
+          {notes.map((note) => (
+            <p className="hint" key={note}>
+              {note}
+            </p>
+          ))}
+          {!notes.length && (
+            <p className="hint">
+              原分析包含多个对象分组；默认方案按整表保留记录。
+            </p>
+          )}
+        </details>
+      )}
+      {requiresReview && !isDefault && (
         <Alert
           type={draft.confirmed ? "info" : "warning"}
           showIcon
-          title={
-            draft.confirmed
-              ? "多对象处理方式已确认"
-              : "这张表可能包含多个对象，请先核对分组"
-          }
+          title="对象分组说明"
           description={
             <div>
-              {!draft.confirmed &&
-                notes.map((note) => <p key={note}>{note}</p>)}
+              {notes.map((note) => (
+                <p key={note}>{note}</p>
+              ))}
               <p>
                 {splitTables.length
-                  ? `当前将 ${splitTables.map((t) => t.table_name).join("、")} 拆成多个对象。`
+                  ? `当前将 ${splitTables.map(tableLabel).join("、")} 拆成多个对象。`
                   : draft.confirmed
-                    ? "当前已确认按整表生成对象。"
+                    ? "当前方案按整表生成对象。"
                     : "当前方案可能仍是整表草稿。"}
                 {draft.confirmed
-                  ? "修改后需要重新确认。"
-                  : "请确认字段归属；需要拆分或补充关系时，展开下方高级配置。"}
+                  ? "可修改后生成新版本。"
+                  : "可整体采纳；需要调整字段归属或关系时，展开下方高级配置。"}
               </p>
             </div>
           }
@@ -100,6 +179,7 @@ export function GenerationRules({
       <div className="rule-cards">
         {draft.nodes.map((node, i) => {
           const table = tables.find((t) => t.table_id === node.table_id);
+          const match = nodeMatch(node, table);
           const sameScope = draft.nodes.filter(
             (n) =>
               n.identity_scope === node.identity_scope &&
@@ -111,10 +191,18 @@ export function GenerationRules({
               <div className="rule-card-heading">
                 <span>对象 {i + 1}</span>
                 <strong>{node.concept_name || node.concept_id}</strong>
+                {match && (
+                  <Tag
+                    color={match.status === "matched" ? "success" : "warning"}
+                  >
+                    {match.status === "matched" ? "自动匹配" : "候选建议"} ·{" "}
+                    {match.selected?.score?.toFixed(3) ?? "无分数"}
+                  </Tag>
+                )}
               </div>
               <p className="hint">
-                来源：{table?.table_name} · {table?.row_count.toLocaleString()}{" "}
-                行
+                来源：{table ? tableLabel(table) : "未知表"} ·{" "}
+                {table?.row_count.toLocaleString()} 行
               </p>
               <label className="rule-identity">
                 用哪些字段识别同一个对象
@@ -167,7 +255,7 @@ export function GenerationRules({
           type="info"
           showIcon
           title="暂无可生成的对象"
-          description="请先在上方匹配结果中确认表对应的本体节点。"
+          description="没有有效本体候选，请查看未参与生成的原因；可重新分析或手动选择对象类型。"
         />
       )}
       <div className="rule-relations">
@@ -204,7 +292,7 @@ export function GenerationRules({
           omitted.length > 0 && (
             <details className="rule-properties" key={table.table_id}>
               <summary>
-                {table.table_name}：{omitted.length}{" "}
+                {tableLabel(table)}：{omitted.length}{" "}
                 个字段不写入节点属性，原值保留在暂存库
               </summary>
               <p className="hint">{omitted.map((c) => c.column).join("、")}</p>
@@ -230,26 +318,11 @@ export function GenerationRules({
           },
         ]}
       />
-      {requiresReview && !draft.confirmed && (
-        <Checkbox
-          className="rule-acknowledgement"
-          checked={reviewed}
-          disabled={disabled}
-          onChange={(e) => setReviewed(e.target.checked)}
-        >
-          我已核对多个对象的字段归属、身份标识及关系依据
-        </Checkbox>
-      )}
       <div className="rule-save">
         <Button
           type="primary"
           loading={busy}
-          disabled={
-            disabled ||
-            !draft.nodes.length ||
-            draft.confirmed ||
-            (requiresReview && !reviewed)
-          }
+          disabled={disabled || !draft.nodes.length || !edited}
           onClick={async () => {
             setBusy(true);
             onSaving(true);
@@ -264,16 +337,17 @@ export function GenerationRules({
             }
           }}
         >
-          确认生成规则
+          仅保存方案
         </Button>
         {edited && (
           <Button
             disabled={disabled}
             onClick={() => {
               setDraft(run.result!.template!);
-              setReviewed(run.result!.template!.confirmed);
+              onDraft(undefined);
               setEdited(false);
               onDirty(false);
+              setBeforeDefault(undefined);
               setError("");
             }}
           >
@@ -281,7 +355,7 @@ export function GenerationRules({
           </Button>
         )}
         <span className="hint">
-          确认后再点击下方“生成图谱”；修改规则会保存为新任务版本。
+          可直接点击下方“采纳方案并生成”，会一并保存修改；不需要逐项确认。
         </span>
       </div>
       {error && <ErrorNotice message={error} />}

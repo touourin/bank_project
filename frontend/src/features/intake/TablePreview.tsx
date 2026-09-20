@@ -56,17 +56,19 @@ export function TablePreview({
   token,
   batchId,
   table,
+  removed = false,
 }: {
   token: string;
   batchId: string;
   table: TableInfo;
+  removed?: boolean;
 }) {
   const [offset, setOffset] = useState(0);
   const [view, setView] = useState<"rows" | "schema">("rows");
   const load = useCallback(
     (signal: AbortSignal) =>
-      intakeApi.table(token, batchId, table.id, offset, signal),
-    [token, batchId, table.id, offset],
+      intakeApi.table(token, batchId, table.id, offset, signal, removed),
+    [token, batchId, table.id, offset, removed],
   );
   const resource = useResource(load);
   const columns = useMemo<TableColumnsType<DataRow>>(

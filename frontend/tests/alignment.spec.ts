@@ -47,13 +47,19 @@ test("staged data becomes a mapping, graph publication is separate, and reload r
   await expect(retrieval).toContainText("精确匹配");
   await page.getByRole("tab", { name: "字段映射", exact: true }).click();
   await expect(page.getByRole("region", { name: /字段映射/ })).toBeVisible();
-  await page.getByRole("button", { name: "生成图谱", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "生成图谱版本" });
+  await page
+    .getByRole("button", { name: "采纳方案并生成", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "采纳匹配方案并生成图谱" });
   await expect(dialog).toContainText("共 2 行");
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
   await expect(page.getByText("尚未生成图谱", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "生成图谱", exact: true }).click();
-  await dialog.getByRole("button", { name: "开始生成", exact: true }).click();
+  await page
+    .getByRole("button", { name: "采纳方案并生成", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "采纳并开始生成", exact: true })
+    .click();
   await expect(page.locator(".graph-metrics")).toContainText("2 个实例");
   await page
     .getByRole("button", { name: "查看 合成甲公司", exact: true })
@@ -89,7 +95,7 @@ test("staged data becomes a mapping, graph publication is separate, and reload r
   await expect(page.locator(".selected-concept")).toContainText("customer");
   await expect(page.locator(".graph-metrics")).toContainText("2 个实例");
   await expect(
-    page.getByRole("button", { name: "生成图谱", exact: true }),
+    page.getByRole("button", { name: "采纳方案并生成", exact: true }),
   ).toBeEnabled();
   await page
     .getByRole("tab", { name: "人工修改记录（1）", exact: true })
@@ -184,9 +190,9 @@ test("low confidence remains visible and cannot generate a graph", async ({
   );
   await page.goto("/");
   await page.getByRole("tab", { name: "02 本体对齐与图谱生成" }).click();
-  await expect(page.getByText("需要核对", { exact: true })).toBeVisible();
+  await expect(page.getByText("匹配建议", { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "生成图谱", exact: true }),
+    page.getByRole("button", { name: "采纳方案并生成", exact: true }),
   ).toBeDisabled();
   await page.getByRole("tab", { name: "匹配过程", exact: true }).click();
   await expect(page.getByText(/这条历史任务没有保存匹配过程/)).toBeVisible();
@@ -283,7 +289,7 @@ test("live stages are visible and interrupted jobs cannot pretend to finish", as
     page.getByRole("button", { name: "修改表节点", exact: true }),
   ).toBeDisabled();
   await expect(
-    page.getByRole("button", { name: "生成图谱", exact: true }),
+    page.getByRole("button", { name: "采纳方案并生成", exact: true }),
   ).not.toBeVisible();
   await page
     .getByText("查看候选节点（表概念 1 / 属性 0）", { exact: true })
@@ -385,7 +391,7 @@ test("retrieve scores and low-confidence candidates remain reviewable", async ({
   await expect(records).toContainText("向量匹配");
   await expect(records).toContainText("待确认");
   await expect(
-    page.getByRole("button", { name: "生成图谱", exact: true }),
+    page.getByRole("button", { name: "采纳方案并生成", exact: true }),
   ).toBeDisabled();
   await records.locator(".ant-table-row-expand-icon").first().click();
   await expect(records).toContainText("接口标记：有把握");

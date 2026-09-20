@@ -1,10 +1,11 @@
 import { Alert, Button } from "antd";
 import { Panel } from "../../ui/Panel";
-import { generationPlan } from "./workflow";
-import type { GraphPreview, Run } from "./types";
+import { generationPlan, tableLabel, exclusionReason } from "./workflow";
+import type { GraphOverview, MappingResult, Run } from "./types";
 
 export function GenerationPanel({
   run,
+  result,
   dirty,
   busy,
   configured,
@@ -12,31 +13,27 @@ export function GenerationPanel({
   onGenerate,
 }: {
   run: Run;
+  result: MappingResult;
   dirty: boolean;
   busy: boolean;
   configured: boolean;
-  graph?: GraphPreview | null;
+  graph?: GraphOverview | null;
   onGenerate: () => void;
 }) {
-  const result = run.result!;
   const plan = generationPlan(result);
   const published = run.graph_status === "ready";
   const current = graph?.summary?.run_id === run.id ? graph.summary : null;
-  const reason = dirty
-    ? "生成规则有未保存修改，请先确认或撤销。"
-    : !plan.included.length
-      ? "暂无可生成的表，请先核对上方匹配结果。"
-      : result.template && !result.template.confirmed
-        ? "请先核对并确认上方的生成规则。"
-        : !configured
-          ? "生成图谱需要配置业务 Neo4j。"
-          : "";
+  const reason = !plan.included.length
+    ? "暂无可生成的对象，请查看下方原因，或修改对象类型。"
+    : !configured
+      ? "生成图谱需要配置业务 Neo4j。"
+      : "";
   return (
     <Panel
       title="生成图谱"
       eyebrow="发布结果"
       padded
-      description="按确认后的规则分批读取数据，写入业务图谱。"
+      description="一次采纳整套匹配方案并分批生成；会一并保存当前修改。"
     >
       <div className="generation-metrics">
         <div>
@@ -72,7 +69,23 @@ export function GenerationPanel({
           type="warning"
           showIcon
           title={`以下 ${plan.excluded.length} 张表不参与本次生成`}
-          description={plan.excluded.map((t) => t.table_name).join("、")}
+          description={
+            <ul>
+              {plan.excluded.map((t) => (
+                <li key={t.table_id}>
+                  {tableLabel(t)}：{exclusionReason(t)}
+                </li>
+              ))}
+            </ul>
+          }
+        />
+      )}
+      {plan.suggestedNodes > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          title={`包含 ${plan.suggestedNodes} 个低分或未验证的对象建议`}
+          description="可整体采纳，也可先修改。采纳不会改变原始匹配分数；这些结果仍有不确定性。"
         />
       )}
       {published && (
@@ -99,10 +112,10 @@ export function GenerationPanel({
       <div className="generation-action">
         <Button
           type="primary"
-          disabled={busy || published || Boolean(reason)}
+          disabled={busy || (published && !dirty) || Boolean(reason)}
           onClick={onGenerate}
         >
-          {published ? "该版本已生成图谱" : "生成图谱"}
+          {published && !dirty ? "该版本已生成图谱" : "采纳方案并生成"}
         </Button>
         <span className="hint">
           新图生成成功后切换当前版本；生成失败时保留原图。

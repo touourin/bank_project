@@ -132,6 +132,10 @@ def test_batch_duplicate_names_pagination_and_restart(tmp_path):
         restored.preview(second.id, first.tables[0].id, 0, 10)
     restored.delete(first.id)
     assert restored.get(second.id).row_count == 2
+    assert restored.get(first.id, include_deleted=True).removed
+    with restored.connect() as db:
+        assert db.execute("SELECT count(*) FROM rows").fetchone()[0] == 4
+    restored.purge(first.id)
     with restored.connect() as db:
         assert db.execute("SELECT count(*) FROM rows").fetchone()[0] == 2
 

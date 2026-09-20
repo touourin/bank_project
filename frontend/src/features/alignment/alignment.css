@@ -205,28 +205,146 @@
   font-size: 16px;
   font-weight: 550;
 }
-.graph-canvas {
-  max-height: 360px;
-  overflow: auto;
-  margin: 20px 0;
+/* The canvas renders one batch; group counts cover the full version. */
+.graph-explorer {
+  margin-top: 20px;
+  min-width: 0;
+}
+.graph-groups,
+.graph-browse-toolbar,
+.graph-scope,
+.graph-pagination {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.graph-groups {
+  margin-bottom: 16px;
+}
+.graph-groups i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+.graph-browse-toolbar .ant-input-search {
+  flex: 1;
+  min-width: 220px;
+}
+.graph-browse-toolbar .ant-select {
+  min-width: 120px;
+}
+.graph-view-caption {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.9;
+}
+.graph-scope {
+  justify-content: space-between;
+  margin: 12px 0;
+}
+.graph-network {
+  position: relative;
+  margin: 18px 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
   background: var(--canvas);
+}
+.graph-network-heading {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 18px;
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.graph-network-heading span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.graph-network-host {
+  height: 540px;
+  width: 100%;
+}
+.graph-network-tools {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 7px;
   border: 1px solid var(--border);
   border-radius: 10px;
+  background: var(--surface);
 }
-.graph-canvas svg {
-  width: 100%;
-  min-width: 500px;
-  display: block;
+.graph-network-tooltip {
+  position: absolute;
+  left: 16px;
+  bottom: 70px;
+  max-width: 70%;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
 }
-.graph-canvas g {
-  cursor: pointer;
+.graph-network-expanded {
+  position: fixed;
+  inset: 16px;
+  margin: 0;
+  z-index: 950;
+  box-shadow: var(--shadow);
 }
-.graph-canvas g:focus {
-  outline: none;
+.graph-network-expanded .graph-network-host {
+  height: 100%;
 }
-.graph-canvas g:focus circle {
-  stroke: var(--text);
-  stroke-width: 3;
+.graph-page-status {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 12px 0;
+}
+.graph-page-status span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.graph-pagination {
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+.graph-pagination span {
+  color: var(--muted);
+}
+@media (max-width: 540px) {
+  .graph-network-host {
+    height: 440px;
+  }
+  .graph-network-tools {
+    left: 8px;
+    right: 8px;
+    justify-content: center;
+    gap: 3px;
+  }
+  .graph-network-tools .ant-checkbox-wrapper {
+    font-size: 11px;
+  }
+  .graph-network-heading {
+    left: 12px;
+  }
+  .graph-network-expanded {
+    inset: 4px;
+  }
 }
 .node-fields {
   margin: 20px 0;

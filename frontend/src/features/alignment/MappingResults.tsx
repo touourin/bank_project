@@ -4,14 +4,16 @@ import { DataTable } from "../../ui/DataTable";
 import { Panel } from "../../ui/Panel";
 import { PagePagination } from "../../ui/PagePagination";
 import { ConceptLabel } from "./ConceptLabel";
+import { ColumnHandling } from "./ColumnHandling";
 import { MatchingProcess } from "./MatchingProcess";
 import { MappingEditor } from "./MappingEditor";
 import { matchStatus } from "./RetrievalProcess";
+import { tableLabel } from "./workflow";
 import type { Run, TableMapping } from "./types";
 
 const statuses = {
   mapped: "可生成实例",
-  review: "需要核对",
+  review: "匹配建议",
   unmatched: "未匹配",
   failed: "分析失败",
 };
@@ -85,8 +87,13 @@ function Fields({
           { title: "语义", dataIndex: "semantic", width: 100 },
           {
             title: "属性概念",
-            render: (_, column) =>
-              column.concept_id ? (
+            render: (_, column) => {
+              const match = table.trace?.retrievals?.find(
+                (m) => m.target === "column" && m.name === column.column,
+              );
+              const candidate =
+                match?.status === "review" ? match.selected : null;
+              return column.concept_id ? (
                 <ConceptLabel
                   concept={{
                     id: column.concept_id,
@@ -94,8 +101,18 @@ function Fields({
                   }}
                 />
               ) : (
-                "未匹配"
-              ),
+                <div>
+                  {candidate && (
+                    <>
+                      <Tag color="warning">低分候选</Tag>
+                      <ConceptLabel concept={candidate} />
+                    </>
+                  )}
+                  <ColumnHandling column={column} />
+                  {column.role !== "ignore" && <span>保留原字段名与原值</span>}
+                </div>
+              );
+            },
             width: 200,
           },
           {
@@ -161,13 +178,15 @@ export function MappingResults({
   }>();
   const disabled =
     locked || run.status !== "ready" || run.graph_status === "building";
-  const tableName = (id: string) =>
-    result.tables.find((t) => t.table_id === id)?.table_name || "未选目标表";
+  const tableName = (id: string) => {
+    const table = result.tables.find((t) => t.table_id === id);
+    return table ? tableLabel(table) : "未选目标表";
+  };
   return (
     <Panel
       title="匹配结果"
       eyebrow="核对 1 / 2"
-      description="先确认表代表什么对象、各列代表什么属性。匹配有误时可修改；检索词、候选和得分在“匹配过程”中查看。"
+      description="自动展示表与字段的匹配建议，无需逐项确认。匹配有误时可修改；低分或未匹配字段保留原始属性，检索依据在“匹配过程”中查看。"
       padded
     >
       <details className="mapping-metadata">
@@ -187,7 +206,7 @@ export function MappingResults({
           key: table.table_id,
           label: (
             <div className="mapping-title">
-              <strong>{table.table_name}</strong>
+              <strong>{tableLabel(table)}</strong>
               {table.concept_id ? (
                 <ConceptLabel
                   concept={{

@@ -146,7 +146,7 @@
     "database_updated": false,
     "files": {
       "征信": {
-        "filename": "征信.xlsx",
+        "filename": "来源明细/征信明细.xlsx",
         "rows": 21619,
         "data_sheets": 98,
         "sha256": "aba43825722a96e9ae664102005195b0534c707b2cf039d57488cdaffcbade8e",
@@ -550,7 +550,7 @@
         }
       },
       "工商": {
-        "filename": "工商.xlsx",
+        "filename": "来源明细/工商明细.xlsx",
         "rows": 8324,
         "data_sheets": 39,
         "sha256": "a7151fc91eb3a313756326182033e5754347a4b16847ab364d422b2dd4e8e39c",
@@ -717,6 +717,90 @@
           }
         }
       }
+    },
+    "status": "preserved_as_source_details"
+  },
+  "subject_summary_revision": {
+    "date": "2026-09-20",
+    "layout": "subject_summary_with_preserved_source_details",
+    "database_updated": true,
+    "files": {
+      "征信": {
+        "filename": "征信.xlsx",
+        "data_sheet": "数据",
+        "description_sheet": "字段说明",
+        "rows": 1110,
+        "columns": 52,
+        "sha256": "3c628c41415e04bf454f4a856150ad68aa74d6a6d0bd732e6382d0c44cb178bb",
+        "source_detail": "来源明细/征信明细.xlsx",
+        "source_sha256": "aba43825722a96e9ae664102005195b0534c707b2cf039d57488cdaffcbade8e"
+      },
+      "工商": {
+        "filename": "工商.xlsx",
+        "data_sheet": "数据",
+        "description_sheet": "字段说明",
+        "rows": 1002,
+        "columns": 49,
+        "sha256": "ec8eb640af0d57db2b533bb7ff10a2a547ccbdc674cf991e821de54c7ab93a25",
+        "source_detail": "来源明细/工商明细.xlsx",
+        "source_sha256": "a7151fc91eb3a313756326182033e5754347a4b16847ab364d422b2dd4e8e39c"
+      },
+      "客户标签": {
+        "filename": "客户标签.xlsx",
+        "rows": 1000,
+        "columns": 155,
+        "sha256": "b873153e2afa6ea1443abc214dfc16e32befab8bfb7ae3f0bcabdc01b685e6ef",
+        "content_changed": false
+      },
+      "客户旅程": {
+        "filename": "客户旅程.xlsx",
+        "rows": 16700,
+        "columns": 8,
+        "sha256": "17ccf78c23eb919e91d268beb86c359b7cb5cda9b8a240fe5d65180b24766f3c",
+        "content_changed": false
+      },
+      "交易流水": {
+        "filename": "交易流水.xlsx",
+        "rows": 539534,
+        "columns": 103,
+        "sha256": "eb007f7397e84a72bd41623607987120d11880718a1547b92e663527e5ad49af",
+        "content_changed": false
+      }
+    },
+    "credit_financial_conflict_reports": 100,
+    "credit_unknown_guarantee_currency_reports": 11,
+    "all_summary_cells_verified": true,
+    "other_tables_full_scan_verified": true,
+    "database_sync": {
+      "database": "shanghai_proj",
+      "source_dataset": "desktop",
+      "published_at": "2026-09-20T14:26:57.980364",
+      "catalog_updated": true,
+      "historical_import_batches_modified": false,
+      "tables": {
+        "marketing_credit": {
+          "rows": 1110,
+          "columns": 52,
+          "xlsx_sha256": "2017d0a0b13e7ccbb01a90962dec7cf8c0fb623e17f0a03be08c393684ec6a4c",
+          "fingerprint": {
+            "rows": 1110,
+            "sum_sha256": "feea077fdc39895a15628858b7b571de758797ebb211676d50e72360da1b763a",
+            "xor_sha256": "06692c27e8838fba22f09ce65a7c15db0e3ff8187ea1e3ac8adbde5596c46e7c"
+          }
+        },
+        "marketing_business": {
+          "rows": 1002,
+          "columns": 49,
+          "xlsx_sha256": "42f520b613b68e67e058cd57df72b87302cadb2e9617948c0d87b15ad32742a5",
+          "fingerprint": {
+            "rows": 1002,
+            "sum_sha256": "500056b1e7007fa2e57a8ff84cee588d1c96335f115348693227dd22fea7e469",
+            "xor_sha256": "b71537df4952b5bbc2ff01e9cc089ce74906fdf011fe432f6e5452a1c6c9c641"
+          }
+        }
+      },
+      "collation": "utf8mb4_bin",
+      "customer_snapshot_join_verified": true
     }
   }
 }

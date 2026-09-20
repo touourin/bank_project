@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { Button, Collapse, Select, Tag } from "antd";
-import { Database, FileSpreadsheet, RefreshCw, Trash2 } from "lucide-react";
+import { Button, Collapse, Select, Tag, Segmented } from "antd";
+import { Database, FileSpreadsheet, RefreshCw } from "lucide-react";
 import { useResource } from "../../hooks/useResource";
-import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState, ErrorNotice, LoadingState } from "../../ui/Feedback";
 import { PagePagination } from "../../ui/PagePagination";
 import { Panel } from "../../ui/Panel";
 import { intakeApi } from "./api";
 import { TablePreview } from "./TablePreview";
-import type { BatchInfo } from "./types";
+import { BatchActions } from "./BatchActions";
 
 export function BatchBrowser({
   token,
@@ -22,31 +21,42 @@ export function BatchBrowser({
   const [offset, setOffset] = useState(0);
   const [selectedId, setSelectedId] = useState(savedId);
   const [tableId, setTableId] = useState("");
-  const [pendingDelete, setPendingDelete] = useState<Pick<
-    BatchInfo,
-    "id" | "name"
-  > | null>(null);
+  const [removed, setRemoved] = useState(false);
+  const [notice, setNotice] = useState("");
   const loadList = useCallback(
-    (signal: AbortSignal) => intakeApi.batches(token, offset, signal),
-    [token, offset],
+    (signal: AbortSignal) => intakeApi.batches(token, offset, signal, removed),
+    [token, offset, removed],
   );
-  const batches = useResource(loadList);
+  const batches = useResource(loadList, true);
   const loadDetail = useCallback(
     (signal: AbortSignal) =>
       selectedId
-        ? intakeApi.batch(token, selectedId, signal)
+        ? intakeApi.batch(token, selectedId, signal, removed)
         : Promise.resolve(null),
-    [token, selectedId],
+    [token, selectedId, removed],
   );
   const detail = useResource(loadDetail);
   useEffect(() => {
     setOffset(0);
     setSelectedId(savedId);
+    setRemoved(false);
     batches.refresh();
   }, [savedId, revision, batches.refresh]);
   useEffect(() => {
     setTableId("");
   }, [selectedId]);
+  const cleaning = batches.data?.items.some((item) => item.purging);
+  useEffect(() => {
+    if (!cleaning) return;
+    const timer = setInterval(batches.refresh, 3000);
+    return () => clearInterval(timer);
+  }, [cleaning, batches.refresh]);
+  const changed = (message: string) => {
+    setNotice(message);
+    setSelectedId("");
+    setOffset(0);
+    batches.refresh();
+  };
   const batch = detail.data;
   const table =
     batch?.tables.find((item) => item.id === tableId) || batch?.tables[0];
@@ -59,7 +69,11 @@ export function BatchBrowser({
             接入记录 <Tag color="success">{batches.data?.total ?? "—"}</Tag>
           </>
         }
-        description="每次接入独立保存，可随时查看原始数据。"
+        description={
+          removed
+            ? "已移除的数据仍占用空间，可恢复或检查后彻底删除。"
+            : "每次接入独立保存，可查看数据或移除批次。"
+        }
         actions={
           <Button
             aria-label="刷新接入记录"
@@ -72,19 +86,44 @@ export function BatchBrowser({
           />
         }
       >
+        <div className="batch-lifecycle-toolbar">
+          <Segmented
+            aria-label="接入记录范围"
+            value={removed ? "removed" : "active"}
+            options={[
+              { label: "可用数据", value: "active" },
+              { label: "已移除", value: "removed" },
+            ]}
+            onChange={(value) => {
+              setRemoved(value === "removed");
+              setOffset(0);
+              setSelectedId("");
+              setNotice("");
+            }}
+          />
+          {notice && (
+            <p role="status" className="hint">
+              {notice}
+            </p>
+          )}
+        </div>
         {batches.error ? (
           <ErrorNotice message={batches.error} onRetry={batches.refresh} />
-        ) : batches.loading ? (
+        ) : batches.loading && !batches.data ? (
           <LoadingState label="正在读取接入记录…" />
         ) : !batches.data?.total ? (
           <EmptyState
-            title="从第一份数据开始"
+            title={removed ? "没有已移除的数据" : "从第一份数据开始"}
             description={
-              <>
-                上传表格，或连接 MySQL。接入成功后，
-                <br />
-                可以在这里查看各张表的字段与数据。
-              </>
+              removed ? (
+                "移除的批次会出现在这里。"
+              ) : (
+                <>
+                  上传表格，或连接 MySQL。接入成功后，
+                  <br />
+                  可以在这里查看各张表的字段与数据。
+                </>
+              )
             }
           />
         ) : (
@@ -106,6 +145,7 @@ export function BatchBrowser({
                   </span>
                   <span className="batch-name">
                     <strong>{item.name}</strong>
+                    {item.purging && <Tag color="processing">后台清理中</Tag>}
                     <small>
                       {new Date(item.created_at).toLocaleString("zh-CN", {
                         hour12: false,
@@ -143,13 +183,11 @@ export function BatchBrowser({
           description={batch && <>来源：{batch.source}</>}
           actions={
             batch && (
-              <Button
-                danger
-                aria-label="删除当前批次"
-                icon={<Trash2 size={17} />}
-                onClick={() =>
-                  setPendingDelete({ id: batch.id, name: batch.name })
-                }
+              <BatchActions
+                key={batch.id}
+                token={token}
+                batch={batch}
+                onChanged={changed}
               />
             )
           }
@@ -158,6 +196,10 @@ export function BatchBrowser({
             <ErrorNotice message={detail.error} onRetry={detail.refresh} />
           ) : !batch ? (
             <LoadingState label="正在读取批次…" />
+          ) : batch.purging ? (
+            <p className="hint batch-lifecycle-toolbar">
+              正在后台分批清理，完成后该记录会消失。清理期间无法预览或恢复数据。
+            </p>
           ) : (
             <>
               <div className="table-picker">
@@ -193,33 +235,12 @@ export function BatchBrowser({
                   token={token}
                   batchId={batch.id}
                   table={table}
+                  removed={batch.removed}
                 />
               )}
             </>
           )}
         </Panel>
-      )}
-      {pendingDelete && (
-        <ConfirmDialog
-          title="删除接入批次"
-          confirmLabel="删除批次"
-          danger
-          onClose={() => setPendingDelete(null)}
-          onConfirm={async () => {
-            await intakeApi.remove(token, pendingDelete.id);
-            setSelectedId((current) =>
-              current === pendingDelete.id ? "" : current,
-            );
-            setOffset(0);
-            batches.refresh();
-          }}
-        >
-          <p>确定从接入列表移除「{pendingDelete.name}」？</p>
-          <p className="hint">
-            原始文件和源数据库不受影响；MySQL
-            暂存版本会保留，以便历史分析继续使用。
-          </p>
-        </ConfirmDialog>
       )}
     </div>
   );

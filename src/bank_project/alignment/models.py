@@ -168,6 +168,7 @@ class TableMapping(BaseModel):
     table_id: str
     batch_id: str
     table_name: str
+    source_name: str = ""
     row_count: int
     concept_id: str | None = None
     concept_name: str | None = None
@@ -228,7 +229,7 @@ class GraphSummary(BaseModel):
     created_at: str
 
 
-class GraphNode(BaseModel):
+class GraphNodeBrief(BaseModel):
     id: str
     name: str
     table_id: str
@@ -236,6 +237,9 @@ class GraphNode(BaseModel):
     source_row: int
     concept_id: str
     concept_name: str
+
+
+class GraphNode(GraphNodeBrief):
     fields: dict[str, str | None]
 
 
@@ -251,3 +255,23 @@ class GraphPreview(BaseModel):
     summary: GraphSummary | None = None
     nodes: list[GraphNode] = Field(default_factory=list)
     edges: list[GraphEdge] = Field(default_factory=list)
+
+
+class GraphGroup(BaseModel):
+    concept_id: str
+    concept_name: str
+    count: int
+
+
+class GraphOverview(BaseModel):
+    summary: GraphSummary | None = None
+    groups: list[GraphGroup] = Field(default_factory=list)
+
+
+class GraphPage(BaseModel):
+    nodes: list[GraphNodeBrief] = Field(default_factory=list)
+    edges: list[GraphEdge] = Field(default_factory=list)
+    total: int = 0
+    next_cursor: str | None = None
+    anchor: GraphNodeBrief | None = None
+    edges_truncated: bool = False

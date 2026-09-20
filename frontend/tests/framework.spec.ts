@@ -114,14 +114,14 @@ test("same-name files create independent batches and invalid upload keeps existi
   await expect(
     page.getByRole("cell", { name: "002", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "删除当前批次" }).click();
-  const dialog = page.getByRole("dialog", { name: "删除接入批次" });
+  await page.getByRole("button", { name: "移除数据" }).click();
+  const dialog = page.getByRole("dialog", { name: "移除数据" });
   await expect(dialog).toContainText("同名.csv");
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
   await expect(
     page.locator(".batch-row").filter({ hasText: "同名.csv" }),
   ).toHaveCount(2);
-  await page.getByRole("button", { name: "删除当前批次" }).click();
+  await page.getByRole("button", { name: "移除数据" }).click();
   await page.route("**/api/v1/intake/batches/*", async (route) => {
     if (route.request().method() === "DELETE")
       await route.fulfill({
@@ -130,13 +130,13 @@ test("same-name files create independent batches and invalid upload keeps existi
       });
     else await route.fallback();
   });
-  await dialog.getByRole("button", { name: "删除批次", exact: true }).click();
+  await dialog.getByRole("button", { name: "确认移除", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText("暂时无法删除");
   await expect(
     page.locator(".batch-row").filter({ hasText: "同名.csv" }),
   ).toHaveCount(2);
   await page.unroute("**/api/v1/intake/batches/*");
-  await dialog.getByRole("button", { name: "删除批次", exact: true }).click();
+  await dialog.getByRole("button", { name: "确认移除", exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await expect(
     page.locator(".batch-row").filter({ hasText: "同名.csv" }),
@@ -238,8 +238,8 @@ test("system theme reaches dialogs and credentials stay in memory", async ({
   await expect(
     page.getByRole("heading", { name: "主题预览.csv", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "删除当前批次" }).click();
-  const dialog = page.getByRole("dialog", { name: "删除接入批次" });
+  await page.getByRole("button", { name: "移除数据" }).click();
+  const dialog = page.getByRole("dialog", { name: "移除数据" });
   await expect(
     dialog.getByRole("button", { name: "取消", exact: true }),
   ).toBeVisible();

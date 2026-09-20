@@ -229,6 +229,92 @@ def test_async_upload_api_and_partial_body_cleanup(mysql, tmp_path):
         assert set((tmp_path / "uploads").iterdir()) == before
 
 
+def test_mysql_purge_is_bounded_restartable_and_removes_only_owned_upload(mysql, tmp_path):
+    from uuid import uuid4
+
+    from bank_project.alignment.store import RunStore
+    from bank_project.intake.lifecycle import BatchLifecycle
+    from bank_project.intake.worker import run_job
+    from bank_project.staging.cleanup import BatchCleanup
+
+    _, store, jobs, ids, job_ids = mysql
+    uploads = tmp_path / "uploads"
+    uploads.mkdir()
+    original = tmp_path / "original.csv"
+    original.write_text("id\n" + "\n".join(str(i) for i in range(2505)))
+    path = uploads / str(uuid4())
+    path.write_bytes(original.read_bytes())
+    job = jobs.create("original.csv", path, {}, "a" * 64, path.stat().st_size)
+    job_ids.append(job["id"])
+    run_job(store, jobs, jobs.claim(), Limits())
+    batch_id = jobs.get(job["id"])["batch_id"]
+    table_id = store.get(batch_id).tables[0].id
+    other = store.save(
+        parse_file(b"id\n001\n", "original.csv", Limits()),
+        name="original.csv",
+        source_kind="file",
+        source="original.csv",
+    )
+    ids.append(other.id)
+    lifecycle = BatchLifecycle(store, RunStore(tmp_path / "runs.sqlite3"))
+    with pytest.raises(IntakeError, match="先移除"):
+        lifecycle.purge(batch_id)
+    lifecycle.remove(batch_id)
+    assert jobs.get(job["id"])["batch_removed"]
+    lifecycle.restore(batch_id)
+    assert not store.get(batch_id).removed
+    lifecycle.remove(batch_id)
+    assert lifecycle.purge(batch_id).status == "purging"
+    assert lifecycle.purge(batch_id).status == "purging"  # uncertain HTTP response can be retried
+    with pytest.raises(IntakeError, match="无法恢复"):
+        lifecycle.restore(batch_id)
+    with pytest.raises(IntakeError):
+        store.get(batch_id)
+    assert store.get(batch_id, include_deleted=True).purging
+    assert BatchCleanup(store.database, uploads).collect()
+    with store.database.connect() as db:
+        db.execute("SELECT COUNT(*) FROM intake_rows WHERE table_id=%s", (table_id,))
+        assert db.fetchone()[0] == 1505
+    # A new worker resumes the persisted purging state rather than restarting a huge transaction.
+    cleanup = BatchCleanup(store.database, uploads)
+    for _ in range(6):
+        cleanup.collect()
+    with pytest.raises(IntakeError):
+        store.get(batch_id, include_deleted=True)
+    with pytest.raises(IntakeError):
+        jobs.get(job["id"])
+    assert original.exists() and not path.exists()
+    assert store.get(other.id).row_count == 1
+    assert not cleanup.collect()
+
+
+def test_mysql_referenced_purge_never_enters_cleanup(mysql, tmp_path):
+    from bank_project.alignment.models import Selection
+    from bank_project.alignment.sources import StagedSources
+    from bank_project.alignment.store import RunStore
+    from bank_project.intake.lifecycle import BatchLifecycle
+    from bank_project.staging.cleanup import BatchCleanup
+
+    _, store, _, ids, _ = mysql
+    batch = store.save(
+        parse_file(b"id\n001\n", "test.csv", Limits()),
+        name="test",
+        source_kind="file",
+        source="test.csv",
+    )
+    ids.append(batch.id)
+    runs = RunStore(tmp_path / "runs.sqlite3")
+    runs.create(
+        StagedSources(store, 100).read([Selection(batch_id=batch.id, table_id=batch.tables[0].id)])
+    )
+    lifecycle = BatchLifecycle(store, runs)
+    lifecycle.remove(batch.id)
+    with pytest.raises(IntakeError, match="历史分析"):
+        lifecycle.purge(batch.id)
+    assert not BatchCleanup(store.database, tmp_path / "uploads").collect()
+    assert len(list(store.iter_rows(batch.tables[0].id))) == 1
+
+
 def test_confirmed_template_splits_rows_merges_identity_and_preserves_conflicts(mysql):
     from types import SimpleNamespace
 
@@ -304,3 +390,59 @@ def test_confirmed_template_splits_rows_merges_identity_and_preserves_conflicts(
     with store.database.connect() as db:
         for table in ("graph_draft_nodes", "graph_draft_bindings", "graph_draft_edges"):
             db.execute(f"DELETE FROM {table} WHERE version=%s", (version,))
+
+
+def test_default_plan_keeps_duplicate_null_and_cross_table_identifiers_as_separate_rows(mysql):
+    from types import SimpleNamespace
+
+    from bank_project.alignment.models import SourceTable
+    from bank_project.alignment.presets import row_record_template
+    from bank_project.alignment.templates import GraphTemplate, validate_template
+    from bank_project.staging.compile import TemplateCompiler
+    from bank_project.staging.keys import KeyIndex
+
+    _, store, _, ids, _ = mysql
+    sources, mappings = [], []
+    files = [
+        ("sample.csv", "id,name\n001,甲\n001,乙\n,丙\n,丁\n".encode()),
+        ("sample.csv", "id,name\n001,甲\n".encode()),
+        ("sample.xlsx", workbook({"客户": [["id", "name"], [None, "戊"], [None, "己"]]})),
+    ]
+    for filename, content in files:
+        batch = store.save(
+            parse_file(content, filename, Limits()),
+            name="default-plan",
+            source_kind="file",
+            source=filename,
+        )
+        ids.append(batch.id)
+        sources.append(
+            SourceTable(
+                batch=batch, table=batch.tables[0], rows=store.samples(batch.tables[0]), staged=True
+            )
+        )
+        mappings.append(
+            SimpleNamespace(
+                table_id=batch.tables[0].id,
+                concept_id="customer",
+                status="review",
+                verification="verified",
+            )
+        )
+    catalog = SimpleNamespace(names={"customer": "客户"})
+    template = validate_template(
+        row_record_template(sources, mappings, GraphTemplate(), catalog), sources, catalog
+    )
+    compiler = TemplateCompiler(store, KeyIndex(store))
+    version = compiler.compile(sources, template, lambda: None)
+    try:
+        nodes = list(compiler.rows(version, "nodes"))
+        assert len(nodes) == len({n["id"] for n in nodes}) == 7
+        assert sorted(n["fields"]["name"] for n in nodes) == sorted(
+            ["甲", "乙", "丙", "丁", "甲", "戊", "己"]
+        )
+        assert {n["fields"].get("id") for n in nodes} == {"001", "", None}
+        assert {n["table_id"] for n in nodes} == {s.table.id for s in sources}
+        assert list(compiler.rows(version, "edges")) == []
+    finally:
+        compiler.release(version)

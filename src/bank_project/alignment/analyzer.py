@@ -22,7 +22,7 @@ from .models import (
 from .planning import retrieval_query
 from .relations import map_relations
 from .retrieval import RetrievalPort
-from .templates import EntitySuggestion, draft_template
+from .templates import EntitySuggestion, TemplateProperty, draft_template
 from .tracing import AnalysisProgress, Checkpoint
 
 
@@ -55,7 +55,7 @@ class Analyzer:
             tables=mappings,
             relations=[],
             warnings=[
-                "本体节点由 retrieve 匹配；得分不是正确概率，低分及缺失结果需要人工确认。",
+                "本体节点由 retrieve 匹配；得分不是正确概率，低分候选会标注为建议，可整体采纳或修改。",
                 "按已确认的对象类型、身份字段和属性生成实例；同一身份的记录可合并。",
             ],
         )
@@ -82,8 +82,7 @@ class Analyzer:
                         source, mapping, schemas, catalog, session, reporter
                     )
                     proposals[source.table.id] = proposal.relations
-                    if mapping.status == "mapped":
-                        templates[source.table.id] = proposal
+                    templates[source.table.id] = proposal
                 except (AlignmentError, ValidationError) as exc:
                     mapping.status = "failed"
                     mapping.reason = (
@@ -101,7 +100,7 @@ class Analyzer:
                 sources, mappings, result.relations, templates, catalog
             )
             result.warnings.append(
-                "请核对对象类型、字段归属、身份标识和关系，确认生成规则后再生成图谱。"
+                "已生成完整方案；无需逐项确认，可调整后整体采纳并生成。没有有效对象候选的表会说明原因。"
             )
             if result.template.note:
                 result.warnings.append(result.template.note)
@@ -128,7 +127,7 @@ class Analyzer:
                 + "、".join(e.query for e in plan.entities)
                 + "。请核对字段分组、身份标识及关联依据后再确认生成规则。"
             )
-        plan.query = retrieval_query(source.table.name, plan.query)
+        plan.query = retrieval_query(source.table.name, plan.query, table=True)
         source_columns = {c.name: c for c in source.table.columns}
         for column in plan.columns:
             column.query = retrieval_query(
@@ -185,11 +184,6 @@ class Analyzer:
         mapping.verification = (
             table_match.status if table_match.status in {"mismatch", "unavailable"} else "verified"
         )
-        if any(m.status in {"mismatch", "unavailable"} for m in other_matches):
-            mapping.status = "review"
-            mapping.verification = (
-                "mismatch" if any(m.status == "mismatch" for m in other_matches) else "unavailable"
-            )
         trace.verification = mapping.verification
         proposal = self._proposal(plan, trace.retrievals, mapping)
         await reporter.step(mapping, "selection", "completed", table_match.detail)
@@ -197,9 +191,11 @@ class Analyzer:
         mapping.columns = self._columns(source, proposal, catalog, mapping.warnings)
         pending = sum(m.status != "matched" for m in other_matches)
         if pending:
-            mapping.warnings.append(f"{pending} 项字段或分组尚待确认，原字段数据均保留")
-        if mapping.status != "mapped":
-            mapping.warnings.append("整表匹配尚未通过，请人工确认本体节点后再生成图谱")
+            mapping.warnings.append(
+                f"{pending} 项字段或分组存在不确定性；未匹配字段保留原始属性，不阻止整表生成"
+            )
+        if mapping.status != "mapped" and mapping.concept_id:
+            mapping.warnings.append("整表候选分数不足，仅作为建议；可整体采纳方案或修改对象类型")
         await reporter.step(
             mapping, "validation", "completed", "校验完成；字段与分组的待确认项已标出"
         )
@@ -217,8 +213,18 @@ class Analyzer:
                 properties=e.properties,
             )
             for e in plan.entities
-            if groups[e.id].status == "matched"
+            if groups[e.id].status in {"matched", "review"} and groups[e.id].selected
         ]
+        covered = {p.column for e in entities for p in e.properties}
+        missing = [c.column for c in plan.columns if c.column not in covered]
+        primary = next((e for e in plan.entities if e.query == plan.query), None)
+        if missing and primary and len(entities) == len(plan.entities):
+            # Preserve unassigned source metadata on the explicitly identified primary object.
+            owner = next(e for e in entities if e.id == primary.id)
+            owner.properties.extend(TemplateProperty(column=c, name=c) for c in missing)
+            mapping.structure_notes.append(
+                f"{len(missing)} 个未分组字段作为原始属性保留在主对象“{primary.query}”，可在高级配置中调整。"
+            )
         # Partial grouping must not drop columns or silently remove a transaction participant.
         if len(entities) != len(plan.entities) or (
             entities
@@ -229,7 +235,7 @@ class Analyzer:
             mapping.warnings.append("实体分组未全部匹配或未覆盖所有字段，保留整表草稿供人工调整")
             mapping.structure_notes.append(
                 "分组匹配不完整，当前仅保留整表草稿，尚不能证明整行就是同一个业务对象。"
-                "请在高级配置中补充分组，或确认整行确实属于同一种对象。"
+                "可在高级配置中补充分组；整体采纳时采用当前展示的对象与属性。"
             )
         return TableProposal(
             concept_id=mapping.concept_id,
@@ -257,6 +263,7 @@ class Analyzer:
             table_id=source.table.id,
             batch_id=source.batch.id,
             table_name=source.table.name,
+            source_name=source.batch.name,
             row_count=source.table.row_count,
             trace=MatchTrace(method="retrieve", confidence_threshold=self.threshold),
             columns=[

@@ -41,6 +41,9 @@ class BatchStore:
                     PRIMARY KEY(table_id, position)
                 );
             """)
+            db.execute("BEGIN IMMEDIATE")
+            if "deleted" not in {r[1] for r in db.execute("PRAGMA table_info(batches)")}:
+                db.execute("ALTER TABLE batches ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0")
 
     @contextmanager
     def connect(self):
@@ -75,7 +78,7 @@ class BatchStore:
         )
         with self.connect() as db:
             db.execute(
-                "INSERT INTO batches VALUES (?, ?, ?)",
+                "INSERT INTO batches(id,created_at,metadata) VALUES (?, ?, ?)",
                 (
                     batch.id,
                     batch.created_at,
@@ -107,35 +110,46 @@ class BatchStore:
                 )
         return batch
 
-    def list(self, offset: int, limit: int) -> BatchPage:
+    def list(self, offset: int, limit: int, *, removed=False) -> BatchPage:
         with self.connect() as db:
             db.execute("BEGIN")
-            total = db.execute("SELECT count(*) FROM batches").fetchone()[0]
+            total = db.execute(
+                "SELECT count(*) FROM batches WHERE deleted=?", (removed,)
+            ).fetchone()[0]
             records = db.execute(
-                "SELECT metadata FROM batches ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
-                (limit, offset),
+                "SELECT metadata FROM batches WHERE deleted=? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
+                (removed, limit, offset),
             ).fetchall()
         return BatchPage(
-            items=[BatchInfo.model_validate_json(row[0]) for row in records],
+            items=[
+                BatchInfo.model_validate_json(row[0]).model_copy(update={"removed": removed})
+                for row in records
+            ],
             total=total,
             offset=offset,
             limit=limit,
         )
 
-    def get(self, batch_id: str) -> BatchDetail:
+    def get(self, batch_id: str, *, include_deleted=False) -> BatchDetail:
         with self.connect() as db:
             db.execute("BEGIN")
-            row = db.execute("SELECT metadata FROM batches WHERE id=?", (batch_id,)).fetchone()
-            if row is None:
+            row = db.execute(
+                "SELECT metadata,deleted FROM batches WHERE id=?", (batch_id,)
+            ).fetchone()
+            if row is None or (row[1] and not include_deleted):
                 raise IntakeError("批次不存在或已被删除", status=404)
             tables = db.execute(
                 "SELECT metadata FROM tables WHERE batch_id=? ORDER BY position", (batch_id,)
             ).fetchall()
         return BatchDetail(
-            **json.loads(row[0]), tables=[TableInfo.model_validate_json(t[0]) for t in tables]
+            **(json.loads(row[0]) | {"removed": bool(row[1])}),
+            tables=[TableInfo.model_validate_json(t[0]) for t in tables],
         )
 
-    def preview(self, batch_id: str, table_id: str, offset: int, limit: int) -> TablePage:
+    def preview(
+        self, batch_id: str, table_id: str, offset: int, limit: int, *, include_deleted=False
+    ) -> TablePage:
+        self.get(batch_id, include_deleted=include_deleted)
         with self.connect() as db:
             db.execute("BEGIN")
             table = db.execute(
@@ -156,5 +170,16 @@ class BatchStore:
 
     def delete(self, batch_id: str) -> None:
         with self.connect() as db:
-            if db.execute("DELETE FROM batches WHERE id=?", (batch_id,)).rowcount == 0:
+            if db.execute("UPDATE batches SET deleted=1 WHERE id=?", (batch_id,)).rowcount == 0:
                 raise IntakeError("批次不存在或已被删除", status=404)
+
+    def restore(self, batch_id):
+        with self.connect() as db:
+            if not db.execute("UPDATE batches SET deleted=0 WHERE id=?", (batch_id,)).rowcount:
+                raise IntakeError("批次不存在或已被删除", status=404)
+
+    def purge(self, batch_id):
+        with self.connect() as db:
+            if not db.execute("DELETE FROM batches WHERE id=? AND deleted=1", (batch_id,)).rowcount:
+                raise IntakeError("请先移除数据，再彻底删除", status=409)
+        return "deleted"

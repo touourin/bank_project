@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("an edited graph template must be saved before generation", async ({
+test("one-step generation includes unsaved edits and preserves them after failure", async ({
   page,
 }) => {
   const run = {
@@ -62,6 +62,7 @@ test("an edited graph template must be saved before generation", async ({
     },
   };
   let saved = structuredClone(run);
+  let attempts = 0;
   await page.route("**/api/v1/alignment/runs", (route) =>
     route.fulfill({ json: [{ ...run, result: null }] }),
   );
@@ -72,8 +73,16 @@ test("an edited graph template must be saved before generation", async ({
     route.fulfill({ json: saved }),
   );
   await page.route(
-    "**/api/v1/alignment/runs/template-original/template",
+    "**/api/v1/alignment/runs/template-original/graph",
     async (route) => {
+      attempts += 1;
+      if (attempts === 1) {
+        await route.fulfill({
+          status: 409,
+          json: { detail: "已有任务，请稍后重试" },
+        });
+        return;
+      }
       saved = {
         ...run,
         id: "template-saved",
@@ -82,12 +91,15 @@ test("an edited graph template must be saved before generation", async ({
           template: { ...route.request().postDataJSON(), confirmed: true },
         },
       };
-      await route.fulfill({ status: 201, json: saved });
+      await route.fulfill({ status: 202, json: saved });
     },
   );
   await page.goto("/");
   await page.getByRole("tab", { name: "02 本体对齐与图谱生成" }).click();
-  const generate = page.getByRole("button", { name: "生成图谱", exact: true });
+  const generate = page.getByRole("button", {
+    name: "采纳方案并生成",
+    exact: true,
+  });
   await expect(generate).toBeEnabled();
   await page
     .getByText("高级配置：实体拆分、跨表合并与关系", { exact: true })
@@ -95,9 +107,20 @@ test("an edited graph template must be saved before generation", async ({
   await page
     .getByRole("textbox", { name: "节点 1 身份范围", exact: true })
     .fill("shared-customers");
-  await expect(generate).toBeDisabled();
-  await page.getByRole("button", { name: "确认生成规则", exact: true }).click();
   await expect(generate).toBeEnabled();
+  await generate.click();
+  const dialog = page.getByRole("dialog", { name: "采纳匹配方案并生成图谱" });
+  await dialog
+    .getByRole("button", { name: "采纳并开始生成", exact: true })
+    .click();
+  await expect(dialog).toContainText("已有任务，请稍后重试");
+  await expect(
+    page.getByRole("textbox", { name: "节点 1 身份范围", exact: true }),
+  ).toHaveValue("shared-customers");
+  await dialog
+    .getByRole("button", { name: "采纳并开始生成", exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
   expect(saved.result.template.nodes[0].identity_scope).toBe(
     "shared-customers",
   );

@@ -32,6 +32,43 @@ class RunStore:
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS one_active_job ON jobs(active) WHERE active=1;
             """)
+            # Build once for existing runs, including those outside the recent-30 list.
+            db.execute("BEGIN IMMEDIATE")
+            if not db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='run_batches'"
+            ).fetchone():
+                db.execute(
+                    "CREATE TABLE run_batches (run_id TEXT NOT NULL, batch_id TEXT NOT NULL, "
+                    "PRIMARY KEY(batch_id,run_id))"
+                )
+                for run_id, content in db.execute("SELECT id,sources FROM runs"):
+                    self._index_batches(
+                        db, run_id, (s["batch"]["id"] for s in json.loads(zlib.decompress(content)))
+                    )
+
+    @staticmethod
+    def _index_batches(db, run_id, batch_ids):
+        db.executemany(
+            "INSERT OR IGNORE INTO run_batches VALUES(?,?)",
+            ((run_id, batch_id) for batch_id in batch_ids),
+        )
+
+    @contextmanager
+    def source_guard(self):
+        """Serialize source admission and removal across API processes."""
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            yield db
+
+    @staticmethod
+    def batch_references(db, batch_id):
+        count = db.execute(
+            "SELECT COUNT(*) FROM run_batches WHERE batch_id=?", (batch_id,)
+        ).fetchone()[0]
+        rows = db.execute(
+            "SELECT run_id FROM run_batches WHERE batch_id=? ORDER BY run_id LIMIT 5", (batch_id,)
+        ).fetchall()
+        return {"count": count, "run_ids": [r[0] for r in rows]}
 
     @contextmanager
     def connect(self):
@@ -78,24 +115,33 @@ class RunStore:
         return cursor.lastrowid, owner
 
     def create(self, sources: list[SourceTable]):
+        return self.create_from(lambda: sources)
+
+    def create_from(self, read_sources):
+        # Keep the guard from source validation through durable reference publication.
+        with self.source_guard() as db:
+            return self._create(db, read_sources())
+
+    def _create(self, db, sources):
         run = Run(id=str(uuid4()), created_at=datetime.now(UTC).isoformat())
         content = zlib.compress(
             json.dumps([s.model_dump() for s in sources], ensure_ascii=False).encode()
         )
-        with self.connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            sequence, owner = self._claim(db, run.id, "analyze")
-            db.execute(
-                "INSERT INTO runs VALUES(?,?,?,?)",
-                (run.id, run.created_at, run.model_dump_json(), content),
-            )
+        sequence, owner = self._claim(db, run.id, "analyze")
+        db.execute(
+            "INSERT INTO runs VALUES(?,?,?,?)",
+            (run.id, run.created_at, run.model_dump_json(), content),
+        )
+        self._index_batches(db, run.id, (s.batch.id for s in sources))
         return run, sequence, owner
 
-    def start_graph(self, run_id):
+    def start_graph(self, run_id, result=None):
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             self._expire(db)
             run = self._read(db, run_id)
+            if result is not None:
+                run = self._revise(db, run, result)
             if (
                 run.status != "ready"
                 or not run.result
@@ -107,7 +153,7 @@ class RunStore:
                 raise AlignmentError("没有可生成实例的匹配结果")
             if run.graph_status == "ready":
                 raise AlignmentError("该分析版本已生成图谱，请查看已发布版本", 409)
-            sequence, owner = self._claim(db, run_id, "graph")
+            sequence, owner = self._claim(db, run.id, "graph")
             run.graph_status, run.graph_error = "building", None
             self._write(db, run)
         return run, sequence, owner
@@ -124,20 +170,29 @@ class RunStore:
             db.execute("BEGIN IMMEDIATE")
             self._expire(db)
             original = self._read(db, run_id)
-            if original.status != "ready" or original.graph_status == "building":
-                raise AlignmentError("请等待当前任务完成后再修改匹配", 409)
-            run = Run(
-                id=str(uuid4()),
-                created_at=datetime.now(UTC).isoformat(),
-                status="ready",
-                progress="人工修改已保存，请核对后生成图谱",
-                result=result,
-                based_on_run_id=original.id,
-            )
-            db.execute(
-                "INSERT INTO runs SELECT ?,?, ?,sources FROM runs WHERE id=?",
-                (run.id, run.created_at, run.model_dump_json(), original.id),
-            )
+            run = self._revise(db, original, result)
+        return run
+
+    def _revise(self, db, original, result):
+        # Used by both saving and atomic adopt-and-generate. Failed job claims roll back the fork.
+        if original.status != "ready" or original.graph_status == "building":
+            raise AlignmentError("请等待当前任务完成后再修改匹配", 409)
+        run = Run(
+            id=str(uuid4()),
+            created_at=datetime.now(UTC).isoformat(),
+            status="ready",
+            progress="方案已保存，可生成图谱",
+            result=result,
+            based_on_run_id=original.id,
+        )
+        db.execute(
+            "INSERT INTO runs SELECT ?,?, ?,sources FROM runs WHERE id=?",
+            (run.id, run.created_at, run.model_dump_json(), original.id),
+        )
+        db.execute(
+            "INSERT INTO run_batches SELECT ?,batch_id FROM run_batches WHERE run_id=?",
+            (run.id, original.id),
+        )
         return run
 
     def list(self):

@@ -18,6 +18,8 @@ class TemplateNode(BaseModel):
     table_id: str = Field(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_:.-]+$")
     concept_id: str = Field(min_length=1, max_length=200)
     concept_name: str = ""
+    retrieval_target: Literal["table", "entity"] | None = None
+    retrieval_name: str | None = Field(default=None, max_length=255)
     identity_scope: str = Field(min_length=1, max_length=200)
     key_columns: list[str] = Field(default_factory=list, max_length=16)
     properties: list[TemplateProperty] = Field(default_factory=list, max_length=2048)
@@ -54,6 +56,7 @@ class GraphTemplate(BaseModel):
     nodes: list[TemplateNode] = Field(default_factory=list, max_length=120)
     edges: list[TemplateEdge] = Field(default_factory=list, max_length=240)
     confirmed: bool = False
+    mode: Literal["suggested", "row_records", "custom"] = "suggested"
     note: str = Field(default="", max_length=2000)
 
 
@@ -61,7 +64,12 @@ def draft_template(sources, mappings, relations, suggestions=None, catalog=None)
     """Conservative initial template. Shared identity requires explicit user confirmation."""
     nodes = []
     for source, mapping in zip(sources, mappings, strict=True):
-        if mapping.status != "mapped" or not mapping.concept_id:
+        if (
+            mapping.status not in {"mapped", "review"}
+            or mapping.verification in {"mismatch", "unavailable"}
+            or not mapping.concept_id
+            or (catalog is not None and mapping.concept_id not in catalog.names)
+        ):
             continue
         nodes.append(
             TemplateNode(
@@ -69,6 +77,8 @@ def draft_template(sources, mappings, relations, suggestions=None, catalog=None)
                 table_id=source.table.id,
                 concept_id=mapping.concept_id,
                 concept_name=mapping.concept_name or "",
+                retrieval_target="table",
+                retrieval_name=source.table.name,
                 identity_scope=source.table.id,
                 key_columns=[c.name for c in source.table.columns if c.primary_key],
                 properties=[
@@ -84,11 +94,13 @@ def draft_template(sources, mappings, relations, suggestions=None, catalog=None)
     rejected = []
     for source in sources:
         proposal = (suggestions or {}).get(source.table.id)
-        # A single-object table already has a stable, source-keyed default above.
-        # Only multi-object suggestions require a split template for review.
-        if not proposal or len(proposal.entities) < 2 or catalog is None:
+        # Valid entity groups can provide a proposal even when the sheet name did not match.
+        if not proposal or not proposal.entities or catalog is None:
             continue
-        local = {e.id: str(uuid4()) for e in proposal.entities}
+        local = {
+            e.id: source.table.id if len(proposal.entities) == 1 else str(uuid4())
+            for e in proposal.entities
+        }
         if len(local) != len(proposal.entities):
             rejected.append(source.table.name)
             continue
@@ -98,12 +110,20 @@ def draft_template(sources, mappings, relations, suggestions=None, catalog=None)
                 table_id=source.table.id,
                 concept_id=e.concept_id,
                 concept_name=catalog.names.get(e.concept_id, ""),
-                identity_scope=source.table.id + ":" + e.id,
+                retrieval_target="entity",
+                retrieval_name=e.id,
+                identity_scope=source.table.id + (":" + e.id if len(proposal.entities) > 1 else ""),
                 key_columns=e.key_columns,
                 properties=e.properties,
             )
             for e in proposal.entities
         ]
+        if len(candidates) == 1:
+            # Object-type suggestions must not replace source keys with guessed identities.
+            candidates[0].key_columns = [c.name for c in source.table.columns if c.primary_key]
+            candidates[0].properties = [
+                TemplateProperty(column=c.name, name=c.name) for c in source.table.columns
+            ]
         edges = [
             TemplateEdge(
                 id=str(uuid4()),
@@ -202,5 +222,19 @@ def validate_template(template, sources, catalog):
                     c.name for c in tables[node.table_id].columns
                 }:
                     raise AlignmentError("关系连接字段重复或不存在")
+    if result.mode == "row_records" and (
+        result.edges
+        or len({n.table_id for n in result.nodes}) != len(result.nodes)
+        or any(
+            n.key_columns
+            or n.identity_scope != f"row:{n.table_id}"
+            or [(p.column, p.name) for p in n.properties]
+            != [(c.name, c.name) for c in tables[n.table_id].columns]
+            for n in result.nodes
+        )
+    ):
+        raise AlignmentError(
+            "默认方案需每表一个对象、每行独立且保留全部字段；调整规则请使用自定义方案"
+        )
     result.confirmed = True
     return result

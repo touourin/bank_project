@@ -3,6 +3,7 @@ import { Alert, Button, Input, Select, Space } from "antd";
 import { ErrorNotice } from "../../ui/Feedback";
 import { errorMessage } from "../../api/request";
 import { alignmentApi } from "./api";
+import { tableLabel } from "./workflow";
 import type { Run, GraphTemplate, TemplateNode } from "./types";
 
 export function AdvancedTemplateEditor({
@@ -84,7 +85,7 @@ export function AdvancedTemplateEditor({
                   disabled={disabled}
                   options={tables.map((t) => ({
                     value: t.table_id,
-                    label: t.table_name,
+                    label: tableLabel(t),
                   }))}
                   onChange={(value) =>
                     updateNode(node.id, {

@@ -87,6 +87,7 @@ class FieldInterpreter:
         if len(names) <= self.batch_columns:
             prompt = encode(
                 {
+                    "source_name": source.batch.name[:255],
                     "table": source.table.model_dump(),
                     "samples": [
                         [None if v is None else v[:80] for v in source.rows[i].values]
@@ -120,6 +121,7 @@ class FieldInterpreter:
         def prompt(indices):
             return encode(
                 {
+                    "source_name": source.batch.name[:255],
                     "table": {"id": source.table.id, "name": source.table.name},
                     "overview": outline.model_dump(exclude={"relations"}),
                     "column_count": len(names),
@@ -172,6 +174,7 @@ class FieldInterpreter:
             else []
         )
         data = {
+            "source_name": source.batch.name[:255],
             "table": {"id": source.table.id, "name": source.table.name},
             "column_count": len(catalog),
             "catalog": catalog,
