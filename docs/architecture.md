@@ -5,7 +5,10 @@ HTTP / React 页面
     ├─ intake：上传流 / 外部只读 MySQL → 后台接入任务
     │          CSV / XLSX 流式解析 → 批次写入端口
     ├─ staging：独立 MySQL 批次、行、任务、关联索引、模板编译
-    └─ alignment：结构与样例 → 字段含义解释 → retrieve 匹配 → 人工确认模板 → 分批业务图谱
+    ├─ alignment：结构与样例 → 字段含义解释 → retrieve 匹配 → 人工确认模板 → 分批业务图谱
+    ├─ graphrag：TXT → 持久后台索引 → Parquet / LanceDB → 图谱 / 问答
+    ├─ resolution：完整 GraphRAG / DB 图 → 候选证据 → 人工审核 → 可撤销派生图
+    └─ knowledge：GraphRAG 实体 → 现有 retrieve 决策 → 追加 BOID / 边类型
 ```
 
 解析器只接收文件和写入端口，不掌握数据库凭据。外部 MySQL 适配器只读来源，通过相同写入端口交付数据。内部存储不调用文件解析器或模型。`main.py` 集中装配依赖，API 路由负责输入、鉴权与响应，不承载匹配算法。
@@ -15,6 +18,9 @@ HTTP / React 页面
 | `intake/` | 数据契约、值保持、文件/源适配、上传落盘与独立 worker |
 | `staging/` | 内部 MySQL 连接、不可变批次、持久队列、关联索引、模板实例编译 |
 | `alignment/` | 本体/LLM 适配、可追踪分析、人工修改、模板校验、图谱版本发布 |
+| `graphrag/` | 迁入文档接入与索引 worker、原生 GraphRAG 查询及完整产物适配 |
+| `resolution/` | 迁入消歧引擎、两类图谱证据适配、快照与审核、合并过程和派生图 |
+| `knowledge/` | 已发布 DB 版本全量读取、复用匹配逻辑的追加标注 |
 | `api/` | 两步路由、Bearer / Origin 防护、请求限额、健康检查 |
 | `frontend/src/ui/` | 公共主题、面板、表格、反馈、分页、确认弹窗 |
 | `frontend/src/features/` | 各步骤页面、契约、API、业务组件 |

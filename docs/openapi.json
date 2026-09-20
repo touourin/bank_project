@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Bank project",
-    "description": "第一步：通用数据接入与暂存。第二步：按表进行本体对齐、展示映射及生成独立图谱版本。",
+    "description": "数据接入、本体对齐与图谱生成、TXT GraphRAG 索引问答、实体消歧及 BOID 挂载。",
     "version": "0.1.0"
   },
   "paths": {
@@ -1556,6 +1556,934 @@
           }
         }
       }
+    },
+    "/api/v1/graphrag/config": {
+      "get": {
+        "tags": [
+          "GraphRAG 文档图谱"
+        ],
+        "summary": "Config",
+        "operationId": "config_api_v1_graphrag_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/graphrag/datasets": {
+      "get": {
+        "tags": [
+          "GraphRAG 文档图谱"
+        ],
+        "summary": "Datasets",
+        "operationId": "datasets_api_v1_graphrag_datasets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/graphrag/uploads": {
+      "post": {
+        "tags": [
+          "GraphRAG 文档图谱"
+        ],
+        "summary": "Upload",
+        "operationId": "upload_api_v1_graphrag_uploads_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "title": "Filename"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/graphrag/datasets/{key}": {
+      "get": {
+        "tags": [
+          "GraphRAG 文档图谱"
+        ],
+        "summary": "Dataset",
+        "operationId": "dataset_api_v1_graphrag_datasets__key__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/graphrag/datasets/{key}/index": {
+      "post": {
+        "tags": [
+          "GraphRAG 文档图谱"
+        ],
+        "summary": "Index",
+        "operationId": "index_api_v1_graphrag_datasets__key__index_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/graphrag/datasets/{key}/graph": {
+      "get": {
+        "tags": [
+          "GraphRAG 文档图谱"
+        ],
+        "summary": "Graph",
+        "operationId": "graph_api_v1_graphrag_datasets__key__graph_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/graphrag/datasets/{key}/query": {
+      "post": {
+        "tags": [
+          "GraphRAG 文档图谱"
+        ],
+        "summary": "Query",
+        "operationId": "query_api_v1_graphrag_datasets__key__query_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/sources": {
+      "get": {
+        "tags": [
+          "图谱来源与 GraphRAG 本体匹配"
+        ],
+        "summary": "Sources",
+        "operationId": "sources_api_v1_knowledge_sources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/knowledge/matches": {
+      "get": {
+        "tags": [
+          "图谱来源与 GraphRAG 本体匹配"
+        ],
+        "summary": "Matches",
+        "operationId": "matches_api_v1_knowledge_matches_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "图谱来源与 GraphRAG 本体匹配"
+        ],
+        "summary": "Match",
+        "operationId": "match_api_v1_knowledge_matches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/knowledge/matches/{run_id}": {
+      "get": {
+        "tags": [
+          "图谱来源与 GraphRAG 本体匹配"
+        ],
+        "summary": "Get Match",
+        "operationId": "get_match_api_v1_knowledge_matches__run_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/matches/{run_id}/concepts": {
+      "get": {
+        "tags": [
+          "图谱来源与 GraphRAG 本体匹配"
+        ],
+        "summary": "Concepts",
+        "operationId": "concepts_api_v1_knowledge_matches__run_id__concepts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/matches/{run_id}/decisions": {
+      "post": {
+        "tags": [
+          "图谱来源与 GraphRAG 本体匹配"
+        ],
+        "summary": "Decide",
+        "operationId": "decide_api_v1_knowledge_matches__run_id__decisions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/matches/{run_id}/graph": {
+      "get": {
+        "tags": [
+          "图谱来源与 GraphRAG 本体匹配"
+        ],
+        "summary": "Graph",
+        "operationId": "graph_api_v1_knowledge_matches__run_id__graph_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resolution/runs": {
+      "get": {
+        "tags": [
+          "实体消歧与人工校验"
+        ],
+        "summary": "Runs",
+        "operationId": "runs_api_v1_resolution_runs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResolutionRun"
+                  },
+                  "type": "array",
+                  "title": "Response Runs Api V1 Resolution Runs Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "实体消歧与人工校验"
+        ],
+        "summary": "Create",
+        "operationId": "create_api_v1_resolution_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/resolution/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "实体消歧与人工校验"
+        ],
+        "summary": "Run",
+        "operationId": "run_api_v1_resolution_runs__run_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resolution/runs/{run_id}/decisions": {
+      "post": {
+        "tags": [
+          "实体消歧与人工校验"
+        ],
+        "summary": "Decide",
+        "operationId": "decide_api_v1_resolution_runs__run_id__decisions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resolution/runs/{run_id}/manual": {
+      "post": {
+        "tags": [
+          "实体消歧与人工校验"
+        ],
+        "summary": "Manual",
+        "operationId": "manual_api_v1_resolution_runs__run_id__manual_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resolution/runs/{run_id}/graph": {
+      "get": {
+        "tags": [
+          "实体消歧与人工校验"
+        ],
+        "summary": "Graph",
+        "operationId": "graph_api_v1_resolution_runs__run_id__graph_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resolution/runs/{run_id}/original": {
+      "get": {
+        "tags": [
+          "实体消歧与人工校验"
+        ],
+        "summary": "Original",
+        "operationId": "original_api_v1_resolution_runs__run_id__original_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1578,6 +2506,78 @@
           "tables"
         ],
         "title": "AnalyzeRequest"
+      },
+      "Audit": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "merge",
+              "reject",
+              "reset",
+              "manual"
+            ],
+            "title": "Action"
+          },
+          "candidate_id": {
+            "type": "string",
+            "title": "Candidate Id"
+          },
+          "canonical_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Id"
+          },
+          "reviewer": {
+            "type": "string",
+            "title": "Reviewer"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "previous_status": {
+            "type": "string",
+            "title": "Previous Status"
+          },
+          "source_nodes": {
+            "items": {
+              "$ref": "#/components/schemas/NodeBrief"
+            },
+            "type": "array",
+            "title": "Source Nodes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "action",
+          "candidate_id",
+          "reviewer",
+          "note",
+          "created_at",
+          "revision",
+          "previous_status"
+        ],
+        "title": "Audit"
       },
       "BatchDetail": {
         "properties": {
@@ -1789,6 +2789,86 @@
         ],
         "title": "BatchReferences"
       },
+      "Candidate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Node Ids"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/NodeBrief"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Evidence"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/Conflict"
+            },
+            "type": "array",
+            "title": "Conflicts"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "merged",
+              "rejected"
+            ],
+            "title": "Status",
+            "default": "pending"
+          },
+          "canonical_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Id"
+          },
+          "decision_order": {
+            "type": "integer",
+            "title": "Decision Order",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "node_ids",
+          "nodes",
+          "score",
+          "reasons"
+        ],
+        "title": "Candidate"
+      },
       "CatalogTable": {
         "properties": {
           "name": {
@@ -1964,6 +3044,28 @@
         ],
         "title": "ConceptRef"
       },
+      "Conflict": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "values": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "values"
+        ],
+        "title": "Conflict"
+      },
       "DataRow": {
         "properties": {
           "number": {
@@ -1991,6 +3093,64 @@
           "values"
         ],
         "title": "DataRow"
+      },
+      "DecisionRequest": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Candidate Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "merge",
+              "reject",
+              "reset"
+            ],
+            "title": "Action"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "canonical_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Id"
+          },
+          "reviewer": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reviewer",
+            "default": "人工校验"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "action",
+          "expected_revision"
+        ],
+        "title": "DecisionRequest"
       },
       "ForeignKey": {
         "properties": {
@@ -2529,6 +3689,57 @@
         "type": "object",
         "title": "Limits"
       },
+      "ManualRequest": {
+        "properties": {
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 2,
+            "title": "Node Ids"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "canonical_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Id"
+          },
+          "reviewer": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reviewer",
+            "default": "人工校验"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "node_ids",
+          "expected_revision"
+        ],
+        "title": "ManualRequest"
+      },
       "MappingEdit": {
         "properties": {
           "created_at": {
@@ -2677,6 +3888,98 @@
         ],
         "title": "MappingResult"
       },
+      "MatchDecision": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "enum": [
+              "node",
+              "edge"
+            ],
+            "title": "Target"
+          },
+          "target_id": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Target Id"
+          },
+          "boid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Boid"
+          },
+          "edge_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edge Type"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "reviewer": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Reviewer",
+            "default": "人工审核"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target",
+          "target_id",
+          "expected_revision"
+        ],
+        "title": "MatchDecision"
+      },
+      "MatchRequest": {
+        "properties": {
+          "source_kind": {
+            "type": "string",
+            "const": "graphrag",
+            "title": "Source Kind"
+          },
+          "source_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_kind",
+          "source_id"
+        ],
+        "title": "MatchRequest"
+      },
       "MatchStep": {
         "properties": {
           "key": {
@@ -2816,6 +4119,31 @@
         ],
         "title": "MatchTrace"
       },
+      "Merge": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "title": "Candidate Id"
+          },
+          "source_nodes": {
+            "items": {
+              "$ref": "#/components/schemas/NodeBrief"
+            },
+            "type": "array",
+            "title": "Source Nodes"
+          },
+          "target_node": {
+            "$ref": "#/components/schemas/NodeBrief"
+          }
+        },
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "source_nodes",
+          "target_node"
+        ],
+        "title": "Merge"
+      },
       "MysqlConnection": {
         "properties": {
           "host": {
@@ -2909,6 +4237,29 @@
         "type": "object",
         "title": "MysqlRequest"
       },
+      "NodeBrief": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "NodeBrief"
+      },
       "PurgeResult": {
         "properties": {
           "status": {
@@ -2925,6 +4276,31 @@
           "status"
         ],
         "title": "PurgeResult"
+      },
+      "QueryRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 16000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "local",
+              "global",
+              "drift"
+            ],
+            "title": "Method",
+            "default": "local"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "QueryRequest"
       },
       "ReadyResponse": {
         "properties": {
@@ -3011,6 +4387,103 @@
           "status"
         ],
         "title": "RelationMapping"
+      },
+      "ResolutionRun": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "graphrag",
+              "database"
+            ],
+            "title": "Source Kind"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "default": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "analyzing",
+              "ready",
+              "failed"
+            ],
+            "title": "Status",
+            "default": "analyzing"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "progress": {
+            "type": "string",
+            "title": "Progress",
+            "default": "正在完整读取来源图谱"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "audits": {
+            "items": {
+              "$ref": "#/components/schemas/Audit"
+            },
+            "type": "array",
+            "title": "Audits"
+          },
+          "merges": {
+            "items": {
+              "$ref": "#/components/schemas/Merge"
+            },
+            "type": "array",
+            "title": "Merges"
+          },
+          "diagnostics": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Diagnostics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "source_kind",
+          "source_id",
+          "created_at"
+        ],
+        "title": "ResolutionRun"
       },
       "RetrievalTrace": {
         "properties": {
@@ -3238,6 +4711,72 @@
           "table_id"
         ],
         "title": "Selection"
+      },
+      "StartRequest": {
+        "properties": {
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "graphrag",
+              "database"
+            ],
+            "title": "Source Kind"
+          },
+          "source_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_kind",
+          "source_id"
+        ],
+        "title": "StartRequest"
+      },
+      "Summary": {
+        "properties": {
+          "original_node_count": {
+            "type": "integer",
+            "title": "Original Node Count",
+            "default": 0
+          },
+          "original_edge_count": {
+            "type": "integer",
+            "title": "Original Edge Count",
+            "default": 0
+          },
+          "node_count": {
+            "type": "integer",
+            "title": "Node Count",
+            "default": 0
+          },
+          "edge_count": {
+            "type": "integer",
+            "title": "Edge Count",
+            "default": 0
+          },
+          "pending_count": {
+            "type": "integer",
+            "title": "Pending Count",
+            "default": 0
+          },
+          "merged_count": {
+            "type": "integer",
+            "title": "Merged Count",
+            "default": 0
+          },
+          "rejected_count": {
+            "type": "integer",
+            "title": "Rejected Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "Summary"
       },
       "TableInfo": {
         "properties": {

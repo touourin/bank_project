@@ -3,6 +3,8 @@ import { Button, Form, Input, Tabs, Tooltip } from "antd";
 import { Blocks, KeyRound, Moon, Sun } from "lucide-react";
 import { IntakePage } from "./features/intake/IntakePage";
 import { AlignmentPage } from "./features/alignment/AlignmentPage";
+import { GraphRagPage } from "./features/knowledge/GraphRagPage";
+import { ResolutionPage } from "./features/knowledge/ResolutionPage";
 import { getHealth } from "./api/client";
 import { useResource } from "./hooks/useResource";
 import { useTheme } from "./hooks/useTheme";
@@ -93,6 +95,16 @@ export function App() {
             key: "alignment",
             label: "02 本体对齐与图谱生成",
             children: <AlignmentPage key={token} token={token} />,
+          },
+          {
+            key: "graphrag",
+            label: "03 GraphRAG 图谱与问答",
+            children: <GraphRagPage key={token} token={token} />,
+          },
+          {
+            key: "resolution",
+            label: "04 实体消歧",
+            children: <ResolutionPage key={token} token={token} />,
           },
         ]}
       />

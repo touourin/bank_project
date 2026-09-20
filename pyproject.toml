@@ -18,17 +18,31 @@ dependencies = [
   "defusedxml>=0.7,<1",
   "httpx>=0.28,<1",
   "neo4j>=6.3,<7",
+  "PyYAML>=6,<7",
+  "python-dotenv>=1,<2",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "httpx>=0.28,<1", "ruff>=0.11,<1"]
 mock = ["openpyxl>=3.1,<4", "PyMySQL[rsa]>=1.1,<2", "python-dotenv>=1,<2"]
+graphrag = [
+  "graphrag==2.5.0",
+  "pypdf>=6,<7",
+  "pandas==2.3.1",
+  "numpy==1.26.4",
+  "pyarrow==21.0.0",
+  "lancedb==0.17.0",
+  "openai==1.107.0",
+]
 
 [project.scripts]
 bank-project = "bank_project.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+bank_project = ["graphrag/LICENSE", "resolution/engine/LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

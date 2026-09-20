@@ -20,13 +20,19 @@ from bank_project.alignment.sources import StagedSources
 from bank_project.alignment.store import RunStore
 from bank_project.api.alignment import router as alignment_router
 from bank_project.api.body_limit import BodyLimitMiddleware
+from bank_project.api.graphrag import router as graphrag_router
 from bank_project.api.health import router as health_router
 from bank_project.api.intake import router as intake_router
+from bank_project.api.knowledge import router as knowledge_router
+from bank_project.api.resolution import router as resolution_router
+from bank_project.graphrag import GraphRagError, GraphRagService
 from bank_project.intake.lifecycle import BatchLifecycle
 from bank_project.intake.models import IntakeError
 from bank_project.intake.mysql import MysqlConnection, MysqlSource
 from bank_project.intake.service import IntakeService
 from bank_project.intake.store import BatchStore
+from bank_project.knowledge.service import KnowledgeService
+from bank_project.resolution.service import ResolutionService
 from bank_project.settings import Settings
 
 
@@ -86,21 +92,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             VersionedGraph(config, batch_store if database else None, key_index),
         )
         app.state.batch_lifecycle = BatchLifecycle(batch_store, app.state.alignment.store)
+        app.state.graphrag = GraphRagService(config)
+        app.state.knowledge = KnowledgeService(
+            config, app.state.graphrag, app.state.alignment.graph
+        )
+        app.state.resolution = ResolutionService(config, app.state.knowledge.load_graph)
+        app.state.knowledge.resolution = app.state.resolution
         try:
             yield
         finally:
             await app.state.alignment.close()
+            await app.state.knowledge.close()
+            await app.state.resolution.close()
 
     app = FastAPI(
         title="Bank project",
         version=__version__,
-        description="第一步：通用数据接入与暂存。第二步：按表进行本体对齐、展示映射及生成独立图谱版本。",
+        description="数据接入、本体对齐与图谱生成、TXT GraphRAG 索引问答、实体消歧及 BOID 挂载。",
         lifespan=lifespan,
     )
     app.add_middleware(BodyLimitMiddleware)
     app.include_router(health_router)
     app.include_router(intake_router)
     app.include_router(alignment_router)
+    app.include_router(graphrag_router)
+    app.include_router(knowledge_router)
+    app.include_router(resolution_router)
+
+    @app.exception_handler(GraphRagError)
+    async def graphrag_error(request, exc: GraphRagError):
+        return JSONResponse({"detail": exc.message}, status_code=exc.status)
 
     @app.exception_handler(AlignmentError)
     async def alignment_error(request, exc: AlignmentError):

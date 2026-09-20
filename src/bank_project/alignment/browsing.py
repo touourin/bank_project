@@ -100,9 +100,7 @@ class GraphBrowser:
                 clauses.append("""EXISTS { MATCH (a:BankAlignedInstance {version:$version,id:$focus})
                     -[:BANK_SOURCE_LINK {version:$version}]-(n) }""")
             where = " AND ".join(clauses)
-            params = dict(
-                version=version, concept=concept, term=query.strip().lower(), focus=focus
-            )
+            params = dict(version=version, concept=concept, term=query.strip().lower(), focus=focus)
             total = self.query(
                 session,
                 f"MATCH (n:BankAlignedInstance) WHERE {where} RETURN count(n) AS count",

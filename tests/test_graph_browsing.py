@@ -38,7 +38,9 @@ def test_labels_prefer_subject_name_never_a_participant_or_internal_table_id():
 
 
 def test_browse_api_retains_auth_and_validates_bounded_parameters(tmp_path):
-    settings = Settings(_env_file=None, data_dir=tmp_path, api_token="browser-test-token-1234567890")
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, api_token="browser-test-token-1234567890"
+    )
     with TestClient(create_app(settings)) as client:
         assert client.get("/api/v1/alignment/graph/overview").status_code == 401
         headers = {"Authorization": "Bearer browser-test-token-1234567890"}

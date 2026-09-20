@@ -8,6 +8,10 @@ React + TypeScript + Vite + Ant Design。Docker 由 Caddy 提供静态文件和�
 
 第二步“本体对齐与图谱生成”位于 `src/features/alignment/`，包含跨批次选表、分析任务轮询、字段映射与关联依据、独立图谱生成、已发布版本预览及节点原值详情。两个步骤复用 `ui/` 公共组件及 `api/request.ts` HTTP 边界；不会自动重试生成等写操作。
 
+文档与消歧功能位于 `src/features/knowledge/`。第一步的 TXT 面板负责多文件保存；第三步 `GraphRagPage` 提供索引任务、Cytoscape 图谱、三种原生问答和 `MatchingPanel` 节点/边审核；第四步 `ResolutionPage` 提供两类图谱来源、证据/冲突核验、多个节点到一个节点的合并过程、人工合并、撤销及审计。`KnowledgeGraphPanel` 保留完整数据表和 JSON 导出，画布最多绘制 250 个节点/1,000 条边。所有新页面复用原有主题、公共组件、鉴权和请求边界。
+
+匹配与消歧的来源选择包含固定修订的派生结果，可双向串联；旧版本选择失效会提示刷新。问答清楚标示使用原始 GraphRAG 索引，避免将独立派生图当作已经重建的社区报告和向量。新增浏览器测试通过确定性接口替身覆盖这些交互，后端服务及原生索引契约另由 Python 回归验证。
+
 ```bash
 npm --prefix frontend run dev
 npm --prefix frontend run build

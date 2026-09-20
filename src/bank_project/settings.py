@@ -55,6 +55,16 @@ class Settings(BaseSettings):
     model_max_tokens: int = Field(default=4096, ge=1, le=32768)
     model_max_retries: int = Field(default=2, ge=0, le=3)
 
+    graphrag_chat_model: str | None = None
+    graphrag_api_base: str | None = None
+    graphrag_api_key: SecretStr | None = None
+    graphrag_embedding_model: str = "text-embedding-3-small"
+    graphrag_embedding_api_base: str | None = None
+    graphrag_embedding_api_key: SecretStr | None = None
+    graphrag_request_timeout_seconds: int = Field(default=600, ge=30, le=1800)
+    graphrag_chunk_size: int = Field(default=1200, ge=100, le=16000)
+    graphrag_chunk_overlap: int = Field(default=100, ge=0, le=15999)
+
     @field_validator("retrieve_base_url")
     @classmethod
     def validate_retrieve_url(cls, value: str | None) -> str | None:
@@ -95,6 +105,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_api_token(self) -> Self:
+        if self.graphrag_chunk_overlap >= self.graphrag_chunk_size:
+            raise ValueError("GraphRAG 分块重叠必须小于分块大小")
         if self.api_token is not None and len(self.api_token.get_secret_value()) < 24:
             raise ValueError("BANK_API_TOKEN must contain at least 24 characters")
         if self.staging_backend == "mysql" and not self.staging_mysql_password:

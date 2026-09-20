@@ -45,9 +45,11 @@
 .source-tabs .ant-tabs-tab-btn {
   display: flex;
   align-items: center;
+  font-size: 13px;
 }
 .source-tabs .ant-tabs-tab-icon {
   display: inline-flex;
+  margin-inline-end: 8px;
 }
 .upload-zone.ant-upload-wrapper .ant-upload-drag {
   background: var(--hero);

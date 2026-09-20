@@ -9,6 +9,7 @@ import { BatchBrowser } from "./BatchBrowser";
 import { MysqlPanel } from "./MysqlPanel";
 import { IntakeJobs } from "./IntakeJobs";
 import { UploadPanel } from "./UploadPanel";
+import { TxtUploadPanel } from "../knowledge/TxtUploadPanel";
 import type { BatchDetail } from "./types";
 import "./intake.css";
 
@@ -55,6 +56,8 @@ export function IntakePage({ token }: { token: string }) {
             <>
               <Tabs
                 className="source-tabs"
+                tabBarGutter={12}
+                size="small"
                 aria-label="接入方式"
                 defaultActiveKey="file"
                 items={[
@@ -71,6 +74,11 @@ export function IntakePage({ token }: { token: string }) {
                         onQueued={() => setRevision((value) => value + 1)}
                       />
                     ),
+                  },
+                  {
+                    key: "txt",
+                    label: "TXT 文本",
+                    children: <TxtUploadPanel key={token} token={token} />,
                   },
                   {
                     key: "mysql",

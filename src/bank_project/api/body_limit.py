@@ -11,18 +11,26 @@ class BodyLimitMiddleware:
         if scope["type"] != "http" or scope["method"] not in {"POST", "PUT", "PATCH"}:
             return await self.app(scope, receive, send)
         path = scope["path"]
-        if not path.startswith(("/api/v1/intake", "/api/v1/alignment")):
+        if not path.startswith(
+            (
+                "/api/v1/intake",
+                "/api/v1/alignment",
+                "/api/v1/graphrag",
+                "/api/v1/resolution",
+                "/api/v1/knowledge",
+            )
+        ):
             return await self.app(scope, receive, send)
         limit = (
             scope["app"].state.intake.limits.max_upload_bytes
-            if path == "/api/v1/intake/uploads"
+            if path in {"/api/v1/intake/uploads", "/api/v1/graphrag/uploads"}
             else (
                 1024 * 1024
                 if path.endswith(("/template", "/template/default", "/graph"))
                 else 64 * 1024
             )
         )
-        if path == "/api/v1/intake/uploads":
+        if path in {"/api/v1/intake/uploads", "/api/v1/graphrag/uploads"}:
             from bank_project.intake.models import IntakeError
 
             consumed = 0

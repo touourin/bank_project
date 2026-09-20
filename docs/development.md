@@ -2,9 +2,11 @@
 
 Python 3.12+，Node.js 24。默认推荐使用 Docker Compose 启动。
 
+完整 GraphRAG 运行环境使用 Python 3.12。Docker 固定官方 Python 镜像的 ECR 镜像摘要，并安装 OpenMP 运行库，避免 GraphRAG 数值依赖缺失；可通过构建参数 `PYTHON_IMAGE` 使用其他提供 Python 3.12 的受信镜像。
+
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -c requirements.lock -e '.[dev,mock]'
+.venv/bin/python -m pip install -c requirements.lock -e '.[dev,mock,graphrag]'
 npm --prefix frontend ci
 ```
 
