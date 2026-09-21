@@ -153,21 +153,29 @@ def decide(service, run, ids, action="merge", canonical=None):
 
 
 @pytest.mark.parametrize("kind", ["graphrag", "database"])
-def test_identity_conflicts_and_missing_scope_block_candidate_and_manual_merges(tmp_path, kind):
+@pytest.mark.parametrize("policy", ["balanced", "original"])
+def test_identity_conflicts_and_missing_scope_block_candidate_and_manual_merges(
+    tmp_path, kind, policy
+):
     graph = source(kind)
     for record, name in zip(
         graph["nodes"], ["甲公司2025年年报", "甲公司年报", "甲公司2026年年报"], strict=True
     ):
         record.update(name=name, type="财务指标", properties={})
-    service, run = ready(tmp_path, graph)
-    assert candidate(run, "a", "c").status == "excluded"
-    assert run.summary.pending_count == 0 and run.summary.excluded_count == 3
+    service, run = ready(tmp_path, graph, options={"retrieval_policy": policy})
+    if policy == "original":
+        assert candidate(run, "a", "c").status == "excluded"
+        with pytest.raises(AlignmentError, match="身份字段冲突"):
+            decide(service, run, ("a", "c"))
+        for action in ("reject", "reset"):
+            with pytest.raises(AlignmentError, match="无需人工审核"):
+                decide(service, run, ("a", "c"), action=action)
+    else:
+        assert all(set(row.node_ids) != {"a", "c"} for row in run.candidates)
+        assert run.diagnostics["retrieval"]["identity_filtered_pairs"] == 1
+    assert run.summary.pending_count == 0
+    assert run.summary.excluded_count == (3 if policy == "original" else 2)
     assert not run.audits and run.revision == 0
-    with pytest.raises(AlignmentError, match="身份字段冲突"):
-        decide(service, run, ("a", "c"))
-    for action in ("reject", "reset"):
-        with pytest.raises(AlignmentError, match="无需人工审核"):
-            decide(service, run, ("a", "c"), action=action)
     with pytest.raises(AlignmentError, match="身份字段冲突"):
         service.manual(run.id, ManualRequest(node_ids=["a", "c"], expected_revision=0))
     # A missing year also keeps records separate; no manual or transitive bridge.
@@ -188,7 +196,8 @@ def test_historical_conflicts_leave_review_queue_without_rewriting_original_deci
         graph["nodes"], ["甲公司2025年年报", "甲公司年报", "甲公司2026年年报"], strict=True
     ):
         record.update(name=name, type="财务指标", properties={})
-    service, run = ready(tmp_path, graph)
+    # Historical/wide-recall records include the explicitly conflicting pair.
+    service, run = ready(tmp_path, graph, options={"retrieval_policy": "original"})
     stored = run.model_dump()
     for row in stored["candidates"]:
         row.update(status="pending", evidence={"proposal": "same", "verdict": "uncertain"})
@@ -287,10 +296,15 @@ def test_cannot_link_protects_full_cluster_and_failed_decision_is_atomic(tmp_pat
     assert {node["id"] for node in service.graph(run.id)["nodes"]} == {"a", "c"}
 
 
-def test_concurrent_review_rejects_stale_revisions_and_is_durable(tmp_path):
+@pytest.mark.parametrize("action", ["merge", "reset"])
+def test_concurrent_review_rejects_stale_revisions_and_is_durable(tmp_path, action):
     service, run = ready(tmp_path)
+    if action == "reset":
+        run = decide(service, run, ("a", "b"))
     payload = DecisionRequest(
-        candidate_id=candidate(run, "a", "b").id, action="merge", expected_revision=0
+        candidate_id=candidate(run, "a", "b").id,
+        action=action,
+        expected_revision=run.revision,
     )
 
     def edit():
@@ -305,7 +319,90 @@ def test_concurrent_review_rejects_stale_revisions_and_is_durable(tmp_path):
         sum(isinstance(value, AlignmentError) and value.status == 409 for value in responses) == 1
     )
     saved = service.get(run.id)
-    assert saved.revision == 1 and len(saved.audits) == 1
+    assert saved.revision == run.revision + 1 and len(saved.audits) == len(run.audits) + 1
+    assert saved.audits[-1].action == action
+    assert ResolutionStore(service.store.path).get(run.id) == saved
+    if action == "reset":
+        assert service.graph(run.id)["nodes"] == source()["nodes"]
+
+
+@pytest.mark.parametrize("kind", ["graphrag", "database"])
+def test_manual_merge_reset_restores_source_and_can_be_merged_again(tmp_path, kind):
+    graph = source(kind, count=4)
+    service, run = ready(tmp_path, graph)
+    run = service.manual(
+        run.id,
+        ManualRequest(
+            node_ids=["a", "node-3"], expected_revision=run.revision, canonical_id="node-3"
+        ),
+    )
+    first_audit = run.audits[0].model_dump()
+    run = service.decide(
+        run.id,
+        DecisionRequest(
+            candidate_id=candidate(run, "a", "node-3").id,
+            action="reset",
+            expected_revision=run.revision,
+            reviewer="复核员",
+            note="来源并非同一主体，退回核验",
+        ),
+    )
+    restored = service.graph(run.id)
+    assert restored["nodes"] == graph["nodes"] and restored["edges"] == graph["edges"]
+    assert service.store.original(run.id) == graph
+    assert run.summary.merged_count == 0 and run.merges == []
+    assert candidate(run, "a", "node-3").status == "not_recommended"
+    assert candidate(run, "a", "node-3").canonical_id is None
+    assert run.audits[0].model_dump() == first_audit
+    audit = run.audits[-1]
+    assert (audit.action, audit.previous_status, audit.reviewer, audit.revision) == (
+        "reset",
+        "merged",
+        "复核员",
+        2,
+    )
+    assert audit.note == "来源并非同一主体，退回核验"
+    assert {node.id for node in audit.source_nodes} == {"a", "node-3"}
+    assert service.get(run.id) == run
+
+    run = service.manual(
+        run.id,
+        ManualRequest(node_ids=["a", "node-3"], expected_revision=run.revision, canonical_id="a"),
+    )
+    assert run.summary.node_count == 3 and run.summary.merged_count == 1
+    assert run.merges[0].target_node.id == "a"
+    assert [audit.action for audit in run.audits] == ["manual", "reset", "manual"]
+    assert [audit.revision for audit in run.audits] == [1, 2, 3]
+    assert service.store.original(run.id) == graph
+
+
+def test_reset_removes_only_selected_merge_and_keeps_other_accepted_paths(tmp_path):
+    graph = source()
+    service, run = ready(tmp_path, graph)
+    run = decide(service, run, ("a", "b"), canonical="b")
+    run = decide(service, run, ("b", "c"), canonical="c")
+    run = decide(service, run, ("a", "c"), canonical="a")
+    run = decide(service, run, ("a", "b"), action="reset")
+    assert run.summary.merged_count == 2 and run.summary.node_count == 1
+    assert service.graph(run.id)["resolution"]["memberships"] == dict.fromkeys("abc", "a")
+    assert {node.id for node in run.audits[-1].source_nodes} == {"a", "b", "c"}
+
+    run = decide(service, run, ("a", "c"), action="reset")
+    projected = service.graph(run.id)
+    assert projected["resolution"]["memberships"] == {"a": "a", "b": "c", "c": "c"}
+    assert [(edge["source"], edge["target"]) for edge in projected["edges"]] == [
+        ("a", "c"),
+        ("a", "c"),
+        ("c", "c"),
+    ]
+    assert run.merges[0].target_node.id == "c"
+    assert {node.id for node in run.merges[0].source_nodes} == {"b", "c"}
+
+    run = decide(service, run, ("b", "c"), action="reset")
+    restored = service.graph(run.id)
+    assert restored["nodes"] == graph["nodes"] and restored["edges"] == graph["edges"]
+    assert run.summary.merged_count == 0 and run.summary.node_count == 3
+    assert [audit.action for audit in run.audits] == ["merge"] * 3 + ["reset"] * 3
 
 
 def test_manual_review_can_add_unretrieved_pair_and_validates_canonical(tmp_path):
@@ -436,6 +533,44 @@ def test_only_grounded_model_same_results_enter_confirmation_queue(tmp_path):
     assert approved.summary.pending_count == 0
     undone = decide(service, approved, ("a", "b"), action="reset")
     assert undone.summary.pending_count == 1 and undone.summary.node_count == 3
+
+
+def test_automatically_applied_merge_can_be_reset_and_confirmed_again(tmp_path):
+    class Model:
+        configured = True
+
+        async def complete(self, system, user):
+            pair = json.loads(user)
+            ids = {pair[side]["mention_id"] for side in ("left", "right")}
+            return {
+                "verdict": "same" if ids == {"a", "b"} else "different",
+                "reason": "按合成原文证据判定",
+                "left_quote": pair["left"]["context"],
+                "right_quote": pair["right"]["context"],
+            }
+
+    graph = source()
+    service, run = ready(tmp_path, graph, model=Model(), options={"model_policy": "apply"})
+    assert run.summary.merged_count == 1 and run.summary.node_count == 2
+    assert candidate(run, "a", "b").status == "merged"
+    assert run.audits[0].reviewer == "消歧引擎 · 自动应用"
+    first_audit = run.audits[0].model_dump()
+
+    run = decide(service, run, ("a", "b"), action="reset")
+    assert candidate(run, "a", "b").status == "pending"
+    assert run.summary.pending_count == 1 and run.summary.merged_count == 0
+    assert run.audits[0].model_dump() == first_audit
+    assert run.audits[-1].previous_status == "merged" and run.audits[-1].action == "reset"
+    restored = service.graph(run.id)
+    assert restored["nodes"] == graph["nodes"] and restored["edges"] == graph["edges"]
+    assert service.get(run.id) == run
+
+    run = decide(service, run, ("a", "b"), canonical="b")
+    assert run.summary.merged_count == 1 and run.summary.pending_count == 0
+    assert run.merges[0].target_node.id == "b"
+    assert [audit.action for audit in run.audits] == ["merge", "reset", "merge"]
+    assert [audit.revision for audit in run.audits] == [1, 2, 3]
+    assert service.store.original(run.id) == graph
 
 
 def test_without_model_does_not_present_name_similarity_as_merge_suggestions(tmp_path):

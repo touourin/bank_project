@@ -68,14 +68,20 @@ export function JsonDetails({
     />
   );
 }
-export function AuditTable({ audits }: { audits: Audit[] }) {
+export function AuditTable({
+  audits,
+  showEntities = false,
+}: {
+  audits: Audit[];
+  showEntities?: boolean;
+}) {
   return (
     <Table
       rowKey="id"
       size="small"
       dataSource={audits}
       pagination={{ pageSize: 8 }}
-      scroll={{ x: 650 }}
+      scroll={{ x: showEntities ? 850 : 650 }}
       locale={{ emptyText: "暂无人工修改记录" }}
       columns={[
         {
@@ -86,16 +92,31 @@ export function AuditTable({ audits }: { audits: Audit[] }) {
         {
           title: "操作",
           render: (_, row) =>
-            ({
-              accept_proposal: "采纳匹配建议",
-              refresh_endpoints: "端点变更后重新校验",
-              merge: "合并",
-              manual: "人工指定合并",
-              reject: "保留独立节点",
-              reset: "撤销决定",
-            })[row.action ?? ""] ??
-            (row.target === "edge" ? "修改边类型" : "修改节点"),
+            row.action === "reset" && row.previous_status === "merged"
+              ? "退回合并"
+              : ({
+                  accept_proposal: "采纳匹配建议",
+                  refresh_endpoints: "端点变更后重新校验",
+                  merge: "合并",
+                  manual: "人工指定合并",
+                  reject: "保留独立节点",
+                  reset: "撤销决定",
+                }[row.action ?? ""] ??
+                (row.target === "edge" ? "修改边类型" : "修改节点")),
         },
+        ...(showEntities
+          ? [
+              {
+                title: "涉及实体",
+                render: (_: unknown, row: Audit) => (
+                  <span className="resolution-audit-entities">
+                    {row.source_nodes?.map((node) => node.name).join(" / ") ||
+                      "—"}
+                  </span>
+                ),
+              },
+            ]
+          : []),
         {
           title: "审核人",
           dataIndex: "reviewer",

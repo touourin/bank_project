@@ -69,6 +69,26 @@ def test_review_export_auth_and_stale_conflict(tmp_path):
             client.get(f"{root}/{run.id}/candidates/missing/sources", headers=headers).status_code
             == 404
         )
+        reset = {
+            "candidate_id": pair["id"],
+            "action": "reset",
+            "expected_revision": 1,
+            "note": "退回合并，重新核验来源",
+        }
+        response = client.post(f"{root}/{run.id}/decisions", json=reset, headers=headers)
+        assert response.status_code == 200
+        restored_run = response.json()
+        assert restored_run["revision"] == 2 and restored_run["merges"] == []
+        assert [audit["action"] for audit in restored_run["audits"]] == ["merge", "reset"]
+        assert restored_run["audits"][-1]["note"] == reset["note"]
+        assert restored_run["audits"][-1]["previous_status"] == "merged"
+        restored_graph = client.get(f"{root}/{run.id}/graph", headers=headers).json()
+        assert restored_graph["nodes"] == original["nodes"]
+        assert restored_graph["edges"] == original["edges"]
+        assert (
+            client.post(f"{root}/{run.id}/decisions", json=reset, headers=headers).status_code
+            == 409
+        )
         assert (
             client.post(
                 root, json={"source_kind": "unexpected", "source_id": "test"}, headers=headers

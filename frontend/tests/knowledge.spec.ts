@@ -53,6 +53,7 @@ async function mockKnowledge(
     decorate?: (run: MatchRun) => void;
     acceptConflictOnce?: boolean;
   } = {},
+  resolutionOptions: { resetConflictOnce?: boolean } = {},
 ) {
   let datasets: Dataset[] = initial
     ? [
@@ -71,6 +72,7 @@ async function mockKnowledge(
   let derivedGraph = structuredClone(originalGraph);
   let matchInputGraph = structuredClone(originalGraph);
   let acceptConflictPending = matchingOptions.acceptConflictOnce;
+  let resetConflictPending = resolutionOptions.resetConflictOnce;
   const requests: { path: string; body: Record<string, unknown> }[] = [];
   await page.route(
     /\/api\/v1\/(graphrag|knowledge|resolution)(\/|$)/,
@@ -471,11 +473,17 @@ async function mockKnowledge(
         resolution
       ) {
         expect(body.expected_revision).toBe(resolution.revision);
+        if (body.action === "reset" && resetConflictPending) {
+          resetConflictPending = false;
+          resolution.revision++;
+          return send({ detail: "消歧版本已更新，请刷新后重试" }, 409);
+        }
         resolution.revision++;
         const candidate = resolution.candidates[0];
-        const action = path.endsWith("/manual") ? "merge" : body.action;
+        const previousStatus = candidate.status;
+        const action = path.endsWith("/manual") ? "manual" : body.action;
         candidate.status =
-          action === "merge"
+          action === "merge" || action === "manual"
             ? "merged"
             : action === "reject"
               ? "rejected"
@@ -508,6 +516,8 @@ async function mockKnowledge(
           id: `audit${resolution.revision}`,
           action: String(action),
           candidate_id: candidate.id,
+          previous_status: previousStatus,
+          source_nodes: structuredClone(candidate.nodes),
           canonical_id: candidate.canonical_id ?? undefined,
           reviewer: body.reviewer as string,
           note: body.note as string,
@@ -791,16 +801,19 @@ test("GraphRAG bulk acceptance refreshes a conflicting revision and respects a c
   ).toEqual([{ expected_revision: 1 }, { expected_revision: 2 }]);
 });
 
-test("both graph sources support review, visible merge flow, undo and manual merge", async ({
+test("both graph sources combine merge review and support cancellation, rollback, remerge and manual rollback", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   const requests = await mockKnowledge(page);
+  const resets = () => requests.filter((item) => item.body.action === "reset");
   await page.goto("/");
   await page.getByRole("tab", { name: "04 实体消歧" }).click();
   for (const source of ["GraphRAG · 企业关系.txt", "数据库 · 客户数据库"]) {
     await page.getByRole("combobox", { name: "待消歧图谱" }).click();
     await page.getByText(source, { exact: true }).last().click();
     await page.getByRole("button", { name: "分析消歧候选" }).click();
+    await page.getByRole("tab", { name: "合并建议（1）", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "内容差异（1 项）", exact: true }),
     ).toBeVisible();
@@ -810,10 +823,25 @@ test("both graph sources support review, visible merge flow, undo and manual mer
     await page.getByLabel("消歧审核备注").fill("已核实为同一企业");
     await page.getByRole("button", { name: "确认合并", exact: true }).click();
     await expect(page.getByText("3 → 2", { exact: true })).toBeVisible();
-    await page.getByRole("tab", { name: "合并过程（1）", exact: true }).click();
+    await page
+      .getByRole("tab", { name: "合并与审核（1）", exact: true })
+      .click();
+    await expect(
+      page.getByRole("tab", { name: /^合并过程|^审核历史/ }),
+    ).toHaveCount(0);
     await expect(page.getByLabel("2 个节点合并为 1 个节点")).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "已合并 2 个实体" }),
+    ).toBeVisible();
+    const audits = page.getByRole("region", { name: "审核记录", exact: true });
+    await expect(
+      audits.getByRole("cell", { name: "李审核", exact: true }),
+    ).toBeVisible();
+    await expect(
+      audits.getByRole("cell", { name: "甲企业 / 甲公司", exact: true }),
+    ).toBeVisible();
+    await expect(
+      audits.getByRole("cell", { name: "已核实为同一企业", exact: true }),
     ).toBeVisible();
     if (source.startsWith("GraphRAG")) {
       await page.getByRole("button", { name: "切换深浅主题" }).click();
@@ -823,18 +851,85 @@ test("both graph sources support review, visible merge flow, undo and manual mer
         animations: "disabled",
       });
     }
-    await page.getByRole("tab", { name: "审核历史（1）", exact: true }).click();
+    const resetsBeforeCancel = resets().length;
+    await page.getByRole("button", { name: "退回合并", exact: true }).click();
+    const rollback = page.getByRole("dialog", {
+      name: "退回合并",
+      exact: true,
+    });
+    await expect(rollback).toContainText("甲企业");
+    await expect(rollback).toContainText("甲公司");
+    await rollback.getByRole("button", { name: "取消", exact: true }).click();
+    await expect(rollback).not.toBeVisible();
+    expect(resets()).toHaveLength(resetsBeforeCancel);
+    await expect(page.getByText("3 → 2", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "退回合并", exact: true }).click();
+    await rollback.getByLabel("退回审核人", { exact: true }).fill("王复核");
+    await rollback
+      .getByLabel("退回原因", { exact: true })
+      .fill("账号不同，需要重新核验");
+    await rollback
+      .getByRole("button", { name: "确认退回", exact: true })
+      .click();
+    await expect(rollback).not.toBeVisible();
+    await expect(page.getByText("3 → 3", { exact: true })).toBeVisible();
     await expect(
-      page.getByRole("cell", { name: "李审核", exact: true }),
+      page.getByRole("tab", { name: "合并与审核（2）", exact: true }),
     ).toBeVisible();
+    await expect(page.getByLabel("2 个节点合并为 1 个节点")).toHaveCount(0);
+    await expect(
+      page.getByText("暂无生效中的合并", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      audits.getByRole("cell", { name: "退回合并", exact: true }),
+    ).toBeVisible();
+    await expect(
+      audits.getByRole("cell", { name: "王复核", exact: true }),
+    ).toBeVisible();
+    await expect(
+      audits.getByRole("cell", { name: "账号不同，需要重新核验", exact: true }),
+    ).toBeVisible();
+    await expect(
+      audits.getByRole("cell", { name: "已核实为同一企业", exact: true }),
+    ).toBeVisible();
+    expect(resets().at(-1)?.body).toEqual({
+      candidate_id: "candidate1",
+      action: "reset",
+      expected_revision: 2,
+      reviewer: "王复核",
+      note: "账号不同，需要重新核验",
+    });
+
+    await page.getByRole("tab", { name: "合并建议（1）", exact: true }).click();
+    await expect(page.getByLabel("待核验实体对，尚未合并")).toBeVisible();
+    await page.getByRole("button", { name: "确认合并", exact: true }).click();
+    await expect(page.getByText("3 → 2", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "分析记录（1）", exact: true }).click();
     await page.getByRole("combobox", { name: "候选状态" }).click();
     await page.getByText("已合并", { exact: true }).last().click();
-    await page.getByRole("button", { name: "撤销审核决定" }).click();
+    await expect(
+      page.getByRole("button", { name: "撤销审核决定", exact: true }),
+    ).toHaveCount(0);
+    await page.getByRole("button", { name: "退回合并", exact: true }).click();
+    await expect(rollback).toBeVisible();
+    await rollback
+      .getByLabel("退回原因", { exact: true })
+      .fill("从分析记录退回重新核验");
+    await rollback
+      .getByRole("button", { name: "确认退回", exact: true })
+      .click();
+    await expect(rollback).not.toBeVisible();
     await expect(page.getByText("3 → 3", { exact: true })).toBeVisible();
+    expect(resets().at(-1)?.body).toMatchObject({
+      expected_revision: 4,
+      note: "从分析记录退回重新核验",
+    });
   }
   await page.getByRole("button", { name: "人工指定合并" }).click();
-  const dialog = page.getByRole("dialog");
+  const dialog = page.getByRole("dialog", {
+    name: "人工指定实体合并",
+    exact: true,
+  });
   const choices = dialog.getByRole("combobox", {
     name: "人工合并节点",
     exact: true,
@@ -845,6 +940,17 @@ test("both graph sources support review, visible merge flow, undo and manual mer
   await dialog.getByText("人工指定实体合并", { exact: true }).click();
   await dialog.getByRole("button", { name: "确认合并", exact: true }).click();
   await expect(dialog).not.toBeVisible();
+  await page.getByRole("tab", { name: "合并与审核（5）", exact: true }).click();
+  await expect(
+    page.getByRole("cell", { name: "人工指定合并", exact: true }),
+  ).toBeVisible();
+  const activeMerges = page.getByRole("region", {
+    name: "当前生效的合并",
+    exact: true,
+  });
+  await expect(
+    activeMerges.getByLabel("2 个节点合并为 1 个节点"),
+  ).toBeVisible();
   expect(
     requests
       .filter((item) => item.path === "/resolution/runs")
@@ -855,9 +961,12 @@ test("both graph sources support review, visible merge flow, undo and manual mer
   ).toMatchObject({
     node_ids: ["n1", "n2"],
     canonical_id: "n1",
-    expected_revision: 3,
+    expected_revision: 5,
   });
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    activeMerges.getByLabel("2 个节点合并为 1 个节点"),
+  ).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(390);
@@ -865,6 +974,159 @@ test("both graph sources support review, visible merge flow, undo and manual mer
     path: "test-results/resolution-mobile.png",
     fullPage: true,
     animations: "disabled",
+  });
+  await page.getByRole("button", { name: "退回合并", exact: true }).click();
+  const rollback = page.getByRole("dialog", { name: "退回合并", exact: true });
+  await expect(rollback).toBeVisible();
+  const bounds = await rollback.boundingBox();
+  expect(bounds?.x).toBeGreaterThanOrEqual(0);
+  expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(390);
+  await rollback
+    .getByLabel("退回原因", { exact: true })
+    .fill("退回人工指定的合并");
+  await rollback.getByRole("button", { name: "确认退回", exact: true }).click();
+  await expect(rollback).not.toBeVisible();
+  await expect(page.getByText("3 → 3", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "合并与审核（6）", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "退回合并", exact: true }),
+  ).toHaveCount(3);
+  await expect(
+    page.getByRole("cell", { name: "退回人工指定的合并", exact: true }),
+  ).toBeVisible();
+  expect(resets().at(-1)?.body).toMatchObject({ expected_revision: 6 });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(390);
+});
+
+test("resolution rollback keeps a conflicting merge and refreshes before retrying with a new revision", async ({
+  page,
+}) => {
+  const requests = await mockKnowledge(
+    page,
+    true,
+    undefined,
+    {},
+    { resetConflictOnce: true },
+  );
+  await page.goto("/");
+  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
+  await page.getByRole("button", { name: "确认合并", exact: true }).click();
+  await page.getByRole("tab", { name: "合并与审核（1）", exact: true }).click();
+  await page.getByRole("button", { name: "退回合并", exact: true }).click();
+  const rollback = page.getByRole("dialog", { name: "退回合并", exact: true });
+  await rollback.getByLabel("退回审核人", { exact: true }).fill("陈复核");
+  await rollback
+    .getByLabel("退回原因", { exact: true })
+    .fill("发现不同的账号证据");
+  await rollback.getByRole("button", { name: "确认退回", exact: true }).click();
+  await expect(rollback).toBeVisible();
+  await expect(rollback).toContainText("消歧版本已更新，请刷新后重试");
+  await expect(rollback).toContainText(
+    "审核记录已更新，请关闭窗口并重新选择要退回的合并。",
+  );
+  await expect(
+    rollback.getByRole("button", { name: "确认退回", exact: true }),
+  ).toBeDisabled();
+  await expect(rollback.getByLabel("退回原因", { exact: true })).toHaveValue(
+    "发现不同的账号证据",
+  );
+  await expect(page.getByText("3 → 2", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("2 个节点合并为 1 个节点")).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "合并与审核（1）", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "退回合并", exact: true }),
+  ).toHaveCount(0);
+  await rollback.getByRole("button", { name: "取消", exact: true }).click();
+  await page.getByRole("button", { name: "退回合并", exact: true }).click();
+  await expect(
+    rollback.getByRole("button", { name: "确认退回", exact: true }),
+  ).toBeEnabled();
+  await rollback.getByRole("button", { name: "确认退回", exact: true }).click();
+  await expect(rollback).not.toBeVisible();
+  await expect(page.getByText("3 → 3", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "退回合并", exact: true }),
+  ).toBeVisible();
+  expect(
+    requests
+      .filter((item) => item.body.action === "reset")
+      .map((item) => item.body),
+  ).toEqual([
+    {
+      candidate_id: "candidate1",
+      action: "reset",
+      expected_revision: 2,
+      reviewer: "陈复核",
+      note: "发现不同的账号证据",
+    },
+    {
+      candidate_id: "candidate1",
+      action: "reset",
+      expected_revision: 3,
+      reviewer: "陈复核",
+      note: "发现不同的账号证据",
+    },
+  ]);
+
+  await page.reload();
+  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "合并与审核（2）", exact: true }).click();
+  await expect(page.getByText("3 → 3", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("暂无生效中的合并", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "合并", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "退回合并", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "发现不同的账号证据", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "合并建议（1）", exact: true }),
+  ).toBeVisible();
+});
+
+test("rejected resolution decisions retain their direct undo action", async ({
+  page,
+}) => {
+  const requests = await mockKnowledge(page);
+  await page.goto("/");
+  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
+  await page
+    .getByRole("button", { name: "保留为不同实体", exact: true })
+    .click();
+  await page.getByRole("tab", { name: "分析记录（1）", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "退回合并", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "撤销审核决定", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "退回合并", exact: true }),
+  ).not.toBeVisible();
+  await page.getByRole("tab", { name: "合并与审核（2）", exact: true }).click();
+  await expect(
+    page.getByRole("cell", { name: "保留独立节点", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "撤销决定", exact: true }),
+  ).toBeVisible();
+  expect(
+    requests.filter((item) => item.body.action === "reset").at(-1)?.body,
+  ).toMatchObject({
+    candidate_id: "candidate1",
+    action: "reset",
+    expected_revision: 2,
   });
 });
 

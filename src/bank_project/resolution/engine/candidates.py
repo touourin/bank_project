@@ -8,6 +8,10 @@ import unicodedata
 from collections import defaultdict
 from difflib import SequenceMatcher
 
+from bank_project.resolution.engine.candidate_identity import (
+    financial_conflicts,
+    financial_dimensions,
+)
 from bank_project.resolution.engine.contracts import Corpus, ResolverConfig, require
 
 
@@ -177,6 +181,7 @@ def retrieve(corpus, config, semantic_neighbors=None, *, diagnostics=None):
         return result
     mentions = {m.mention_id: m for m in corpus.mentions}
     postings, names, descriptions, features = defaultdict(set), {}, {}, {}
+    financial = {mid: financial_dimensions(m) for mid, m in mentions.items()}
     for mid, m in mentions.items():
         names[mid] = {normalize(n) for n in (m.name, *m.aliases)} - {""}
         descriptions[mid] = terms(m.description)
@@ -197,6 +202,7 @@ def retrieve(corpus, config, semantic_neighbors=None, *, diagnostics=None):
         for mid, ts in descriptions.items()
     }
     candidates, overflow, pairs, inspected, rejected = {}, set(), set(), set(), set()
+    identity_filtered, identity_reasons = set(), defaultdict(set)
     for mid in sorted(mentions):
         pool = set(forced[mid])
         for key in features[mid]:
@@ -227,6 +233,15 @@ def retrieve(corpus, config, semantic_neighbors=None, *, diagnostics=None):
             if not eligible:
                 rejected.add(pair)
                 continue
+            conflicts = financial_conflicts(financial[mid], financial[other])
+            if conflicts and other not in forced[mid] and not identifier:
+                # Conflicting financial records must not crowd out valid aliases
+                # before the per-record cap. Explicit constraints/IDs still reach
+                # the resolver so their evidence and conflicts can be inspected.
+                identity_filtered.add(pair)
+                for field in conflicts:
+                    identity_reasons[field].add(pair)
+                continue
             rank = (
                 -int(other in forced[mid]),
                 -int(identifier),
@@ -253,6 +268,10 @@ def retrieve(corpus, config, semantic_neighbors=None, *, diagnostics=None):
             policy="balanced",
             inspected_pairs=len(inspected),
             omitted_by_policy=len(rejected - pairs),
+            identity_filtered_pairs=len(identity_filtered),
+            identity_filter_reasons={
+                field: len(values) for field, values in sorted(identity_reasons.items())
+            },
             selected_pairs=len(pairs),
             rare_term_max_frequency=frequency_limit,
             recall_quality="not_measured_without_gold",

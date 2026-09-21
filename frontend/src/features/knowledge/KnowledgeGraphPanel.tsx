@@ -394,11 +394,6 @@ export function KnowledgeGraphPanel({
                   { title: "原始 ID", dataIndex: "id", ellipsis: true },
                   { title: "原始类型", dataIndex: "type" },
                   {
-                    title: "挂载 boid",
-                    dataIndex: "boid",
-                    render: (value: string) => value || "未挂载",
-                  },
-                  {
                     title: "详情",
                     render: (_, node) => (
                       <Button size="small" onClick={() => setDetail(node)}>

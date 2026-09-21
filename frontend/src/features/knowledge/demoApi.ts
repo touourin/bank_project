@@ -544,6 +544,7 @@ export const demoKnowledgeApi = {
     const candidate = run.candidates.find(
       (item) => item.id === decision.candidate_id,
     )!;
+    const previousStatus = candidate.status;
     candidate.status =
       decision.action === "merge"
         ? "merged"
@@ -558,6 +559,8 @@ export const demoKnowledgeApi = {
     run.audits.push({
       ...decision,
       id: `audit-${++serial}`,
+      previous_status: previousStatus,
+      source_nodes: candidate.nodes,
       created_at: now(),
       revision: run.revision,
     });
@@ -587,6 +590,7 @@ export const demoKnowledgeApi = {
       status: "pending",
       canonical_id: null,
     };
+    const previousStatus = candidate.status;
     candidate.status = "merged";
     candidate.canonical_id = decision.canonical_id;
     if (!existing) run.candidates.push(candidate);
@@ -594,8 +598,10 @@ export const demoKnowledgeApi = {
     run.audits.push({
       ...decision,
       id: `audit-${++serial}`,
-      action: "merge",
+      action: "manual",
       candidate_id: candidate.id,
+      previous_status: previousStatus,
+      source_nodes: candidate.nodes,
       created_at: now(),
       revision: run.revision,
     });

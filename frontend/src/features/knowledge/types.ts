@@ -102,6 +102,8 @@ export interface Audit {
   id: string;
   action?: string;
   candidate_id?: string;
+  previous_status?: string;
+  source_nodes?: Pick<KnowledgeNode, "id" | "name" | "type">[];
   canonical_id?: string;
   target?: string;
   target_id?: string;

@@ -16,19 +16,15 @@ import { EmptyState, ErrorNotice, LoadingState } from "../../ui/Feedback";
 import { Panel } from "../../ui/Panel";
 import { knowledgeApi } from "./api";
 import { KnowledgeGraphPanel } from "./KnowledgeGraphPanel";
-import { AuditTable, JsonDetails, StatusTag, usePolling } from "./shared";
-import type {
-  KnowledgeNode,
-  ResolutionCandidate,
-  ResolutionRun,
-  SourceKind,
-} from "./types";
+import { JsonDetails, StatusTag, usePolling } from "./shared";
+import type { ResolutionCandidate, ResolutionRun, SourceKind } from "./types";
 import {
   ResolutionOptionsPanel,
   defaultResolutionOptions,
 } from "./ResolutionOptionsPanel";
 import { ResolutionSourcesPanel } from "./ResolutionSources";
 import { ResolutionDifferences } from "./ResolutionDifferences";
+import { MergeFlow, ResolutionHistory } from "./ResolutionHistory";
 import "./knowledge.css";
 
 export function ResolutionPage({ token }: { token: string }) {
@@ -88,6 +84,12 @@ export function ResolutionPage({ token }: { token: string }) {
   const [manual, setManual] = useState(false);
   const [manualNodes, setManualNodes] = useState<string[]>([]);
   const [canonical, setCanonical] = useState<string>();
+  const [rollback, setRollback] = useState<{
+    runId: string;
+    revision: number;
+    candidate: ResolutionCandidate;
+  }>();
+  useEffect(() => setRollback(undefined), [runId]);
   usePolling(run?.status === "analyzing", resource.refresh);
   useEffect(() => {
     if (!source) {
@@ -114,6 +116,7 @@ export function ResolutionPage({ token }: { token: string }) {
         setFilter("all");
       } else resource.refresh();
       setManual(false);
+      setRollback(undefined);
       setNote("");
       history.refresh();
     } catch (reason) {
@@ -142,6 +145,11 @@ export function ResolutionPage({ token }: { token: string }) {
     canonical_id?: string,
   ) {
     if (!run) return;
+    if (action === "reset" && candidate.status === "merged") {
+      setError("");
+      setRollback({ runId: run.id, revision: run.revision, candidate });
+      return;
+    }
     void mutate(() =>
       knowledgeApi.resolutionDecision(token, run.id, {
         candidate_id: candidate.id,
@@ -406,7 +414,7 @@ export function ResolutionPage({ token }: { token: string }) {
                       value={note}
                       maxLength={4000}
                       onChange={(event) => setNote(event.target.value)}
-                      placeholder="用于下一次合并、保留或撤销操作"
+                      placeholder="用于下一次合并、保留或退回操作"
                     />
                   </label>
                 </div>
@@ -539,28 +547,16 @@ export function ResolutionPage({ token }: { token: string }) {
                     },
                     {
                       key: "merges",
-                      label: `合并过程（${run.merges.length}）`,
-                      children: run.merges.length ? (
-                        run.merges.map((merge) => (
-                          <div
-                            key={merge.candidate_id}
-                            className="resolution-candidate"
-                          >
-                            <h3>已合并 {merge.source_nodes.length} 个实体</h3>
-                            <MergeFlow
-                              nodes={merge.source_nodes}
-                              target={merge.target_node}
-                            />
-                          </div>
-                        ))
-                      ) : (
-                        <EmptyState title="尚无合并记录" />
+                      label: `合并与审核（${run.audits.length}）`,
+                      children: (
+                        <ResolutionHistory
+                          run={run}
+                          disabled={busy || run.status !== "ready"}
+                          onRollback={(candidate) =>
+                            decision(candidate, "reset")
+                          }
+                        />
                       ),
-                    },
-                    {
-                      key: "audits",
-                      label: `审核历史（${run.audits.length}）`,
-                      children: <AuditTable audits={run.audits} />,
                     },
                     {
                       key: "graph",
@@ -595,6 +591,80 @@ export function ResolutionPage({ token }: { token: string }) {
           )}
         </div>
       </div>
+      <Modal
+        title="退回合并"
+        open={Boolean(rollback && rollback.runId === run?.id)}
+        onCancel={() => {
+          if (!busy) setRollback(undefined);
+        }}
+        confirmLoading={busy}
+        okText="确认退回"
+        cancelText="取消"
+        okButtonProps={{
+          "aria-label": "确认退回",
+          danger: true,
+          disabled:
+            !run ||
+            run.status !== "ready" ||
+            rollback?.revision !== run.revision,
+        }}
+        cancelButtonProps={{ disabled: busy }}
+        onOk={() => {
+          if (rollback && run?.revision === rollback.revision)
+            void mutate(() =>
+              knowledgeApi.resolutionDecision(token, rollback.runId, {
+                candidate_id: rollback.candidate.id,
+                action: "reset",
+                expected_revision: rollback.revision,
+                reviewer: reviewer.trim() || undefined,
+                note,
+              }),
+            );
+        }}
+      >
+        <p>
+          将退回以下实体的本次合并决定，并重新计算图谱中的节点与关系。退回后可在“分析记录”中查看；符合模型合并条件的记录会重新进入“合并建议”。
+        </p>
+        <div className="resolution-pair">
+          {rollback?.candidate.nodes.map((node) => (
+            <div className="merge-node" key={node.id}>
+              <strong>{node.name}</strong>
+              <small>{node.id}</small>
+            </div>
+          ))}
+        </div>
+        <p className="hint">
+          合并和退回记录都会保留。其他合并决定继续生效；若这些实体还参与其他合并，退回后可能仍属于同一实体组。
+        </p>
+        <label className="knowledge-field">
+          审核人
+          <Input
+            aria-label="退回审核人"
+            value={reviewer}
+            maxLength={200}
+            onChange={(event) => setReviewer(event.target.value)}
+            placeholder="可选"
+          />
+        </label>
+        <label className="knowledge-field">
+          退回原因
+          <Input.TextArea
+            aria-label="退回原因"
+            value={note}
+            maxLength={4000}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder="可选，说明需要重新核验的原因"
+          />
+        </label>
+        {error && <ErrorNotice message={error} />}
+        {rollback && run && rollback.revision !== run.revision && (
+          <Alert
+            type="warning"
+            showIcon
+            title="审核记录已更新，请关闭窗口并重新选择要退回的合并。"
+          />
+        )}
+      </Modal>
       <Modal
         title="人工指定实体合并"
         open={manual}
@@ -684,39 +754,6 @@ export function ResolutionPage({ token }: { token: string }) {
   );
 }
 
-type BriefNode = Pick<KnowledgeNode, "id" | "name" | "type">;
-function MergeFlow({
-  nodes,
-  target,
-}: {
-  nodes: BriefNode[];
-  target?: BriefNode;
-}) {
-  return (
-    <div
-      className="merge-flow"
-      aria-label={`${nodes.length} 个节点合并为 1 个节点`}
-    >
-      <div className="merge-flow-sources">
-        {nodes.map((node) => (
-          <div className="merge-node" key={node.id}>
-            <strong>{node.name}</strong>
-            <small>
-              {node.type} · {node.id}
-            </small>
-          </div>
-        ))}
-      </div>
-      <span aria-hidden="true">→</span>
-      <div className="merge-node merge-node-target">
-        <strong>{target?.name || "选择保留节点"}</strong>
-        <small>
-          {target ? `${target.type} · ${target.id}` : "合并后的唯一实体"}
-        </small>
-      </div>
-    </div>
-  );
-}
 type IdentityGuard = {
   block_merge: boolean;
   verdict: string;
@@ -989,7 +1026,7 @@ function CandidateCard({
           disabled={disabled}
           onClick={() => onDecision(candidate, "reset")}
         >
-          撤销审核决定
+          {candidate.status === "merged" ? "退回合并" : "撤销审核决定"}
         </Button>
       )}
     </article>

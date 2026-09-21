@@ -192,6 +192,25 @@
 .resolution-candidate .ant-collapse {
   margin: 12px 0;
 }
+.resolution-history {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.resolution-history > section {
+  min-width: 0;
+}
+.resolution-review-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.resolution-audit-entities {
+  display: block;
+  min-width: 120px;
+  max-width: 240px;
+  overflow-wrap: anywhere;
+}
 .knowledge-form-row {
   display: flex;
   gap: 12px;
