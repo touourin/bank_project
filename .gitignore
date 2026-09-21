@@ -15,6 +15,12 @@ dist/
 !.env.example
 !.env.ontology.example
 data/
+# Share the ontology snapshot while keeping runtime data local.
+!/data/
+/data/*
+!/data/ontology/
+/data/ontology/*
+!/data/ontology/snapshot.json
 node_modules/
 *.tsbuildinfo
 playwright-report/
