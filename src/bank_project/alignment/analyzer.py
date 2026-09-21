@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from .catalog import Catalog
 from .interpretation import FieldInterpreter, ModelPort
-from .matching import decide
+from .matching import decide, reviewable_candidate
 from .models import (
     AlignmentError,
     ColumnMapping,
@@ -172,8 +172,9 @@ class Analyzer:
         trace.selection_confidence = table_match.selected.score if table_match.selected else None
         mapping.reason = table_match.detail
         mapping.confidence = trace.selection_confidence or 0
-        mapping.concept_id = trace.selected.id if trace.selected else None
-        mapping.concept_name = trace.selected.name if trace.selected else None
+        candidate = reviewable_candidate(table_match, catalog)
+        mapping.concept_id = candidate.id if candidate else None
+        mapping.concept_name = candidate.name if candidate else None
         mapping.status = {
             "matched": "mapped",
             "review": "review",

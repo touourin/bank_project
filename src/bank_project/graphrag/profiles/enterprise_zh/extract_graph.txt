@@ -1,0 +1,126 @@
+
+-目标-
+给定一段可能与本任务相关的文本以及一组实体类型，从文本中识别出属于这些类型的全部实体，以及这些实体之间的全部关系。本任务的语料是关于一家中国上市公司（目标客户）的企业情报，包括四类信息：公开数据（工商注册、股东、经营状况、法律诉讼）、招标信息（中标项目、采购人、金额）、社交/自媒体信息（高管动态、行业热点、客户痛点、竞争对手动态）以及高管战略风向标（高管演讲、署名文章、反复强调的战略关键词）。
+
+-步骤-
+1. 识别所有实体。对每个实体提取以下信息：
+- entity_name：实体名称。中文实体使用文中出现的规范名称，同一实体在全文保持同一写法（公司可用通用简称，如“科大讯飞股份有限公司”写作“科大讯飞”，子公司写全称）；人名写全名；项目/合同用文中的正式项目名称；财务指标名称包含公司与期间（如“科大讯飞2025年营业收入”）；英文缩写或产品代号保留原样并大写（如 iFLYTEK、X1）。
+- entity_type：以下类型之一：[{entity_types}]
+- entity_description：对该实体属性和活动的全面描述，保留文中给出的时间、数字、金额、职务、场合和来源等具体信息。人物的职务写入描述（如“科大讯飞董事长”）。
+每个实体按以下格式输出：("entity"{tuple_delimiter}<entity_name>{tuple_delimiter}<entity_type>{tuple_delimiter}<entity_description>)
+
+2. 从步骤 1 识别出的实体中，找出所有*明确相关*的 (source_entity, target_entity) 实体对。
+对每一对相关实体提取以下信息：
+- source_entity：源实体名称，与步骤 1 中的写法一致
+- target_entity：目标实体名称，与步骤 1 中的写法一致
+- relationship_description：说明两者为何相关（任职、持股、母子公司、中标/采购、签约合作、竞争、发布产品、演讲提及、诉讼处罚等），尽量带上时间与数字
+- relationship_strength：表示关系强度的数值分数（1-10）；直接任职、控股、母子公司、签约或中标为 8-10，业务合作或明确竞争为 5-7，同场提及或间接关联为 2-4
+每个关系按以下格式输出：("relationship"{tuple_delimiter}<source_entity>{tuple_delimiter}<target_entity>{tuple_delimiter}<relationship_description>{tuple_delimiter}<relationship_strength>)
+
+3. 以中文输出步骤 1 和步骤 2 识别出的全部实体和关系，合并为一个列表，列表项之间用 **{record_delimiter}** 分隔。
+
+4. 完成后输出 {completion_delimiter}
+
+######################
+-示例-
+######################
+示例 1：
+Entity_types: 组织机构,人物,地点,财务指标
+Text:
+星桥科技股份有限公司（股票代码 600XXX，简称“星桥科技”）成立于 2005 年 3 月，注册地为杭州市滨江区，法定代表人为董事长沈立群。截至 2025 年 12 月 31 日，第一大股东为浙江东辰投资有限公司，持股比例 14.2%；公司无实际控制人。2025 年公司实现营业收入 86.5 亿元，同比增长 12.3%，研发投入 15.8 亿元。[来源：星桥科技 2025 年年度报告｜https://example.com/annual-report｜2026-04-20]
+######################
+Output:
+("entity"{tuple_delimiter}星桥科技{tuple_delimiter}组织机构{tuple_delimiter}星桥科技股份有限公司，股票代码 600XXX，2005 年 3 月成立，注册地杭州市滨江区，法定代表人兼董事长沈立群；截至 2025 年末第一大股东为浙江东辰投资有限公司（持股 14.2%），无实际控制人；2025 年营业收入 86.5 亿元，同比增长 12.3%，研发投入 15.8 亿元)
+{record_delimiter}
+("entity"{tuple_delimiter}沈立群{tuple_delimiter}人物{tuple_delimiter}沈立群是星桥科技的董事长兼法定代表人)
+{record_delimiter}
+("entity"{tuple_delimiter}浙江东辰投资有限公司{tuple_delimiter}组织机构{tuple_delimiter}浙江东辰投资有限公司截至 2025 年 12 月 31 日为星桥科技第一大股东，持股比例 14.2%)
+{record_delimiter}
+("entity"{tuple_delimiter}杭州市滨江区{tuple_delimiter}地点{tuple_delimiter}杭州市滨江区是星桥科技的注册地)
+{record_delimiter}
+("entity"{tuple_delimiter}星桥科技2025年营业收入{tuple_delimiter}财务指标{tuple_delimiter}星桥科技 2025 年营业收入 86.5 亿元，同比增长 12.3%，同期研发投入 15.8 亿元，数据来自 2025 年年度报告)
+{record_delimiter}
+("relationship"{tuple_delimiter}沈立群{tuple_delimiter}星桥科技{tuple_delimiter}沈立群担任星桥科技董事长兼法定代表人{tuple_delimiter}10)
+{record_delimiter}
+("relationship"{tuple_delimiter}浙江东辰投资有限公司{tuple_delimiter}星桥科技{tuple_delimiter}浙江东辰投资有限公司是星桥科技第一大股东，截至 2025 年末持股 14.2%{tuple_delimiter}9)
+{record_delimiter}
+("relationship"{tuple_delimiter}星桥科技{tuple_delimiter}杭州市滨江区{tuple_delimiter}星桥科技注册地位于杭州市滨江区{tuple_delimiter}6)
+{record_delimiter}
+("relationship"{tuple_delimiter}星桥科技{tuple_delimiter}星桥科技2025年营业收入{tuple_delimiter}星桥科技 2025 年年度报告披露营业收入 86.5 亿元{tuple_delimiter}8)
+{completion_delimiter}
+
+######################
+示例 2：
+Entity_types: 组织机构,项目或合同,产品或技术,地点
+Text:
+2026 年 3 月 12 日，中国政府采购网发布《临川市教育局智慧课堂建设项目中标公告》：中标供应商为星桥科技全资子公司星桥教育科技有限公司，中标金额 2,860 万元，项目内容包括为全市 120 所中小学部署“星桥智慧课堂”系统与 AI 学情分析平台，采购人为临川市教育局。[来源：中国政府采购网｜https://example.gov/notice｜2026-03-12]
+######################
+Output:
+("entity"{tuple_delimiter}临川市教育局智慧课堂建设项目{tuple_delimiter}项目或合同{tuple_delimiter}2026 年 3 月 12 日在中国政府采购网公告中标结果的政府采购项目，采购人为临川市教育局，中标供应商为星桥教育科技有限公司，中标金额 2,860 万元，内容为向全市 120 所中小学部署星桥智慧课堂系统与 AI 学情分析平台)
+{record_delimiter}
+("entity"{tuple_delimiter}临川市教育局{tuple_delimiter}组织机构{tuple_delimiter}临川市教育局是智慧课堂建设项目的采购人，需求覆盖全市 120 所中小学，是教育行业的政府客户)
+{record_delimiter}
+("entity"{tuple_delimiter}星桥教育科技有限公司{tuple_delimiter}组织机构{tuple_delimiter}星桥科技的全资子公司，2026 年 3 月中标临川市教育局智慧课堂建设项目，中标金额 2,860 万元)
+{record_delimiter}
+("entity"{tuple_delimiter}星桥科技{tuple_delimiter}组织机构{tuple_delimiter}星桥教育科技有限公司的母公司，通过子公司承接教育行业政府采购项目)
+{record_delimiter}
+("entity"{tuple_delimiter}星桥智慧课堂{tuple_delimiter}产品或技术{tuple_delimiter}星桥科技面向中小学的智慧课堂系统，在临川市教育局项目中与 AI 学情分析平台一同部署)
+{record_delimiter}
+("entity"{tuple_delimiter}中国政府采购网{tuple_delimiter}组织机构{tuple_delimiter}发布临川市教育局智慧课堂建设项目中标公告的政府采购信息平台)
+{record_delimiter}
+("relationship"{tuple_delimiter}星桥教育科技有限公司{tuple_delimiter}临川市教育局智慧课堂建设项目{tuple_delimiter}星桥教育科技有限公司于 2026 年 3 月 12 日公告中标该项目，中标金额 2,860 万元{tuple_delimiter}10)
+{record_delimiter}
+("relationship"{tuple_delimiter}临川市教育局{tuple_delimiter}临川市教育局智慧课堂建设项目{tuple_delimiter}临川市教育局是该项目的采购人{tuple_delimiter}9)
+{record_delimiter}
+("relationship"{tuple_delimiter}星桥教育科技有限公司{tuple_delimiter}星桥科技{tuple_delimiter}星桥教育科技有限公司是星桥科技的全资子公司{tuple_delimiter}9)
+{record_delimiter}
+("relationship"{tuple_delimiter}临川市教育局{tuple_delimiter}星桥教育科技有限公司{tuple_delimiter}临川市教育局通过政府采购向星桥教育科技有限公司采购智慧课堂系统，是其教育行业客户{tuple_delimiter}8)
+{record_delimiter}
+("relationship"{tuple_delimiter}星桥智慧课堂{tuple_delimiter}临川市教育局智慧课堂建设项目{tuple_delimiter}星桥智慧课堂是该项目部署的核心产品{tuple_delimiter}7)
+{record_delimiter}
+("relationship"{tuple_delimiter}中国政府采购网{tuple_delimiter}临川市教育局智慧课堂建设项目{tuple_delimiter}中国政府采购网于 2026 年 3 月 12 日发布该项目中标公告{tuple_delimiter}4)
+{completion_delimiter}
+
+######################
+示例 3：
+Entity_types: 人物,组织机构,事件,战略关键词,产品或技术
+Text:
+2026 年 5 月 18 日，星桥科技董事长沈立群在“2026 全球开发者大会”主题演讲中表示：“未来三年，星桥的核心战略是‘AI 化转型’，我们会把星桥大模型 3.0 落地到教育和医疗两个根据地行业，国产算力是这条路的底座。”这是沈立群 2026 年以来第四次在公开场合强调“AI 化转型”。同日，公司总裁周敏在雪球访谈中回应称，公司 2026 年将把研发投入占比维持在 18% 以上。[来源：新华财经｜https://example.com/speech｜2026-05-18]
+######################
+Output:
+("entity"{tuple_delimiter}沈立群{tuple_delimiter}人物{tuple_delimiter}星桥科技董事长，2026 年 5 月 18 日在 2026 全球开发者大会发表主题演讲，提出未来三年核心战略是“AI 化转型”，要把星桥大模型 3.0 落地教育和医疗两个根据地行业，并称国产算力是底座；这是其 2026 年以来第四次公开强调 AI 化转型)
+{record_delimiter}
+("entity"{tuple_delimiter}周敏{tuple_delimiter}人物{tuple_delimiter}星桥科技总裁，2026 年 5 月 18 日在雪球访谈中表示公司 2026 年研发投入占比将维持在 18% 以上)
+{record_delimiter}
+("entity"{tuple_delimiter}星桥科技{tuple_delimiter}组织机构{tuple_delimiter}董事长沈立群、总裁周敏；未来三年核心战略为 AI 化转型，聚焦教育和医疗两个根据地行业，2026 年研发投入占比目标 18% 以上)
+{record_delimiter}
+("entity"{tuple_delimiter}2026 全球开发者大会{tuple_delimiter}事件{tuple_delimiter}2026 年 5 月 18 日举行的行业大会，沈立群在会上发表主题演讲阐述 AI 化转型战略)
+{record_delimiter}
+("entity"{tuple_delimiter}AI 化转型{tuple_delimiter}战略关键词{tuple_delimiter}星桥科技未来三年的核心战略关键词，由董事长沈立群 2026 年以来四次公开强调，内容包括将星桥大模型 3.0 落地教育和医疗行业、以国产算力为底座)
+{record_delimiter}
+("entity"{tuple_delimiter}国产算力{tuple_delimiter}战略关键词{tuple_delimiter}沈立群称国产算力是星桥科技 AI 化转型的底座)
+{record_delimiter}
+("entity"{tuple_delimiter}星桥大模型 3.0{tuple_delimiter}产品或技术{tuple_delimiter}星桥科技的大模型产品，计划落地教育和医疗两个根据地行业)
+{record_delimiter}
+("relationship"{tuple_delimiter}沈立群{tuple_delimiter}星桥科技{tuple_delimiter}沈立群是星桥科技董事长{tuple_delimiter}10)
+{record_delimiter}
+("relationship"{tuple_delimiter}周敏{tuple_delimiter}星桥科技{tuple_delimiter}周敏是星桥科技总裁，并对外说明 2026 年研发投入占比目标{tuple_delimiter}10)
+{record_delimiter}
+("relationship"{tuple_delimiter}沈立群{tuple_delimiter}AI 化转型{tuple_delimiter}沈立群在 2026 年 5 月 18 日演讲中提出 AI 化转型是未来三年核心战略，2026 年以来第四次公开强调{tuple_delimiter}9)
+{record_delimiter}
+("relationship"{tuple_delimiter}沈立群{tuple_delimiter}2026 全球开发者大会{tuple_delimiter}沈立群在 2026 全球开发者大会发表主题演讲{tuple_delimiter}7)
+{record_delimiter}
+("relationship"{tuple_delimiter}AI 化转型{tuple_delimiter}国产算力{tuple_delimiter}国产算力被描述为 AI 化转型战略的底座{tuple_delimiter}6)
+{record_delimiter}
+("relationship"{tuple_delimiter}星桥大模型 3.0{tuple_delimiter}AI 化转型{tuple_delimiter}星桥大模型 3.0 落地教育和医疗是 AI 化转型战略的具体内容{tuple_delimiter}7)
+{record_delimiter}
+("relationship"{tuple_delimiter}星桥科技{tuple_delimiter}星桥大模型 3.0{tuple_delimiter}星桥大模型 3.0 是星桥科技的大模型产品{tuple_delimiter}8)
+{completion_delimiter}
+
+######################
+-真实数据-
+######################
+Entity_types: {entity_types}
+Text: {input_text}
+######################
+Output:

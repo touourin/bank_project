@@ -4,22 +4,16 @@ import { DataTable } from "../../ui/DataTable";
 import { PagePagination } from "../../ui/PagePagination";
 import { ConceptLabel } from "./ConceptLabel";
 import { ColumnHandling } from "./ColumnHandling";
+import {
+  RetrievalEvidence,
+  matchMethods,
+  matchStatus,
+} from "./RetrievalEvidence";
 import type { RetrievalTrace, Run, TableMapping } from "./types";
 
-export const matchStatus = {
-  matched: "已匹配",
-  review: "待确认",
-  unmatched: "无候选",
-  unavailable: "检索失败",
-  mismatch: "版本不一致",
-};
+export { matchStatus } from "./RetrievalEvidence";
+
 const targets = { table: "整表", column: "字段", entity: "实体分组" };
-const methods: Record<string, string> = {
-  exact: "精确匹配",
-  fuzzy: "模糊匹配",
-  vector: "向量匹配",
-  none: "未命中",
-};
 const titles = {
   meaning: "理解表与字段含义",
   recall: "retrieve 检索节点",
@@ -164,7 +158,7 @@ export function RetrievalProcess({
           {
             title: "匹配方式",
             width: 110,
-            render: (_, m) => methods[m.match_method] || m.match_method,
+            render: (_, m) => matchMethods[m.match_method] || m.match_method,
           },
           {
             title: "原检索 / 当前处理",
@@ -187,31 +181,7 @@ export function RetrievalProcess({
           },
         ]}
         expandable={{
-          expandedRowRender: (m) => (
-            <>
-              <p>
-                {m.detail} · 接口标记：{m.confident ? "有把握" : "无把握"}
-              </p>
-              <DataTable
-                label={`${m.name} 的检索候选`}
-                rowKey="id"
-                dataSource={m.candidates}
-                columns={[
-                  {
-                    title: "候选节点",
-                    render: (_, node) => (
-                      <ConceptLabel concept={node} parents />
-                    ),
-                  },
-                  {
-                    title: "得分",
-                    width: 100,
-                    render: (_, node) => node.score?.toFixed(3) ?? "未提供",
-                  },
-                ]}
-              />
-            </>
-          ),
+          expandedRowRender: (m) => <RetrievalEvidence trace={m} />,
         }}
       />
       <PagePagination

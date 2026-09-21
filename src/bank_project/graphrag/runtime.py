@@ -65,14 +65,17 @@ def require_models(settings) -> dict:
     return params
 
 
-def initialize(folder: Path, settings, chunk_size: int, overlap: int) -> None:
-    """Generate the upstream default prompts and complete indexing/search config."""
+def initialize(folder: Path, settings, chunk_size: int, overlap: int, profile="general") -> None:
+    """Generate native indexing/search config with source-language prompt rules."""
     require_runtime()
     params = require_models(settings)
     import yaml
     from graphrag.cli.initialize import initialize_project_at
 
+    from .prompts import configure_prompt_languages
+
     initialize_project_at(folder, force=True)
+    configure_prompt_languages(folder)
     config = yaml.safe_load((folder / "settings.yaml").read_text(encoding="utf-8"))
     # The upstream initializer writes a placeholder .env. Never load it or store secrets there.
     (folder / ".env").unlink(missing_ok=True)
@@ -135,6 +138,9 @@ def initialize(folder: Path, settings, chunk_size: int, overlap: int) -> None:
         "text_unit.text",
     ]
     config["drift_search"]["reduce_prompt"] = "prompts/drift_reduce_prompt.txt"
+    from .profiles import apply_profile
+
+    apply_profile(folder, config, profile, settings)
     config.pop("workflows", None)
     (folder / "settings.yaml").write_text(
         yaml.safe_dump(config, allow_unicode=True, sort_keys=False), encoding="utf-8"
@@ -155,8 +161,10 @@ def load_config(folder: Path, settings):
     config = yaml.safe_load(_inside(folder, "settings.yaml").read_text(encoding="utf-8"))
     config = copy.deepcopy(config)
     # Model names/addresses are pinned with the index; credentials are supplied at runtime.
-    config["models"]["default_chat_model"]["api_key"] = params["chat_key"]
-    config["models"]["default_embedding_model"]["api_key"] = params["embedding_key"]
+    for model in config["models"].values():
+        model["api_key"] = (
+            params["embedding_key"] if model["type"] == "openai_embedding" else params["chat_key"]
+        )
     for store in config.get("vector_store", {}).values():
         store["db_uri"] = str(_inside(folder, store["db_uri"]))
         # Query must open existing vectors. build_index explicitly controls overwrites itself.
@@ -178,6 +186,7 @@ def worker_environment(settings) -> dict[str, str]:
         "MODEL_MAX_RETRIES": settings.model_max_retries,
         "ALIGNMENT_MODEL_CONCURRENCY": settings.alignment_model_concurrency,
         "GRAPHRAG_CHAT_MODEL": params["chat_model"],
+        "GRAPHRAG_FAST_CHAT_MODEL": getattr(settings, "graphrag_fast_chat_model", None) or "",
         "GRAPHRAG_API_BASE": params["chat_base"],
         "GRAPHRAG_API_KEY": params["chat_key"],
         "GRAPHRAG_EMBEDDING_MODEL": params["embedding_model"],

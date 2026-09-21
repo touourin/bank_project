@@ -1,0 +1,84 @@
+{
+  "schema_version": "er-gold-v1",
+  "corpus_sha256": "452e3fd96ccd1ff92bf4a2d355a114886fa2bbeb369acf908dbb0e20ae6837a7",
+  "annotation_version": "synthetic-v1",
+  "mentions": [
+    {
+      "mention_id": "a1",
+      "gold_entity_id": "gold-a",
+      "label": "resolved",
+      "reviewed": true,
+      "notes": "Synthetic fixture label, not human business annotation."
+    },
+    {
+      "mention_id": "a2",
+      "gold_entity_id": "gold-a",
+      "label": "resolved",
+      "reviewed": true,
+      "notes": "Synthetic fixture label, not human business annotation."
+    },
+    {
+      "mention_id": "b1",
+      "gold_entity_id": "gold-b",
+      "label": "resolved",
+      "reviewed": true,
+      "notes": "Synthetic fixture label, not human business annotation."
+    },
+    {
+      "mention_id": "b2",
+      "gold_entity_id": "gold-b",
+      "label": "resolved",
+      "reviewed": true,
+      "notes": "Synthetic fixture label, not human business annotation."
+    },
+    {
+      "mention_id": "c1",
+      "gold_entity_id": "gold-c",
+      "label": "resolved",
+      "reviewed": true,
+      "notes": "Synthetic fixture label, not human business annotation."
+    },
+    {
+      "mention_id": "c2",
+      "gold_entity_id": "gold-c",
+      "label": "resolved",
+      "reviewed": true,
+      "notes": "Synthetic fixture label, not human business annotation."
+    },
+    {
+      "mention_id": "d1",
+      "gold_entity_id": "gold-d",
+      "label": "resolved",
+      "reviewed": true,
+      "notes": "Synthetic fixture label, not human business annotation."
+    },
+    {
+      "mention_id": "d2",
+      "gold_entity_id": "gold-d",
+      "label": "resolved",
+      "reviewed": true,
+      "notes": "Synthetic fixture label, not human business annotation."
+    },
+    {
+      "mention_id": "u1",
+      "gold_entity_id": null,
+      "label": "insufficient",
+      "reviewed": true,
+      "notes": "Synthetic fixture label, not human business annotation."
+    },
+    {
+      "mention_id": "o1",
+      "gold_entity_id": "gold-o",
+      "label": "resolved",
+      "reviewed": true,
+      "notes": "Synthetic fixture label, not human business annotation."
+    },
+    {
+      "mention_id": "p1",
+      "gold_entity_id": "gold-p",
+      "label": "resolved",
+      "reviewed": true,
+      "notes": "Synthetic fixture label, not human business annotation."
+    }
+  ]
+}

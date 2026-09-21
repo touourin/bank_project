@@ -10,9 +10,11 @@ from dataclasses import replace
 from typing import Protocol
 
 from bank_project.resolution.engine.candidates import normalize
+from bank_project.resolution.engine.concurrency import bounded_map
 from bank_project.resolution.engine.contracts import (
     Corpus,
     Mention,
+    ProgressCallback,
     ResolverConfig,
     require,
     text,
@@ -99,6 +101,7 @@ async def expand_corpus(
     dictionary: dict | None = None,
     *,
     max_alias_calls: int = 200,
+    on_progress: ProgressCallback | None = None,
 ) -> tuple[Corpus, dict]:
     """Make an auxiliary retrieval view; preserve original inputs for judging/gold."""
     require(
@@ -107,6 +110,7 @@ async def expand_corpus(
     )
     entries = validate_dictionary(dictionary)
     records, calls = [], 0
+    failed, skipped = 0, 0
 
     async def expand(mention):
         aliases = list(mention.aliases)
@@ -127,9 +131,10 @@ async def expand_corpus(
                         "scope": entry["scope"],
                     }
                 )
-        nonlocal calls
+        nonlocal calls, failed, skipped
         if calls >= max_alias_calls:
             state = "ALIAS_BUDGET_EXHAUSTED"
+            skipped += 1
         else:
             calls += 1
             try:
@@ -140,6 +145,7 @@ async def expand_corpus(
                 state = "complete"
             except (ValueError, RuntimeError, OSError, TimeoutError, TypeError) as exc:
                 state = f"ALIAS_FAILED:{type(exc).__name__}"
+                failed += 1
         unique = {normalize(mention.name)}
         clean = []
         for name in aliases:
@@ -155,16 +161,19 @@ async def expand_corpus(
                 "state": state,
             }
         )
+        if on_progress:
+            await on_progress(len(records), len(corpus.mentions), failed, skipped)
         return replace(mention, aliases=tuple(clean))
 
-    enriched = []
-    for offset in range(0, len(corpus.mentions), config.concurrency):
-        enriched.extend(
-            await asyncio.gather(
-                *(expand(m) for m in corpus.mentions[offset : offset + config.concurrency])
-            )
-        )
-    return replace(corpus, mentions=tuple(enriched)), {
+    enriched = {}
+
+    async def collect(mention):
+        enriched[mention.mention_id] = await expand(mention)
+
+    if on_progress:
+        await on_progress(0, len(corpus.mentions), 0, 0)
+    await bounded_map(corpus.mentions, collect, config.concurrency)
+    return replace(corpus, mentions=tuple(enriched[m.mention_id] for m in corpus.mentions)), {
         "schema_version": "er-alias-expansion-v1",
         "corpus_sha256": corpus.sha256,
         "model_requests": calls,

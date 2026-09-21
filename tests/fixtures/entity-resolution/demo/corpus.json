@@ -1,0 +1,192 @@
+{
+  "schema_version": "er-corpus-v1",
+  "namespace": "synthetic-demo",
+  "mentions": [
+    {
+      "mention_id": "a1",
+      "name": "张伟",
+      "type": "PERSON",
+      "source_id": "doc1",
+      "context": "张伟在本合成文档中的登记编号为DEMO-A。该编号仅用于演示身份比对。",
+      "description": "合成样例，用于验证方法和指标，不是真实评测结果。",
+      "aliases": [],
+      "identifiers": [
+        {
+          "namespace": "employee_registry",
+          "value": "DEMO-A",
+          "quote": "张伟在本合成文档中的登记编号为DEMO-A。该编号仅用于演示身份比对。",
+          "verified": true
+        }
+      ]
+    },
+    {
+      "mention_id": "a2",
+      "name": "张伟",
+      "type": "PERSON",
+      "source_id": "doc2",
+      "context": "张伟在本合成文档中的登记编号为DEMO-A。该编号仅用于演示身份比对。",
+      "description": "合成样例，用于验证方法和指标，不是真实评测结果。",
+      "aliases": [],
+      "identifiers": [
+        {
+          "namespace": "employee_registry",
+          "value": "DEMO-A",
+          "quote": "张伟在本合成文档中的登记编号为DEMO-A。该编号仅用于演示身份比对。",
+          "verified": true
+        }
+      ]
+    },
+    {
+      "mention_id": "b1",
+      "name": "张伟",
+      "type": "PERSON",
+      "source_id": "doc3",
+      "context": "张伟在本合成文档中的登记编号为DEMO-B。该编号仅用于演示身份比对。",
+      "description": "合成样例，用于验证方法和指标，不是真实评测结果。",
+      "aliases": [],
+      "identifiers": [
+        {
+          "namespace": "employee_registry",
+          "value": "DEMO-B",
+          "quote": "张伟在本合成文档中的登记编号为DEMO-B。该编号仅用于演示身份比对。",
+          "verified": true
+        }
+      ]
+    },
+    {
+      "mention_id": "b2",
+      "name": "张伟",
+      "type": "PERSON",
+      "source_id": "doc4",
+      "context": "张伟在本合成文档中的登记编号为DEMO-B。该编号仅用于演示身份比对。",
+      "description": "合成样例，用于验证方法和指标，不是真实评测结果。",
+      "aliases": [],
+      "identifiers": [
+        {
+          "namespace": "employee_registry",
+          "value": "DEMO-B",
+          "quote": "张伟在本合成文档中的登记编号为DEMO-B。该编号仅用于演示身份比对。",
+          "verified": true
+        }
+      ]
+    },
+    {
+      "mention_id": "c1",
+      "name": "星河科技有限公司",
+      "type": "ORGANIZATION",
+      "source_id": "doc1",
+      "context": "星河科技有限公司在本合成文档中的登记编号为DEMO-C。该编号仅用于演示身份比对。",
+      "description": "合成样例，用于验证方法和指标，不是真实评测结果。",
+      "aliases": [],
+      "identifiers": [
+        {
+          "namespace": "company_registry",
+          "value": "DEMO-C",
+          "quote": "星河科技有限公司在本合成文档中的登记编号为DEMO-C。该编号仅用于演示身份比对。",
+          "verified": true
+        }
+      ]
+    },
+    {
+      "mention_id": "c2",
+      "name": "星河科技",
+      "type": "ORGANIZATION",
+      "source_id": "doc2",
+      "context": "星河科技在本合成文档中的登记编号为DEMO-C。该编号仅用于演示身份比对。",
+      "description": "合成样例，用于验证方法和指标，不是真实评测结果。",
+      "aliases": [],
+      "identifiers": [
+        {
+          "namespace": "company_registry",
+          "value": "DEMO-C",
+          "quote": "星河科技在本合成文档中的登记编号为DEMO-C。该编号仅用于演示身份比对。",
+          "verified": true
+        }
+      ]
+    },
+    {
+      "mention_id": "d1",
+      "name": "云桥",
+      "type": "ORGANIZATION",
+      "source_id": "doc3",
+      "context": "云桥在本合成文档中的登记编号为DEMO-D。该编号仅用于演示身份比对。",
+      "description": "合成样例，用于验证方法和指标，不是真实评测结果。",
+      "aliases": [],
+      "identifiers": [
+        {
+          "namespace": "company_registry",
+          "value": "DEMO-D",
+          "quote": "云桥在本合成文档中的登记编号为DEMO-D。该编号仅用于演示身份比对。",
+          "verified": true
+        }
+      ]
+    },
+    {
+      "mention_id": "d2",
+      "name": "Yunqiao",
+      "type": "ORGANIZATION",
+      "source_id": "doc4",
+      "context": "Yunqiao在本合成文档中的登记编号为DEMO-D。该编号仅用于演示身份比对。",
+      "description": "合成样例，用于验证方法和指标，不是真实评测结果。",
+      "aliases": [],
+      "identifiers": [
+        {
+          "namespace": "company_registry",
+          "value": "DEMO-D",
+          "quote": "Yunqiao在本合成文档中的登记编号为DEMO-D。该编号仅用于演示身份比对。",
+          "verified": true
+        }
+      ]
+    },
+    {
+      "mention_id": "u1",
+      "name": "李明",
+      "type": "PERSON",
+      "source_id": "doc5",
+      "context": "李明参加了会议，文档没有提供更多身份信息。",
+      "description": "",
+      "aliases": [],
+      "identifiers": []
+    },
+    {
+      "mention_id": "o1",
+      "name": "蓝星",
+      "type": "ORGANIZATION",
+      "source_id": "doc6",
+      "context": "蓝星是一家企业，本段没有给出唯一身份编号。",
+      "description": "",
+      "aliases": [],
+      "identifiers": []
+    },
+    {
+      "mention_id": "p1",
+      "name": "蓝星",
+      "type": "PRODUCT",
+      "source_id": "doc7",
+      "context": "蓝星是一款产品，与同名企业不是同一个对象。",
+      "description": "",
+      "aliases": [],
+      "identifiers": []
+    }
+  ],
+  "input_kind": "mentions",
+  "constraints": [],
+  "relations": [
+    {
+      "relation_id": "r1",
+      "source_mention_id": "a1",
+      "target_mention_id": "c1",
+      "description": "合成任职关系"
+    },
+    {
+      "relation_id": "r2",
+      "source_mention_id": "b1",
+      "target_mention_id": "d1",
+      "description": "合成任职关系"
+    }
+  ],
+  "metadata": {
+    "synthetic": true,
+    "purpose": "mechanics and regression only; not a production quality benchmark"
+  }
+}

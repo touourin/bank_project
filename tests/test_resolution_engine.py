@@ -200,6 +200,45 @@ async def test_model_budget_does_not_fall_back_to_name_merge():
 
 
 @synchronous
+async def test_progress_counts_failed_and_budget_skipped_pairs_as_processed():
+    events = []
+
+    async def report(*values):
+        events.append(values)
+
+    result = await resolve_evidence(
+        corpus(3),
+        ResolverConfig(max_model_calls=1),
+        Judge(invalid=True),
+        on_progress=report,
+    )
+    assert events[0] == (0, 3, 0, 0) and events[-1] == (3, 3, 1, 2)
+    assert [event[0] for event in events] == [0, 1, 2, 3]
+    assert len(result.decisions) == 3 and len(result.entities) == 3
+
+
+@synchronous
+async def test_alias_progress_reports_failures_and_budget_without_losing_mentions():
+    from bank_project.resolution.engine.synonyms import expand_corpus
+
+    events = []
+
+    async def report(*values):
+        events.append(values)
+
+    class FailedAliases:
+        async def expand_aliases(self, mention):
+            raise TimeoutError("Synthetic timeout")
+
+    enriched, _ = await expand_corpus(
+        corpus(3), FailedAliases(), ResolverConfig(), max_alias_calls=1, on_progress=report
+    )
+    assert events[0] == (0, 3, 0, 0) and events[-1] == (3, 3, 1, 2)
+    assert [event[0] for event in events] == [0, 1, 2, 3]
+    assert enriched == corpus(3)
+
+
+@synchronous
 async def test_candidate_overflow_blocks_model_auto_merge():
     result = await resolve_evidence(
         corpus(3), ResolverConfig(model_policy="apply", candidate_limit=1), Judge()

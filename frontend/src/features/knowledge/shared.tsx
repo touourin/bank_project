@@ -26,6 +26,8 @@ export const statusLabel = (status: string) =>
     failed: "失败",
     merged: "已合并",
     rejected: "已保留",
+    excluded: "自动不合并",
+    not_recommended: "未建议合并",
     matched: "已匹配",
     review: "待确认",
     unmatched: "未匹配",
@@ -85,6 +87,8 @@ export function AuditTable({ audits }: { audits: Audit[] }) {
           title: "操作",
           render: (_, row) =>
             ({
+              accept_proposal: "采纳匹配建议",
+              refresh_endpoints: "端点变更后重新校验",
               merge: "合并",
               manual: "人工指定合并",
               reject: "保留独立节点",

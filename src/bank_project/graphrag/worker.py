@@ -233,7 +233,10 @@ def run_job(data_root: Path, key: str, run_id: str) -> int:
                 previous_loader = loaders[InputFileType.csv]
                 loaders[InputFileType.csv] = _load_canonical_csv
                 callbacks = JobProgress(folder, run_id)
-                results = asyncio.run(build_index(config=config, callbacks=[callbacks]))
+                from .records import capture_records
+
+                with capture_records(folder):
+                    results = asyncio.run(build_index(config=config, callbacks=[callbacks]))
                 if not results:
                     raise RuntimeError("索引流程没有返回执行结果。")
                 errors = [
@@ -245,6 +248,13 @@ def run_job(data_root: Path, key: str, run_id: str) -> int:
                     raise RuntimeError("\n".join(errors))
                 service._update_job(folder, run_id, stage="验证索引产物", progress=0.98)
                 artifacts = _verify_artifacts(folder)
+                artifacts["resolution_records"] = (
+                    folder / "output/entity_resolution/latest.json"
+                ).is_file()
+                if artifacts["resolution_records"]:
+                    from .records import load_records
+
+                    artifacts["resolution_record_count"] = len(load_records(folder).mentions)
                 service._register(root, key, community_level=artifacts["community_level"])
                 service._update_job(
                     folder,

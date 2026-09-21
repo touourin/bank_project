@@ -9,7 +9,7 @@ import pytest
 from test_alignment import FakeRetriever, catalog_bytes
 
 from bank_project.alignment.models import AlignmentError
-from bank_project.api.knowledge import MatchDecision
+from bank_project.api.knowledge import AcceptMatchProposals, MatchDecision
 from bank_project.knowledge.service import KnowledgeService
 from bank_project.settings import Settings
 
@@ -192,3 +192,180 @@ def test_manual_annotation_requires_explicit_target_value():
     with pytest.raises(ValidationError):
         MatchDecision(target="node", target_id="a", expected_revision=1)
     assert MatchDecision(target="node", target_id="a", boid=None, expected_revision=1).boid is None
+
+
+def test_accept_low_score_proposals_atomically_retains_evidence_and_source(tmp_path):
+    svc = service(tmp_path, score=0.177)
+    value = finish(svc)
+    assert value["confidence_threshold"] == 0.75
+    accepted = svc.accept_proposals(
+        value["id"],
+        AcceptMatchProposals(expected_revision=1, reviewer="张三", note="已核对建议"),
+    )
+    assert accepted["revision"] == 2
+    assert accepted["summary"]["matched_nodes"] == 2
+    assert accepted["summary"]["matched_edges"] == 2
+    assert all(node["reviewed"] for node in accepted["nodes"])
+    assert all(edge["reviewed"] and edge["edge_type"] == "OWNS" for edge in accepted["edges"])
+    assert [node["trace"] for node in accepted["nodes"]] == [
+        node["trace"] for node in value["nodes"]
+    ]
+    assert len(accepted["audits"]) == 4
+    assert all(
+        audit["action"] == "accept_proposal"
+        and audit["revision"] == 2
+        and audit["reviewer"] == "张三"
+        and audit["note"] == "已核对建议"
+        for audit in accepted["audits"]
+    )
+    graph = svc.result_graph(value["id"])
+    for original, annotated in zip(sample_graph()["nodes"], graph["nodes"], strict=True):
+        assert annotated == {**original, "boid": "customer"}
+    for original, annotated in zip(sample_graph()["edges"], graph["edges"], strict=True):
+        assert annotated == {**original, "edge_type": "OWNS"}
+    assert svc.store.get(value["id"])["graph"] == sample_graph()
+    with pytest.raises(AlignmentError, match="刷新"):
+        svc.accept_proposals(value["id"], AcceptMatchProposals(expected_revision=1))
+    repeated = svc.accept_proposals(value["id"], AcceptMatchProposals(expected_revision=2))
+    assert repeated["revision"] == 2 and repeated["audits"] == accepted["audits"]
+
+
+@pytest.mark.parametrize("boid", [None, "account"])
+def test_bulk_accept_keeps_manual_node_clear_and_override_in_legacy_runs(tmp_path, boid):
+    svc = service(tmp_path, score=0.2)
+    value = finish(svc)
+    svc.review(
+        value["id"], MatchDecision(target="node", target_id="a", boid=boid, expected_revision=1)
+    )
+    # Previously saved runs may have audit evidence without the explicit flag.
+    svc.store.mutate(value["id"], lambda run: run["nodes"][0].pop("reviewed"))
+    accepted = svc.accept_proposals(value["id"], AcceptMatchProposals(expected_revision=2))
+    assert accepted["nodes"][0]["boid"] == boid
+    assert accepted["nodes"][1]["boid"] == "customer"
+    assert all(edge["edge_type"] is None for edge in accepted["edges"])
+    assert len(accepted["audits"]) == 2
+
+
+def test_bulk_accept_keeps_manually_cleared_edges_and_supports_legacy_suggestions(tmp_path):
+    svc = service(tmp_path)
+    value = finish(svc)
+    svc.review(
+        value["id"],
+        MatchDecision(target="edge", target_id="e1", edge_type=None, expected_revision=1),
+    )
+
+    def legacy(run):
+        for edge in run["edges"]:
+            edge.pop("proposed_edge_type", None)
+            edge.pop("reviewed", None)
+
+    svc.store.mutate(value["id"], legacy)
+    legacy_public = svc.store.public(svc.store.get(value["id"]))
+    assert legacy_public["edges"][1]["proposed_edge_type"] == "OWNS"
+    accepted = svc.accept_proposals(value["id"], AcceptMatchProposals(expected_revision=2))
+    assert accepted["edges"][0]["edge_type"] is None
+    assert accepted["edges"][1]["edge_type"] == "OWNS"
+    assert accepted["revision"] == 3
+
+
+def test_bulk_accept_rejects_catalog_change_without_partial_writes(tmp_path):
+    svc = service(tmp_path, score=0.2)
+    value = finish(svc)
+    svc.settings.ontology_snapshot.write_bytes(catalog_bytes())
+    with pytest.raises(AlignmentError, match="快照已变化"):
+        svc.accept_proposals(value["id"], AcceptMatchProposals(expected_revision=1))
+    assert svc.store.get(value["id"]) == value
+
+
+@pytest.mark.parametrize("status", ["unavailable", "mismatch", "unmatched"])
+def test_bulk_accept_never_uses_invalid_retrieval_evidence(tmp_path, status):
+    svc = service(tmp_path, score=0.2)
+    value = finish(svc)
+    svc.store.mutate(value["id"], lambda run: run["nodes"][0]["trace"].update(status=status))
+    accepted = svc.accept_proposals(value["id"], AcceptMatchProposals(expected_revision=1))
+    assert accepted["nodes"][0]["boid"] is None
+    assert accepted["nodes"][1]["boid"] == "customer"
+    assert accepted["summary"]["matched_edges"] == 0
+
+
+def test_bulk_accept_does_not_choose_ambiguous_edge_types(tmp_path):
+    svc = service(tmp_path, score=0.2)
+    snapshot = json.loads(svc.settings.ontology_snapshot.read_text())
+    snapshot["graph"]["relationships"].append(
+        {
+            "start": "Concept:r1:customer",
+            "end": "Concept:r1:customer",
+            "type": "CONTROLS",
+            "properties": {"dataset_revision": "r1"},
+        }
+    )
+    svc.settings.ontology_snapshot.write_text(json.dumps(snapshot))
+    value = finish(svc)
+    accepted = svc.accept_proposals(value["id"], AcceptMatchProposals(expected_revision=1))
+    assert accepted["edges"][0]["edge_type"] == "OWNS"
+    assert accepted["edges"][1]["edge_type"] is None
+    assert accepted["edges"][1]["proposed_edge_type"] is None
+    assert accepted["edges"][1]["candidates"] == ["CONTROLS", "OWNS"]
+
+
+def test_rematch_keeps_existing_annotations_when_new_retrieval_is_low_or_different(tmp_path):
+    svc = service(tmp_path)
+    first = finish(svc)
+
+    async def execute():
+        # New evidence points elsewhere; the selected graph's prior matching stays intact.
+        svc.retriever.score, svc.retriever.node_id = 0.1, "account"
+        second = await svc.start_match("graphrag", f"match:{first['id']}:1")
+        await asyncio.gather(*svc.tasks)
+        return svc.store.get(second["id"])
+
+    second = asyncio.run(execute())
+    output = svc.result_graph(second["id"])
+    assert all(node["boid"] == "customer" for node in output["nodes"])
+    assert output["edges"][0]["edge_type"] == "OWNS"
+    assert all(node["trace"]["selected"]["id"] == "account" for node in second["nodes"])
+    accepted = svc.accept_proposals(second["id"], AcceptMatchProposals(expected_revision=1))
+    assert all(node["boid"] == "customer" for node in accepted["nodes"])
+    assert svc.store.get(second["id"])["graph"]["nodes"] == output["nodes"]
+
+
+def test_failed_later_batch_retains_completed_matching_evidence(tmp_path):
+    svc = service(tmp_path)
+    graph = sample_graph()
+    graph["nodes"] = [{**graph["nodes"][0], "id": f"n{i}"} for i in range(101)]
+    graph["edges"] = []
+    svc.graphrag.graph = lambda _: copy.deepcopy(graph)
+    original_search = svc.retriever.search_many
+    calls = 0
+
+    async def fail_second_batch(queries):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("retrieval interrupted")
+        return await original_search(queries)
+
+    svc.retriever.search_many = fail_second_batch
+    value = finish(svc)
+    assert value["status"] == "failed"
+    assert len(value["nodes"]) == value["summary"]["matched_nodes"] == 100
+    assert all(node["trace"]["selected"]["id"] == "customer" for node in value["nodes"])
+    assert value["graph"] == graph
+    with pytest.raises(AlignmentError):
+        svc.accept_proposals(value["id"], AcceptMatchProposals(expected_revision=1))
+
+
+def test_bulk_edge_proposals_respect_catalog_direction(tmp_path):
+    svc = service(tmp_path, score=0.2)
+    snapshot = json.loads(svc.settings.ontology_snapshot.read_text())
+    snapshot["graph"]["relationships"][0]["end"] = "Concept:r1:account"
+    svc.settings.ontology_snapshot.write_text(json.dumps(snapshot))
+    graph = sample_graph()
+    graph["nodes"][1]["boid"] = "account"
+    graph["edges"].append({"id": "reverse", "source": "b", "target": "a", "properties": {}})
+    svc.graphrag.graph = lambda _: copy.deepcopy(graph)
+    value = finish(svc)
+    accepted = svc.accept_proposals(value["id"], AcceptMatchProposals(expected_revision=1))
+    assert [node["boid"] for node in accepted["nodes"]] == ["customer", "account"]
+    assert [edge["edge_type"] for edge in accepted["edges"]] == ["OWNS", "OWNS", None]
+    assert accepted["edges"][2]["candidates"] == []

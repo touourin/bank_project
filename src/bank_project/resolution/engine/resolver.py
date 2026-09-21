@@ -10,14 +10,19 @@ from dataclasses import asdict
 from typing import Protocol
 from uuid import NAMESPACE_URL, uuid5
 
-from bank_project.resolution.engine.candidates import retrieve
+from bank_project.resolution.engine.candidates import identity_signals, retrieve
+from bank_project.resolution.engine.concurrency import bounded_map
 from bank_project.resolution.engine.contracts import (
     Corpus,
+    DecisionCallback,
     Mention,
+    ProgressCallback,
     Resolution,
     ResolverConfig,
     require,
 )
+from bank_project.resolution.engine.evidence import quote_covers_target
+from bank_project.resolution.engine.identity_guard import assess_identity
 
 
 class IdentityJudge(Protocol):
@@ -61,6 +66,10 @@ def validate_judgment(value: dict, left: Mention, right: Mention) -> dict:
                 isinstance(quote, str) and len(quote.strip()) >= 4 and quote in mention.context,
                 f"Judge {side} quote is not supported by source context",
             )
+            require(
+                quote_covers_target(mention, quote),
+                f"Judge {side} quote does not cover the target mention occurrence",
+            )
     return {key: value.get(key, "") for key in ("verdict", "left_quote", "right_quote", "reason")}
 
 
@@ -74,6 +83,8 @@ async def resolve_evidence(
     method: str = "evidence_v1",
     model_only: bool = False,
     candidate_data: tuple[dict[str, list[str]], set[str]] | None = None,
+    on_progress: ProgressCallback | None = None,
+    on_decision: DecisionCallback | None = None,
 ) -> Resolution:
     """Resolve the same input records as the legacy baseline without mutating it."""
     config = config or ResolverConfig()
@@ -85,16 +96,35 @@ async def resolve_evidence(
         from bank_project.resolution.engine.vectors import vector_neighbors
 
         semantic_neighbors = vector_neighbors(corpus, vectors, config)
+    retrieval_diagnostics = {}
     candidates, overflow = (
         candidate_data
         if candidate_data is not None
-        else retrieve(retrieval_corpus or corpus, config, semantic_neighbors)
+        else retrieve(
+            retrieval_corpus or corpus,
+            config,
+            semantic_neighbors,
+            diagnostics=retrieval_diagnostics,
+        )
     )
     decisions, model_calls = {}, 0
+    charged_requests = set()
+    failed, skipped = 0, 0
     semaphore = asyncio.Semaphore(config.concurrency)
+    bind_candidates = getattr(judge, "bind_candidates", None)
+    if callable(bind_candidates):
+        bind_candidates(corpus, candidates)
 
     def rule(pair):
         left, right = pair
+        identity = assess_identity(mentions[left], mentions[right])
+        if identity is not None:
+            return {
+                "verdict": identity["verdict"],
+                "reason": identity["reason"],
+                "identity_guard": identity,
+                "origin": "rule",
+            }
         common = ids[left].keys() & ids[right].keys()
         conflict = any(ids[left][key] != ids[right][key] for key in common)
         constraint = constraints.get(pair)
@@ -125,25 +155,31 @@ async def resolve_evidence(
         return None
 
     async def compare(pair):
-        nonlocal model_calls
+        nonlocal model_calls, failed, skipped
         if pair in decisions:
             return decisions[pair]
         result = rule(pair)
         if result is None:
+            budget_key = getattr(judge, "budget_key", None)
+            request_key = (
+                budget_key(mentions[pair[0]], mentions[pair[1]]) if callable(budget_key) else pair
+            )
             if judge is None:
                 result = {
                     "verdict": "uncertain",
                     "reason": "NO_IDENTITY_EVIDENCE",
                     "origin": "unresolved",
                 }
-            elif model_calls >= config.max_model_calls:
+            elif request_key not in charged_requests and model_calls >= config.max_model_calls:
                 result = {
                     "verdict": "uncertain",
                     "reason": "MODEL_BUDGET_EXHAUSTED",
                     "origin": "error",
                 }
             else:
-                model_calls += 1
+                if request_key not in charged_requests:
+                    charged_requests.add(request_key)
+                    model_calls += 1
                 try:
                     async with semaphore:
                         raw = await asyncio.wait_for(
@@ -159,6 +195,15 @@ async def resolve_evidence(
                         "verdict": "uncertain",
                         "reason": "JUDGE_FAILED",
                         "error_type": type(exc).__name__,
+                        "error_code": getattr(
+                            exc,
+                            "code",
+                            "TIMEOUT"
+                            if isinstance(exc, TimeoutError)
+                            else "INVALID_RESPONSE"
+                            if isinstance(exc, ValueError)
+                            else "PROVIDER_FAILURE",
+                        ),
                         "origin": "error",
                     }
         result = {"left": pair[0], "right": pair[1], "accepted": False, **result}
@@ -173,16 +218,31 @@ async def resolve_evidence(
                 result["verdict"] = "uncertain"
                 result["reason"] = "CANDIDATE_OVERFLOW"
         decisions[pair] = result
+        failed += result["reason"] == "JUDGE_FAILED"
+        skipped += result["reason"] == "MODEL_BUDGET_EXHAUSTED"
+        if on_decision:
+            await on_decision(dict(result))
+        if on_progress:
+            await on_progress(
+                len(decisions), max(len(initial_pairs), len(decisions)), failed, skipped
+            )
         return result
 
     initial_pairs = sorted(
         {tuple(sorted((mid, other))) for mid, others in candidates.items() for other in others}
     )
-    # Batches bound the number of allocated coroutines as well as active calls.
-    for offset in range(0, len(initial_pairs), config.concurrency):
-        await asyncio.gather(
-            *(compare(pair) for pair in initial_pairs[offset : offset + config.concurrency])
+    if config.retrieval_policy == "balanced":
+        hints = {m.mention_id: m for m in (retrieval_corpus or corpus).mentions}
+        initial_pairs.sort(
+            key=lambda pair: (
+                -int(pair in constraints),
+                *(-float(v) for v in identity_signals(hints[pair[0]], hints[pair[1]])),
+                pair,
+            )
         )
+    if on_progress:
+        await on_progress(0, len(initial_pairs), 0, 0)
+    await bounded_map(initial_pairs, compare, config.concurrency)
     groups = {mid: {mid} for mid in mentions}
     owner = {mid: mid for mid in mentions}
     blocked = []
@@ -273,6 +333,11 @@ async def resolve_evidence(
         candidates,
         {
             "config": asdict(config),
+            "retrieval": retrieval_diagnostics,
+            "scheduling": "continuous_workers",
+            "budget_order": "identity_signals"
+            if config.retrieval_policy == "balanced"
+            else "record_id",
             "merge_decision_policy": "model_required"
             if model_only
             else "evidence_rules_then_model",

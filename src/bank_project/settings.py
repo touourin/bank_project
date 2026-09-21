@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     model_max_retries: int = Field(default=2, ge=0, le=3)
 
     graphrag_chat_model: str | None = None
+    graphrag_fast_chat_model: str | None = None
+    graphrag_default_profile: Literal["enterprise_zh", "general"] = "enterprise_zh"
+    resolution_experiments_dir: Path | None = None
     graphrag_api_base: str | None = None
     graphrag_api_key: SecretStr | None = None
     graphrag_embedding_model: str = "text-embedding-3-small"

@@ -119,8 +119,38 @@ footer {
   width: calc(100% - 40px);
   margin: 20px auto 0;
 }
+.demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 20px 40px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.demo-banner-title,
+.demo-banner-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.demo-banner-title {
+  font-size: 14px;
+}
+.demo-banner p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
 @media (max-width: 540px) {
+  .demo-banner {
+    padding: 16px;
+  }
   .topbar {
+    flex-wrap: wrap;
     padding: 16px;
     gap: 10px;
   }

@@ -104,9 +104,13 @@ def create_dataset(
     documents: list[Document],
     chunk_size: int = 1200,
     overlap: int = 100,
+    profile: str = "general",
 ) -> str:
     """Create a new isolated dataset, never altering an existing indexed dataset."""
     name = name.strip()
+    from .profiles import profile_info
+
+    profile_info(profile)
     if not name or len(name) > 200:
         raise ValueError("数据集名称需为 1–200 个字符。")
     if not isinstance(chunk_size, int) or not 100 <= chunk_size <= 16000:
@@ -179,6 +183,7 @@ def create_dataset(
                 ],
                 "chunk_size": chunk_size,
                 "overlap": overlap,
+                "profile": profile,
             }
             _atomic_json(folder / "manifest.json", manifest)
             _atomic_json(
@@ -193,6 +198,7 @@ def create_dataset(
                             "created_at",
                             "document_count",
                             "duplicate_count",
+                            "profile",
                         )
                     },
                     "status": "ready",
@@ -270,6 +276,7 @@ def get_job(data_root: Path, key: str) -> dict | None:
 
 
 def list_jobs(data_root: Path) -> list[dict]:
+    """List current datasets; archived sources remain readable by their original key."""
     root = _root(data_root)
     if not root.is_dir():
         return []
@@ -279,7 +286,7 @@ def list_jobs(data_root: Path) -> list[dict]:
             continue
         try:
             job = get_job(root, folder.name)
-            if job is not None:
+            if job is not None and not job.get("archived_at"):
                 jobs.append(job)
         except (ValueError, OSError):
             continue
@@ -299,7 +306,13 @@ def start_index(data_root: Path, key: str, settings) -> dict:
         from .runtime import initialize, worker_environment
 
         manifest = _read_json(folder / "manifest.json")
-        initialize(folder, settings, manifest["chunk_size"], manifest["overlap"])
+        initialize(
+            folder,
+            settings,
+            manifest["chunk_size"],
+            manifest["overlap"],
+            **({"profile": manifest["profile"]} if manifest.get("profile") else {}),
+        )
         run_id = uuid.uuid4().hex
         job.update(
             status="queued",

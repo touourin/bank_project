@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Button, Input, Progress, Select, Tabs } from "antd";
+import { Alert, Button, Progress, Tabs } from "antd";
 import { errorMessage } from "../../api/request";
+import { isDemoMode } from "../../demo";
 import { useResource } from "../../hooks/useResource";
 import { EmptyState, ErrorNotice, LoadingState } from "../../ui/Feedback";
 import { Panel } from "../../ui/Panel";
 import { knowledgeApi } from "./api";
 import { KnowledgeGraphPanel } from "./KnowledgeGraphPanel";
 import { MatchingPanel } from "./MatchingPanel";
-import { JsonDetails, StatusTag, usePolling } from "./shared";
-import type { QueryResult } from "./types";
+import { StatusTag, usePolling } from "./shared";
+import { GraphChat } from "./GraphChat";
+import { ReportsPanel } from "./ReportsPanel";
 import "./knowledge.css";
 
 export function GraphRagPage({ token }: { token: string }) {
@@ -86,7 +88,11 @@ export function GraphRagPage({ token }: { token: string }) {
         <aside className="knowledge-sidebar">
           <Panel
             title="文本数据集"
-            description="在数据接入中上传 TXT，随后在这里启动索引。"
+            description={
+              isDemoMode
+                ? "示例文本已就绪，选择后即可浏览图谱。"
+                : "在数据接入中上传 TXT，随后在这里启动索引。"
+            }
             actions={
               <Button size="small" onClick={datasets.refresh}>
                 刷新
@@ -134,13 +140,19 @@ export function GraphRagPage({ token }: { token: string }) {
               <Alert type="warning" showIcon title={config.data.error} />
             )}
             <p className="hint">
-              GraphRAG
-              依次执行文本分块、实体关系抽取、社区发现、社区报告和向量索引。开始索引会调用已配置的模型。
+              {isDemoMode
+                ? "已准备好示例文本的实体、关系和检索证据，可直接体验右侧的图谱浏览、问答与节点匹配。"
+                : "GraphRAG 依次执行文本分块、实体关系抽取、社区发现、社区报告和向量索引。开始索引会调用已配置的模型。"}
             </p>
             {dataset && (
               <>
                 <p>
                   <strong>{dataset.name}</strong>
+                  <small>
+                    {dataset.profile === "enterprise_zh"
+                      ? "企业情报 · 原项目中文方案（8 类实体）"
+                      : "通用文档方案"}
+                  </small>
                 </p>
                 <p>{dataset.stage || "文本已接收"}</p>
                 {typeof dataset.progress === "number" ? (
@@ -208,11 +220,19 @@ export function GraphRagPage({ token }: { token: string }) {
                     key: "query",
                     label: "图谱问答",
                     children: (
-                      <QuestionPanel
+                      <GraphChat
                         key={`${token}:${selected}`}
                         token={token}
                         datasetKey={selected}
+                        graph={graph.data}
                       />
+                    ),
+                  },
+                  {
+                    key: "reports",
+                    label: "社区报告",
+                    children: (
+                      <ReportsPanel token={token} datasetKey={selected} />
                     ),
                   },
                   {
@@ -245,99 +265,5 @@ export function GraphRagPage({ token }: { token: string }) {
         </div>
       </div>
     </main>
-  );
-}
-
-function QuestionPanel({
-  token,
-  datasetKey,
-}: {
-  token: string;
-  datasetKey: string;
-}) {
-  const [question, setQuestion] = useState("");
-  const [method, setMethod] = useState("local");
-  const [result, setResult] = useState<QueryResult>();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const active = useRef<AbortController | undefined>(undefined);
-  useEffect(() => () => active.current?.abort(), []);
-  async function ask() {
-    if (active.current || !question.trim()) return;
-    const controller = new AbortController();
-    active.current = controller;
-    setBusy(true);
-    setError("");
-    setResult(undefined);
-    try {
-      const value = await knowledgeApi.query(
-        token,
-        datasetKey,
-        question.trim(),
-        method,
-        controller.signal,
-      );
-      if (!controller.signal.aborted) setResult(value);
-    } catch (reason) {
-      if (!controller.signal.aborted) setError(errorMessage(reason));
-    } finally {
-      if (!controller.signal.aborted) {
-        active.current = undefined;
-        setBusy(false);
-      }
-    }
-  }
-  return (
-    <div className="knowledge-query">
-      <p className="hint">
-        Local 聚焦具体实体；Global 基于社区报告回答全局问题；DRIFT
-        扩展相关问题后综合回答。问答依据原始 GraphRAG
-        索引，人工消歧和本体标签不会重写检索证据。
-      </p>
-      <label className="knowledge-field">
-        检索方式
-        <Select
-          aria-label="检索方式"
-          value={method}
-          disabled={busy}
-          onChange={setMethod}
-          options={[
-            { value: "local", label: "Local · 实体与关系" },
-            { value: "global", label: "Global · 全局主题" },
-            { value: "drift", label: "DRIFT · 扩展检索" },
-          ]}
-        />
-      </label>
-      <label className="knowledge-field">
-        你的问题
-        <Input.TextArea
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-          autoSize={{ minRows: 3, maxRows: 8 }}
-          maxLength={10000}
-          disabled={busy}
-          placeholder="例如：文中哪些企业存在关联，它们的关系是什么？"
-        />
-      </label>
-      <Button
-        aria-label="查询图谱"
-        type="primary"
-        loading={busy}
-        disabled={!question.trim()}
-        onClick={() => void ask()}
-      >
-        查询图谱
-      </Button>
-      {busy && <LoadingState label="正在检索图谱并生成回答…" />}
-      {error && <ErrorNotice message={error} />}
-      {result && (
-        <>
-          <div className="knowledge-answer" aria-live="polite">
-            {result.answer}
-          </div>
-          <JsonDetails value={result.context} label="检索证据与上下文" />
-        </>
-      )}
-    </div>
   );
 }

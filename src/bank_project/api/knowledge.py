@@ -46,6 +46,12 @@ class MatchDecision(StrictModel):
         return self
 
 
+class AcceptMatchProposals(StrictModel):
+    expected_revision: int = Field(ge=1)
+    reviewer: str = Field(default="人工审核", min_length=1, max_length=100)
+    note: str = Field(default="", max_length=2000)
+
+
 @router.get("/sources")
 def sources(knowledge: Service):
     return knowledge.sources()
@@ -74,6 +80,11 @@ def concepts(run_id: UUID, knowledge: Service, q: str = Query(default="", max_le
 @router.post("/matches/{run_id}/decisions")
 def decide(run_id: UUID, payload: MatchDecision, knowledge: Service):
     return knowledge.review(str(run_id), payload)
+
+
+@router.post("/matches/{run_id}/accept-proposals")
+def accept_proposals(run_id: UUID, payload: AcceptMatchProposals, knowledge: Service):
+    return knowledge.accept_proposals(str(run_id), payload)
 
 
 @router.get("/matches/{run_id}/graph")

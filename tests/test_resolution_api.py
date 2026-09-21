@@ -39,8 +39,36 @@ def test_review_export_auth_and_stale_conflict(tmp_path):
         )
         result = client.get(f"{root}/{run.id}/graph", headers=headers)
         assert result.status_code == 200 and len(result.json()["nodes"]) == 2
+        experiments = "/api/v1/resolution/experiments"
+        assert client.get(experiments).status_code == 401
+        assert client.get(experiments, headers=headers).json()["runs"][0]["name"] == run.id
+        detail = client.get(f"{experiments}/{run.id}", headers=headers)
+        assert detail.status_code == 200
+        assert detail.json()["report"]["records"] == 3
+        download = client.get(f"{experiments}/{run.id}/download", headers=headers)
+        assert download.status_code == 200
+        import io
+        import zipfile
+
+        with zipfile.ZipFile(io.BytesIO(download.content)) as archive:
+            assert {"corpus.json", "comparison.md", "annotation_template.json"} <= set(
+                archive.namelist()
+            )
+            assert any(name.startswith("implementation/") for name in archive.namelist())
         original = client.get(f"{root}/{run.id}/original", headers=headers).json()
         assert len(original["nodes"]) == len(source()["nodes"]) == 3
+        sources_url = f"{root}/{run.id}/candidates/{pair['id']}/sources"
+        assert client.get(sources_url).status_code == 401
+        sources = client.get(sources_url, headers=headers).json()
+        assert sources["candidate_id"] == pair["id"]
+        assert {n["node_id"] for n in sources["nodes"]} == {"a", "b"}
+        by_id = {n["id"]: n for n in original["nodes"]}
+        for node in sources["nodes"]:
+            assert node["records"][0]["source_text"] == by_id[node["node_id"]]["source_context"]
+        assert (
+            client.get(f"{root}/{run.id}/candidates/missing/sources", headers=headers).status_code
+            == 404
+        )
         assert (
             client.post(
                 root, json={"source_kind": "unexpected", "source_id": "test"}, headers=headers

@@ -30,6 +30,8 @@ class BodyLimitMiddleware:
                 else 64 * 1024
             )
         )
+        if path == "/api/v1/resolution/runs":
+            limit = 32 * 1024 * 1024
         if path in {"/api/v1/intake/uploads", "/api/v1/graphrag/uploads"}:
             from bank_project.intake.models import IntakeError
 

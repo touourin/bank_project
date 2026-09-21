@@ -29,9 +29,9 @@ def _clear_query_models() -> None:
     from graphrag.language_model.manager import ModelManager
 
     manager = ModelManager()
-    for name in ("local_search_chat", "global_search", "drift_search_chat"):
+    for name in ("local_search_chat", "global_search", "drift_search_chat", "basic_search_chat"):
         manager.remove_chat(name)
-    for name in ("local_search_embedding", "drift_search_embedding"):
+    for name in ("local_search_embedding", "drift_search_embedding", "basic_search_embedding"):
         manager.remove_embedding(name)
 
 
@@ -65,6 +65,8 @@ class GraphRagService:
         self.root = Path(settings.data_dir).resolve() / "graphrag"
 
     def config(self) -> dict:
+        from .profiles import PROFILES
+
         version = dependency_version()
         model_configured = all(model_parameters(self.settings).values())
         runtime_available = version == "2.5.0"
@@ -81,7 +83,9 @@ class GraphRagService:
             "error": error,
             "max_upload_bytes": MAX_FILE_BYTES,
             "supported_extensions": ["txt"],
-            "methods": ["local", "global", "drift"],
+            "methods": ["local", "global", "drift", "basic"],
+            "profiles": list(PROFILES.values()),
+            "default_profile": getattr(self.settings, "graphrag_default_profile", "enterprise_zh"),
         }
 
     def list_datasets(self) -> list[dict]:
@@ -96,7 +100,19 @@ class GraphRagService:
             raise GraphRagError("数据集不存在", 404)
         return result
 
-    def upload(self, content: bytes, filename: str, name: str | None = None) -> dict:
+    def upload(
+        self,
+        content: bytes,
+        filename: str,
+        name: str | None = None,
+        profile: str | None = None,
+        chunk_size: int | None = None,
+        overlap: int | None = None,
+    ) -> dict:
+        from .profiles import profile_info
+
+        profile = profile or getattr(self.settings, "graphrag_default_profile", "enterprise_zh")
+        selected = profile_info(profile)
         if Path(filename).suffix.lower() != ".txt":
             raise GraphRagError("文本文档接入支持 .txt；Excel/CSV 请使用表格接入")
         documents = parse_uploads([(filename, content)])
@@ -106,8 +122,9 @@ class GraphRagService:
                 name=name or Path(filename).stem,
                 description="TXT 文档 · GraphRAG",
                 documents=documents,
-                chunk_size=getattr(self.settings, "graphrag_chunk_size", 1200),
-                overlap=getattr(self.settings, "graphrag_chunk_overlap", 100),
+                chunk_size=chunk_size if chunk_size is not None else selected["chunk_size"],
+                overlap=overlap if overlap is not None else selected["overlap"],
+                profile=profile,
             )
         except ValueError as exc:
             # This path only validates/saves local documents; it never loads model config.
@@ -218,6 +235,20 @@ class GraphRagService:
             },
         }
 
+    def raw_graph(self, key: str) -> dict:
+        from .records import records_graph
+
+        job, folder = self._indexed_folder(key)
+        return records_graph(folder, job["name"])
+
+    def reports(self, key: str) -> dict:
+        _, tables, level = self._query_inputs(key)
+        return {
+            "reports": json_value(tables["community_reports"]),
+            "communities": json_value(tables["communities"]),
+            "community_level": level,
+        }
+
     def _query_inputs(self, key: str) -> tuple[Any, dict, int]:
         job, folder = self._indexed_folder(key)
         config = load_config(folder, self.settings)
@@ -249,7 +280,7 @@ class GraphRagService:
         question = question.strip()
         if not question or len(question) > 16000:
             raise GraphRagError("问题需为 1–16000 个字符")
-        if method not in {"local", "global", "drift"}:
+        if method not in {"local", "global", "drift", "basic"}:
             raise GraphRagError("不支持的 GraphRAG 检索方式")
         # The public API and complete dataframes match the migrated GraphRAG Search app.
         async with _NATIVE_QUERY_LOCK:
@@ -267,7 +298,11 @@ class GraphRagService:
             }
             _clear_query_models()
             try:
-                if method == "global":
+                if method == "basic":
+                    answer, context = await api.basic_search(
+                        config=config, text_units=tables["text_units"], query=question
+                    )
+                elif method == "global":
                     answer, context = await api.global_search(
                         **common, dynamic_community_selection=False
                     )
@@ -297,3 +332,142 @@ class GraphRagService:
             "dataset_key": key,
             "index_basis": "original_graphrag_index",
         }
+
+    async def questions(self, key: str, topic: str = "") -> dict:
+        """Original question-generation route uses dynamic community global search."""
+        async with _NATIVE_QUERY_LOCK:
+            config, tables, level = await asyncio.to_thread(self._query_inputs, key)
+            import graphrag.api as api
+
+            _clear_query_models()
+            try:
+                answer, context = await api.global_search(
+                    config=config,
+                    entities=tables["entities"],
+                    communities=tables["communities"],
+                    community_reports=tables["community_reports"],
+                    community_level=level,
+                    dynamic_community_selection=True,
+                    response_type="Single paragraph",
+                    query="请根据数据内容生成五个可以通过这些资料回答的问题。每行一个问题，不要回答。主题："
+                    + topic[:2000],
+                )
+                return {"answer": str(answer), "context": json_value(context)}
+            finally:
+                _clear_query_models()
+
+    async def query_stream(self, key: str, question: str, method: str = "local"):
+        """Native incremental answer plus original context and cited subgraph."""
+        import inspect
+        import time
+
+        from graphrag.callbacks.noop_query_callbacks import NoopQueryCallbacks
+
+        from .exploration import answer_evidence
+
+        if (
+            not question.strip()
+            or len(question) > 16000
+            or method not in {"local", "global", "drift", "basic"}
+        ):
+            raise GraphRagError("问题或检索方式无效")
+        started = time.monotonic()
+        context, trace = {}, []
+
+        class Capture(NoopQueryCallbacks):
+            def on_context(self, value):
+                nonlocal context
+                context = value
+
+            def on_map_response_end(self, values):
+                trace.append(
+                    {
+                        "stage": "map",
+                        "responses": [
+                            {
+                                "response": json_value(v.response),
+                                "context": json_value(v.context_data),
+                                "llm_calls": v.llm_calls,
+                            }
+                            for v in values
+                        ],
+                    }
+                )
+
+            def on_reduce_response_start(self, value):
+                trace.append({"stage": "reduce", "context": json_value(value)})
+
+        async with _NATIVE_QUERY_LOCK:
+            config, tables, level = await asyncio.to_thread(self._query_inputs, key)
+            import graphrag.api as api
+
+            common = dict(
+                config=config,
+                entities=tables["entities"],
+                communities=tables["communities"],
+                community_reports=tables["community_reports"],
+                community_level=level,
+                response_type="Multiple Paragraphs",
+                query=question.strip(),
+                callbacks=[Capture()],
+            )
+            _clear_query_models()
+            answer = ""
+            try:
+                yield {"event": "status", "message": "正在检索图谱"}
+                if method == "drift":
+                    response, context = await api.drift_search(
+                        **common,
+                        text_units=tables["text_units"],
+                        relationships=tables["relationships"],
+                    )
+                    answer = (
+                        response
+                        if isinstance(response, str)
+                        else json.dumps(json_value(response), ensure_ascii=False)
+                    )
+                    yield {"event": "token", "text": answer}
+                else:
+                    if method == "basic":
+                        stream = api.basic_search_streaming(
+                            config=config,
+                            text_units=tables["text_units"],
+                            query=question.strip(),
+                            callbacks=common["callbacks"],
+                        )
+                    elif method == "global":
+                        stream = api.global_search_streaming(
+                            **common, dynamic_community_selection=False
+                        )
+                    else:
+                        stream = api.local_search_streaming(
+                            **common,
+                            text_units=tables["text_units"],
+                            relationships=tables["relationships"],
+                            covariates=tables["covariates"],
+                        )
+                    if inspect.isawaitable(stream):
+                        stream = await stream
+                    async for token in stream:
+                        answer += str(token)
+                        yield {"event": "token", "text": str(token)}
+                evidence = await asyncio.to_thread(answer_evidence, tables, answer, context)
+                yield {
+                    "event": "result",
+                    "result": {
+                        "answer": answer,
+                        "context": json_value(context),
+                        "method": method,
+                        "dataset_key": key,
+                        "index_basis": "original_graphrag_index",
+                        "evidence": evidence,
+                        "trace": trace,
+                        "elapsed_seconds": time.monotonic() - started,
+                    },
+                }
+            except Exception as exc:
+                raise GraphRagError(
+                    "GraphRAG 问答未完成，请检查模型配置、索引产物和服务状态后重试", 503
+                ) from exc
+            finally:
+                _clear_query_models()

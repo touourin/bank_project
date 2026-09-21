@@ -6,12 +6,14 @@ import time
 import zlib
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from itertools import combinations
 from uuid import uuid4
 
 from bank_project.alignment.models import AlignmentError
 
-from .adapter import brief, conflicts
+from .adapter import annotate_run, brief, conflicts, quote_location, source_records
 from .engine.contracts import digest
+from .engine.identity_guard import assess_identity
 from .models import Audit, Candidate, ResolutionRun
 from .projection import memberships, project, update_run
 
@@ -66,7 +68,8 @@ class ResolutionStore:
         ).fetchone()
         if not row:
             raise AlignmentError("消歧记录不存在", 404)
-        return ResolutionRun.model_validate_json(row[0]), row[1]
+        graph = json.loads(zlib.decompress(row[1])) if row[1] is not None else None
+        return annotate_run(ResolutionRun.model_validate_json(row[0]), graph), row[1]
 
     @staticmethod
     def _write(db, run):
@@ -74,13 +77,14 @@ class ResolutionStore:
             "UPDATE resolution_runs SET metadata=? WHERE id=?", (run.model_dump_json(), run.id)
         )
 
-    def create(self, kind, source_id):
+    def create(self, kind, source_id, options=None):
         run = ResolutionRun(
             id=str(uuid4()),
             name="实体消歧",
             source_kind=kind,
             source_id=source_id,
             created_at=now(),
+            **({"options": options} if options is not None else {}),
         )
         owner = str(uuid4())
         with self.connect() as db:
@@ -122,7 +126,7 @@ class ResolutionStore:
             )
         return run
 
-    def progress(self, run_id, owner, message):
+    def progress(self, run_id, owner, message, state=None):
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             if not db.execute(
@@ -132,6 +136,11 @@ class ResolutionStore:
                 raise AlignmentError("消歧任务已失去执行租约", 409)
             run, _ = self._read(db, run_id)
             run.progress = message
+            if state is not None:
+                run.name = state.name
+                run.summary = state.summary
+                run.candidates = state.candidates
+                run.diagnostics = state.diagnostics
             self._write(db, run)
 
     def get(self, run_id):
@@ -145,9 +154,12 @@ class ResolutionStore:
             db.execute("BEGIN IMMEDIATE")
             self._expire(db)
             runs = [
-                ResolutionRun.model_validate_json(row[0])
+                annotate_run(
+                    ResolutionRun.model_validate_json(row[0]),
+                    json.loads(zlib.decompress(row[1])) if row[1] is not None else None,
+                )
                 for row in db.execute(
-                    "SELECT metadata FROM resolution_runs ORDER BY created_at DESC"
+                    "SELECT metadata,original FROM resolution_runs ORDER BY created_at DESC"
                 )
             ]
         return [
@@ -167,6 +179,57 @@ class ResolutionStore:
         if run.status != "ready" or packed is None:
             raise AlignmentError("消歧输入尚未准备完成", 409)
         return json.loads(zlib.decompress(packed))
+
+    def candidate_sources(self, run_id, candidate_id):
+        """Load full evidence on demand from the immutable analysis input, never a live index."""
+        with self.connect() as db:
+            run, packed = self._read(db, run_id)
+        if run.status != "ready" or packed is None:
+            raise AlignmentError("原文快照将在分析完成后提供", 409)
+        candidate = next((c for c in run.candidates if c.id == candidate_id), None)
+        if candidate is None:
+            raise AlignmentError("消歧候选不存在", 404)
+        graph = json.loads(zlib.decompress(packed))
+        by_id = {node["id"]: node for node in graph["nodes"]}
+        nodes = []
+        for index, node_id in enumerate(candidate.node_ids):
+            node = by_id[node_id]
+            records = source_records(node)
+            side = next(
+                (s for s in ("left", "right") if candidate.evidence.get(s) == node_id),
+                "left" if index == 0 else "right" if index == 1 else None,
+            )
+            quote = candidate.evidence.get(f"{side}_quote") if side else None
+            nodes.append(
+                {
+                    "node_id": node_id,
+                    "name": node["name"],
+                    "quote": quote,
+                    "quote_location": quote_location(quote, records, run.source_kind),
+                    "records": [
+                        {
+                            "node_id": record["id"],
+                            "name": record.get("name", ""),
+                            "description": record["properties"].get("description"),
+                            "source_text": record.get("source_context")
+                            if run.source_kind == "graphrag"
+                            else None,
+                            "text_unit_ids": record.get("source_text_unit_ids", []),
+                            "fields": record["properties"]
+                            if run.source_kind == "database"
+                            else None,
+                        }
+                        for record in records
+                    ],
+                }
+            )
+        return {
+            "run_id": run.id,
+            "candidate_id": candidate.id,
+            "source_name": run.name,
+            "source_kind": run.source_kind,
+            "nodes": nodes,
+        }
 
     def decide(self, run_id, request, *, manual=False):
         with self.connect() as db:
@@ -205,11 +268,36 @@ class ResolutionStore:
                 if candidate is None:
                     raise AlignmentError("消歧候选不存在", 404)
                 action = request.action
+            if candidate.status == "excluded":
+                reason = candidate.evidence.get("identity_guard", {}).get("message", "自动不合并")
+                raise AlignmentError(
+                    f"{reason}；已自动不合并，无需人工审核。请先补全或修正来源身份信息后重新分析",
+                    409,
+                )
+            if (
+                not manual
+                and action == "merge"
+                and candidate.evidence.get("quote_validation", {}).get("supported") is False
+            ):
+                raise AlignmentError(
+                    "模型引用未通过来源校验，请重新分析；不能将节点属性当作文档原文", 409
+                )
             if request.canonical_id is not None and request.canonical_id not in candidate.node_ids:
                 raise AlignmentError("保留节点必须来自当前候选的原始节点")
             previous = candidate.status
             owner, groups = memberships(graph, run.candidates)
             affected = set().union(*(groups[owner[mid]] for mid in candidate.node_ids))
+            if action == "merge":
+                records = [
+                    brief(record) for mid in affected for record in source_records(by_id[mid])
+                ]
+                for left, right in combinations(records, 2):
+                    identity = assess_identity(left, right)
+                    if identity and identity["block_merge"]:
+                        raise AlignmentError(
+                            f"不能合并：{left.name} / {right.name}；{identity['message']}。请先核对并修正来源身份信息",
+                            409,
+                        )
             candidate.status = {"merge": "merged", "reject": "rejected", "reset": "pending"}[action]
             candidate.canonical_id = (
                 (request.canonical_id or candidate.node_ids[0]) if action == "merge" else None

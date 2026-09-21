@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { Alert, Button, Input, Progress } from "antd";
+import { Alert, Button, Input, InputNumber, Select, Progress } from "antd";
 import { FileText } from "lucide-react";
 import { errorMessage } from "../../api/request";
 import { useResource } from "../../hooks/useResource";
@@ -22,6 +22,9 @@ export function TxtUploadPanel({
   );
   const [files, setFiles] = useState<File[]>([]);
   const [name, setName] = useState("");
+  const [profile, setProfile] = useState("enterprise_zh");
+  const [chunkSize, setChunkSize] = useState(1000);
+  const [overlap, setOverlap] = useState(150);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -48,6 +51,11 @@ export function TxtUploadPanel({
             token,
             file,
             files.length === 1 ? name : file.name,
+            {
+              profile,
+              chunk_size: String(chunkSize),
+              overlap: String(overlap),
+            },
           );
           completed.push(file.name);
           setSaved([...completed]);
@@ -102,6 +110,49 @@ export function TxtUploadPanel({
           placeholder="默认使用文件名"
         />
       </label>
+      <label className="knowledge-field">
+        建图方案
+        <Select
+          aria-label="建图方案"
+          value={profile}
+          disabled={busy}
+          options={(
+            config.data?.profiles ?? [
+              { id: "enterprise_zh", name: "企业情报 · 原项目中文方案" },
+              { id: "general", name: "通用文档 · 跟随原文语言" },
+            ]
+          ).map((p) => ({ value: p.id, label: p.name }))}
+          onChange={(value) => {
+            setProfile(value);
+            const p = config.data?.profiles?.find((p) => p.id === value);
+            setChunkSize(p?.chunk_size ?? (value === "general" ? 1200 : 1000));
+            setOverlap(p?.overlap ?? (value === "general" ? 100 : 150));
+          }}
+        />
+      </label>
+      <label className="knowledge-field">
+        分块大小（token）
+        <InputNumber
+          aria-label="分块大小"
+          min={100}
+          max={16000}
+          value={chunkSize}
+          onChange={(v) => setChunkSize(v ?? 1000)}
+        />
+      </label>
+      <label className="knowledge-field">
+        重叠 token
+        <InputNumber
+          aria-label="重叠 token"
+          min={0}
+          max={chunkSize - 1}
+          value={overlap}
+          onChange={(v) => setOverlap(v ?? 150)}
+        />
+      </label>
+      <p className="hint">
+        企业方案沿用原项目八类实体及中文业务提示词。已完成的历史索引保留原方案；切换方案需重新接入原文建图。
+      </p>
       <p className="hint">
         接收原文后，前往“GraphRAG
         图谱与问答”启动索引。模型将抽取实体与关系、生成社区摘要并支持图谱问答。
@@ -110,7 +161,7 @@ export function TxtUploadPanel({
         type="primary"
         block
         loading={busy}
-        disabled={!files.length}
+        disabled={!files.length || overlap >= chunkSize}
         onClick={() => void save()}
       >
         保存 TXT 文本{files.length ? `（${files.length} 个文件）` : ""}

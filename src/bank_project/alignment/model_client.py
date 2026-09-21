@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from contextlib import asynccontextmanager
 
 import httpx
 
@@ -11,8 +12,19 @@ from .models import AlignmentError, IncompleteModelOutput
 
 
 class JsonModel:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, *, client: httpx.AsyncClient | None = None):
         self.settings = settings
+        self.client = client
+
+    @asynccontextmanager
+    async def transport(self):
+        if self.client is not None:
+            yield self.client
+        else:
+            async with httpx.AsyncClient(
+                timeout=self.settings.model_timeout_seconds, follow_redirects=False
+            ) as client:
+                yield client
 
     @property
     def configured(self) -> bool:
@@ -22,7 +34,7 @@ class JsonModel:
             and (s.model_provider == "dashscope" or (s.model_base_url and s.model_name))
         )
 
-    async def complete(self, system: str, user: str) -> dict:
+    async def complete(self, system: str, user: str, *, max_tokens: int | None = None) -> dict:
         s = self.settings
         if not self.configured:
             raise AlignmentError("请先配置大模型地址、模型名和密钥", 503)
@@ -31,14 +43,12 @@ class JsonModel:
             "model": s.model_name or "qwen3.7-plus",
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "temperature": 0,
-            "max_tokens": s.model_max_tokens,
+            "max_tokens": max_tokens if max_tokens is not None else s.model_max_tokens,
             "response_format": {"type": "json_object"},
         }
         if s.model_provider == "dashscope":
             payload["enable_thinking"] = False
-        async with httpx.AsyncClient(
-            timeout=s.model_timeout_seconds, follow_redirects=False
-        ) as client:
+        async with self.transport() as client:
             for attempt in range(s.model_max_retries + 1):
                 try:
                     # Include streaming reads in a wall-clock deadline and cap the response body.

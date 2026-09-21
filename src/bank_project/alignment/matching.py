@@ -5,6 +5,17 @@ from .models import RetrievalTrace, ScoredConcept
 from .retrieval import RetrievalResult
 
 
+def reviewable_candidate(trace: RetrievalTrace, catalog: Catalog) -> ScoredConcept | None:
+    """Share the same reviewable suggestion rule across table and graph matching."""
+    if (
+        trace.status in {"matched", "review"}
+        and trace.selected is not None
+        and trace.selected.id in catalog.names
+    ):
+        return trace.selected
+    return None
+
+
 def decide(result: RetrievalResult, target: str, name: str, catalog: Catalog, threshold: float):
     trace = RetrievalTrace(target=target, name=name, query=result.query, status="unmatched")
     if result.status != "ok":

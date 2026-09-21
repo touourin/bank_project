@@ -62,6 +62,19 @@ class MatchStore:
         result = {k: v for k, v in value.items() if k != "graph"}
         if summary:
             result.update(nodes=[], edges=[], audits=[])
+        elif "edges" in result:
+            # Old runs already contain direction-checked candidates. Expose their
+            # suggestions without rewriting the saved graph or review revision.
+            result["edges"] = [
+                {
+                    **edge,
+                    "proposed_edge_type": edge.get(
+                        "proposed_edge_type",
+                        edge["candidates"][0] if len(edge.get("candidates", [])) == 1 else None,
+                    ),
+                }
+                for edge in result["edges"]
+            ]
         return result
 
     def mutate(self, identifier, action, expected_revision=None):

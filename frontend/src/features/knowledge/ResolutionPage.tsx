@@ -5,6 +5,7 @@ import {
   Input,
   Modal,
   Pagination,
+  Progress,
   Select,
   Table,
   Tabs,
@@ -15,18 +16,19 @@ import { EmptyState, ErrorNotice, LoadingState } from "../../ui/Feedback";
 import { Panel } from "../../ui/Panel";
 import { knowledgeApi } from "./api";
 import { KnowledgeGraphPanel } from "./KnowledgeGraphPanel";
-import {
-  AuditTable,
-  JsonDetails,
-  pretty,
-  StatusTag,
-  usePolling,
-} from "./shared";
+import { AuditTable, JsonDetails, StatusTag, usePolling } from "./shared";
 import type {
   KnowledgeNode,
   ResolutionCandidate,
   ResolutionRun,
+  SourceKind,
 } from "./types";
+import {
+  ResolutionOptionsPanel,
+  defaultResolutionOptions,
+} from "./ResolutionOptionsPanel";
+import { ResolutionSourcesPanel } from "./ResolutionSources";
+import { ResolutionDifferences } from "./ResolutionDifferences";
 import "./knowledge.css";
 
 export function ResolutionPage({ token }: { token: string }) {
@@ -44,6 +46,7 @@ export function ResolutionPage({ token }: { token: string }) {
     ),
     true,
   );
+  const [options, setOptions] = useState(defaultResolutionOptions);
   const [source, setSource] = useState("");
   const [runId, setRunId] = useState("");
   const [updated, setUpdated] = useState<ResolutionRun>();
@@ -76,9 +79,12 @@ export function ResolutionPage({ token }: { token: string }) {
   const inFlight = useRef(false);
   const [reviewer, setReviewer] = useState("");
   const [note, setNote] = useState("");
-  const [filter, setFilter] = useState("pending");
+  const [filter, setFilter] = useState("all");
+  const [verdictFilter, setVerdictFilter] = useState("all");
   const [candidatePage, setCandidatePage] = useState(1);
-  useEffect(() => setCandidatePage(1), [filter, runId]);
+  const [suggestionPage, setSuggestionPage] = useState(1);
+  useEffect(() => setSuggestionPage(1), [runId]);
+  useEffect(() => setCandidatePage(1), [filter, verdictFilter, runId]);
   const [manual, setManual] = useState(false);
   const [manualNodes, setManualNodes] = useState<string[]>([]);
   const [canonical, setCanonical] = useState<string>();
@@ -105,7 +111,7 @@ export function ResolutionPage({ token }: { token: string }) {
       setUpdated(value);
       if (created) {
         setRunId(value.id);
-        setFilter("pending");
+        setFilter("all");
       } else resource.refresh();
       setManual(false);
       setNote("");
@@ -126,7 +132,7 @@ export function ResolutionPage({ token }: { token: string }) {
     );
     if (selected)
       void mutate(
-        () => knowledgeApi.resolve(token, selected.kind, selected.id),
+        () => knowledgeApi.resolve(token, selected.kind, selected.id, options),
         true,
       );
   }
@@ -147,10 +153,28 @@ export function ResolutionPage({ token }: { token: string }) {
       }),
     );
   }
+  const suggestions = run?.candidates.filter(isMergeSuggestion) ?? [];
+  const suggestionCurrentPage = Math.min(
+    suggestionPage,
+    Math.max(1, Math.ceil(suggestions.length / 10)),
+  );
   const candidates =
-    run?.candidates.filter(
-      (candidate) => filter === "all" || candidate.status === filter,
-    ) ?? [];
+    run?.candidates.filter((candidate) => {
+      const verdict = effectiveVerdict(candidate);
+      const guard = identityGuard(candidate);
+      return (
+        (filter === "all" || candidate.status === filter) &&
+        (verdictFilter === "all" ||
+          (verdictFilter === "same" && verdict === "same") ||
+          (verdictFilter === "different" && verdict === "different") ||
+          (verdictFilter === "uncertain" &&
+            verdict === "uncertain" &&
+            (guard || candidate.evidence.origin !== "error")) ||
+          (verdictFilter === "error" &&
+            !guard &&
+            candidate.evidence.origin === "error"))
+      );
+    }) ?? [];
   const page = Math.min(
     candidatePage,
     Math.max(1, Math.ceil(candidates.length / 10)),
@@ -185,6 +209,11 @@ export function ResolutionPage({ token }: { token: string }) {
             }
             padded
           >
+            <ResolutionOptionsPanel
+              value={options}
+              onChange={setOptions}
+              onError={setError}
+            />
             {sources.error && (
               <ErrorNotice message={sources.error} onRetry={sources.refresh} />
             )}
@@ -227,7 +256,7 @@ export function ResolutionPage({ token }: { token: string }) {
               分析消歧候选
             </Button>
             <p className="hint">
-              分析生成候选和独立图谱快照。人工核验身份、证据和属性冲突后决定合并或保留，可撤销审核决定。
+              先由规则和大模型分析。只把模型建议合并且通过身份校验的记录提交确认；其他结果保留在分析记录中。
             </p>
           </Panel>
           <Panel
@@ -303,7 +332,28 @@ export function ResolutionPage({ token }: { token: string }) {
                   <Alert key={index} type="warning" showIcon title={warning} />
                 ))}
                 {run.status === "analyzing" && (
-                  <LoadingState label="正在计算实体候选及冲突…" />
+                  <>
+                    <LoadingState label="正在分析，已返回的候选可提前查看…" />
+                    {run.diagnostics.analysis && (
+                      <>
+                        <Progress
+                          percent={
+                            run.diagnostics.analysis.total
+                              ? Math.floor(
+                                  (100 * run.diagnostics.analysis.completed) /
+                                    run.diagnostics.analysis.total,
+                                )
+                              : 0
+                          }
+                        />
+                        <Alert
+                          type="info"
+                          showIcon
+                          title={`分析中预览：已处理 ${run.diagnostics.analysis.completed}/${run.diagnostics.analysis.total} 对，仅预览模型合并建议。最多保存 ${run.diagnostics.analysis.preview_limit} 条预览记录，分析完成后开放确认。`}
+                        />
+                      </>
+                    )}
+                  </>
                 )}
                 <div className="knowledge-metrics">
                   <div>
@@ -314,8 +364,16 @@ export function ResolutionPage({ token }: { token: string }) {
                     </strong>
                   </div>
                   <div>
-                    <span>待核验</span>
+                    <span>模型建议 · 待确认</span>
                     <strong>{run.summary.pending_count}</strong>
+                  </div>
+                  <div>
+                    <span>自动不合并</span>
+                    <strong>{run.summary.excluded_count ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>未形成合并建议</span>
+                    <strong>{run.summary.not_recommended_count ?? 0}</strong>
                   </div>
                   <div>
                     <span>已合并 / 已保留</span>
@@ -353,10 +411,60 @@ export function ResolutionPage({ token }: { token: string }) {
                   </label>
                 </div>
                 <Tabs
+                  key={run.id}
                   items={[
                     {
                       key: "candidates",
-                      label: `候选核验（${run.candidates.length}）`,
+                      label: `${run.status === "analyzing" ? "建议预览" : "合并建议"}（${run.summary.pending_count}）`,
+                      children: (
+                        <>
+                          <p className="hint">
+                            这里只展示大模型建议合并并通过身份与来源校验的节点对。查看模型理由和引用来源后确认。
+                          </p>
+                          {suggestions.length ? (
+                            suggestions
+                              .slice(
+                                (suggestionCurrentPage - 1) * 10,
+                                suggestionCurrentPage * 10,
+                              )
+                              .map((candidate) => (
+                                <CandidateCard
+                                  key={`${run.id}:${candidate.id}:${candidate.status}`}
+                                  candidate={candidate}
+                                  token={token}
+                                  runId={run.id}
+                                  sourceKind={run.source_kind}
+                                  sourcesAvailable={run.status === "ready"}
+                                  disabled={busy || run.status !== "ready"}
+                                  onDecision={decision}
+                                />
+                              ))
+                          ) : (
+                            <EmptyState
+                              title={
+                                run.status === "analyzing"
+                                  ? "等待大模型返回合并建议"
+                                  : "暂无大模型建议合并的节点"
+                              }
+                              description="节点均保持独立；其他判定与失败原因可在“分析记录”查看。"
+                            />
+                          )}
+                          {suggestions.length > 10 && (
+                            <Pagination
+                              current={suggestionCurrentPage}
+                              pageSize={10}
+                              total={suggestions.length}
+                              onChange={setSuggestionPage}
+                              showSizeChanger={false}
+                              showTotal={(total) => `共 ${total} 组合并建议`}
+                            />
+                          )}
+                        </>
+                      ),
+                    },
+                    {
+                      key: "analysis",
+                      label: `分析记录（${run.candidates.length}）`,
                       children: (
                         <>
                           <div className="knowledge-toolbar">
@@ -365,10 +473,30 @@ export function ResolutionPage({ token }: { token: string }) {
                               value={filter}
                               onChange={setFilter}
                               options={[
-                                { value: "pending", label: "待核验" },
+                                {
+                                  value: "pending",
+                                  label: "模型建议 · 待确认",
+                                },
+                                {
+                                  value: "not_recommended",
+                                  label: "未建议合并",
+                                },
+                                { value: "excluded", label: "自动不合并" },
                                 { value: "merged", label: "已合并" },
                                 { value: "rejected", label: "已保留" },
-                                { value: "all", label: "全部候选" },
+                                { value: "all", label: "全部分析记录" },
+                              ]}
+                            />
+                            <Select
+                              aria-label="模型判定筛选"
+                              value={verdictFilter}
+                              onChange={setVerdictFilter}
+                              options={[
+                                { value: "all", label: "全部判定" },
+                                { value: "same", label: "建议同一实体" },
+                                { value: "different", label: "判为不同实体" },
+                                { value: "uncertain", label: "证据不足" },
+                                { value: "error", label: "失败或预算未覆盖" },
                               ]}
                             />
                             <span className="hint">
@@ -382,6 +510,10 @@ export function ResolutionPage({ token }: { token: string }) {
                                 <CandidateCard
                                   key={`${run.id}:${candidate.id}:${candidate.status}:${candidate.canonical_id}`}
                                   candidate={candidate}
+                                  token={token}
+                                  runId={run.id}
+                                  sourceKind={run.source_kind}
+                                  sourcesAvailable={run.status === "ready"}
                                   disabled={busy || run.status !== "ready"}
                                   onDecision={decision}
                                 />
@@ -585,12 +717,85 @@ function MergeFlow({
     </div>
   );
 }
+type IdentityGuard = {
+  block_merge: boolean;
+  verdict: string;
+  message: string;
+  differences: { field: string; left: unknown[]; right: unknown[] }[];
+};
+function identityGuard(
+  candidate: ResolutionCandidate,
+): IdentityGuard | undefined {
+  const value = candidate.evidence.identity_guard;
+  return value && typeof value === "object"
+    ? (value as IdentityGuard)
+    : undefined;
+}
+function effectiveVerdict(candidate: ResolutionCandidate) {
+  return (
+    candidate.evidence.effective_verdict ??
+    candidate.evidence.proposal ??
+    candidate.evidence.verdict ??
+    "uncertain"
+  );
+}
+function isMergeSuggestion(candidate: ResolutionCandidate) {
+  return (
+    candidate.status === "pending" &&
+    candidate.evidence.origin === "model" &&
+    effectiveVerdict(candidate) === "same" &&
+    !identityGuard(candidate)?.block_merge &&
+    quoteValidation(candidate)?.supported !== false &&
+    typeof candidate.evidence.left_quote === "string" &&
+    Boolean(candidate.evidence.left_quote.trim()) &&
+    typeof candidate.evidence.right_quote === "string" &&
+    Boolean(candidate.evidence.right_quote.trim())
+  );
+}
+
+type QuoteLocation = {
+  origin: "source_text" | "source_record" | "node_attribute" | "unverified";
+  message: string;
+  fields?: string[];
+  excerpt?: string;
+  text_unit_ids?: string[];
+};
+function quoteValidation(candidate: ResolutionCandidate) {
+  return candidate.evidence.quote_validation as
+    | { supported: boolean; left: QuoteLocation; right: QuoteLocation }
+    | undefined;
+}
+function quoteDetails(quote: unknown, location?: QuoteLocation) {
+  const labels = {
+    source_text: "文档原文",
+    source_record: "数据库来源字段",
+    node_attribute: "GraphRAG 抽取后的节点属性（不是文档原文）",
+    unverified: "来源未核实",
+  };
+  return {
+    引用文字: quote,
+    引用来源: location ? labels[location.origin] : "历史引用，尚无来源定位信息",
+    核验结果: location?.message,
+    属性字段: location?.fields,
+    原文上下文: location?.excerpt,
+    原文分块ID: location?.text_unit_ids,
+  };
+}
+
 function CandidateCard({
   candidate,
+  token,
+  runId,
+  sourceKind,
+  sourcesAvailable,
   disabled,
   onDecision,
 }: {
   candidate: ResolutionCandidate;
+  token: string;
+  runId: string;
+  sourceKind: SourceKind;
+  sourcesAvailable: boolean;
   disabled: boolean;
   onDecision: (
     candidate: ResolutionCandidate,
@@ -602,48 +807,153 @@ function CandidateCard({
     candidate.canonical_id || candidate.node_ids[0],
   );
   const target = candidate.nodes.find((node) => node.id === canonical);
+  const guard = identityGuard(candidate);
+  const blocked = Boolean(guard?.block_merge);
+  const verdict = effectiveVerdict(candidate);
+  const excluded = candidate.status === "excluded";
+  const incompleteIdentity = guard?.verdict === "uncertain";
+  const recommended = isMergeSuggestion(candidate);
+  const notRecommended = candidate.status === "not_recommended";
+  const validation = quoteValidation(candidate);
+  const label = excluded
+    ? incompleteIdentity
+      ? "身份依据不足，暂不合并，保留独立节点"
+      : "已自动判定不合并，保留独立节点"
+    : (guard?.message ??
+      (candidate.status === "merged"
+        ? "已确认合并"
+        : candidate.status === "rejected"
+          ? "已人工保留为不同实体"
+          : verdict === "same"
+            ? recommended
+              ? candidate.evidence.simulated
+                ? "模拟合并建议（演示），等待确认"
+                : "大模型建议合并，等待确认"
+              : "未形成有效的大模型合并建议"
+            : verdict === "different"
+              ? "判定为不同实体，尚未合并"
+              : candidate.evidence.origin === "error"
+                ? "判断失败，尚未确认身份"
+                : "证据不足，尚未确认身份"));
   return (
     <article className="resolution-candidate">
       <div className="knowledge-toolbar">
         <h3>{candidate.nodes.map((node) => node.name).join(" / ")}</h3>
         <span>
           <StatusTag status={candidate.status} />
-          候选得分 {candidate.score.toFixed(3)}
+          名称相似度 {candidate.score.toFixed(3)}
         </span>
       </div>
       <p className="hint">{candidate.reasons.join("；")}</p>
-      <MergeFlow nodes={candidate.nodes} target={target} />
-      {candidate.conflicts.length > 0 && (
-        <>
-          <Alert
-            type="warning"
-            showIcon
-            title={`存在 ${candidate.conflicts.length} 项属性冲突，请核验`}
+      <Alert
+        type={
+          excluded
+            ? "info"
+            : blocked
+              ? "error"
+              : guard || candidate.evidence.origin === "error"
+                ? "warning"
+                : "info"
+        }
+        showIcon
+        title={label}
+        description={
+          recommended
+            ? String(
+                candidate.evidence.model_reason ||
+                  candidate.evidence.reason ||
+                  "",
+              )
+            : undefined
+        }
+      />
+      {candidate.evidence.origin === "model" &&
+        Boolean(
+          candidate.evidence.left_quote || candidate.evidence.right_quote,
+        ) && (
+          <JsonDetails
+            label="大模型引用与来源"
+            value={{
+              左侧引用: quoteDetails(
+                candidate.evidence.left_quote,
+                validation?.left,
+              ),
+              右侧引用: quoteDetails(
+                candidate.evidence.right_quote,
+                validation?.right,
+              ),
+            }}
           />
-          <Table
-            size="small"
-            rowKey="field"
-            pagination={false}
-            scroll={{ x: 400 }}
-            dataSource={candidate.conflicts}
-            columns={[
-              { title: "冲突属性", dataIndex: "field" },
-              {
-                title: "各节点原值",
-                render: (_, conflict) =>
-                  conflict.values.map((item) => (
-                    <div key={item.node_id}>
-                      <strong>{item.node_id}：</strong>
-                      <span>{pretty(item.value)}</span>
-                    </div>
-                  )),
-              },
-            ]}
-          />
-        </>
+        )}
+      {validation?.supported === false && (
+        <Alert
+          showIcon
+          type="warning"
+          title="模型引用未通过来源校验"
+          description="引用可能仅存在于抽取后的名称或描述中，不能冒充文档原文；该结果不进入合并建议。"
+        />
       )}
+      {candidate.status === "merged" ? (
+        <MergeFlow nodes={candidate.nodes} target={target} />
+      ) : (
+        <div
+          className="resolution-pair"
+          aria-label={excluded ? "已保留的独立实体" : "待核验实体对，尚未合并"}
+        >
+          {candidate.nodes.map((node) => (
+            <div className="merge-node" key={node.id}>
+              <strong>{node.name}</strong>
+              <small>
+                {node.type} · {node.id}
+              </small>
+            </div>
+          ))}
+        </div>
+      )}
+      <ResolutionSourcesPanel
+        token={token}
+        runId={runId}
+        candidateId={candidate.id}
+        available={sourcesAvailable}
+      />
+      {guard && (
+        <Table
+          size="small"
+          rowKey="field"
+          pagination={false}
+          scroll={{ x: 400 }}
+          dataSource={guard.differences}
+          columns={[
+            { title: "身份限定", dataIndex: "field" },
+            {
+              title: "左侧记录",
+              dataIndex: "left",
+              render: (values: unknown[]) =>
+                values.length ? values.join("、") : "未明确",
+            },
+            {
+              title: "右侧记录",
+              dataIndex: "right",
+              render: (values: unknown[]) =>
+                values.length ? values.join("、") : "未明确",
+            },
+          ]}
+        />
+      )}
+
+      <ResolutionDifferences candidate={candidate} sourceKind={sourceKind} />
       <JsonDetails value={candidate.evidence} label="候选证据与来源" />
-      {candidate.status === "pending" ? (
+      {excluded ? (
+        <p className="hint">
+          {incompleteIdentity
+            ? "身份限定未对齐，当前保留为独立节点；补全来源信息后可重新分析。"
+            : "身份字段明确冲突，已保留为不同实体，无需人工审核。"}
+        </p>
+      ) : notRecommended ? (
+        <p className="hint">
+          未形成有效的大模型合并建议，节点保持独立，不进入确认队列。
+        </p>
+      ) : candidate.status === "pending" ? (
         <>
           <label className="knowledge-field">
             合并时保留的节点
@@ -651,7 +961,7 @@ function CandidateCard({
               aria-label={`保留节点 ${candidate.id}`}
               value={canonical}
               onChange={setCanonical}
-              disabled={disabled}
+              disabled={disabled || blocked}
               options={candidate.nodes.map((node) => ({
                 value: node.id,
                 label: `${node.name} · ${node.id}`,
@@ -661,7 +971,7 @@ function CandidateCard({
           <div className="knowledge-review-actions">
             <Button
               type="primary"
-              disabled={disabled || !canonical}
+              disabled={disabled || blocked || !canonical}
               onClick={() => onDecision(candidate, "merge", canonical)}
             >
               确认合并

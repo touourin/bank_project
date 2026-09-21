@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from bank_project.alignment.catalog import Catalog
-from bank_project.alignment.matching import decide
-from bank_project.alignment.models import AlignmentError
+from bank_project.alignment.matching import decide, reviewable_candidate
+from bank_project.alignment.models import AlignmentError, RetrievalTrace
 from bank_project.alignment.retrieval import RetrievalFailure, RetrieveClient
 from bank_project.graphrag.runtime import GraphRagError
 
@@ -43,6 +43,18 @@ class KnowledgeService:
             for item in self.graphrag.list_datasets()
             if item["status"] == "succeeded"
         ]
+        for item in self.graphrag.list_datasets():
+            if item["status"] == "succeeded" and item.get("artifacts", {}).get(
+                "resolution_records"
+            ):
+                sources.append(
+                    {
+                        "kind": "graphrag",
+                        "id": "extracted:" + item["key"],
+                        "name": item["name"] + " · 聚合前记录",
+                        "root_source_id": item["key"],
+                    }
+                )
         # A missing optional Neo4j must not prevent access to TXT graphs.
         try:
             sources.extend(self.database.sources())
@@ -80,7 +92,11 @@ class KnowledgeService:
             if identifier.startswith(("match:", "resolution:")):
                 graph = self.derived_graph(kind, identifier)
             elif kind == "graphrag":
-                graph = self.graphrag.graph(identifier)
+                graph = (
+                    self.graphrag.raw_graph(identifier.removeprefix("extracted:"))
+                    if identifier.startswith("extracted:")
+                    else self.graphrag.graph(identifier)
+                )
             else:
                 graph = self.database.load(identifier)
             return self.validate_graph(graph)
@@ -148,6 +164,7 @@ class KnowledgeService:
             "created_at": now(),
             "ontology_revision": catalog.revision,
             "snapshot_sha256": catalog.sha256,
+            "confidence_threshold": self.settings.alignment_min_confidence,
             "summary": {
                 "node_count": len(graph["nodes"]),
                 "edge_count": len(graph["edges"]),
@@ -182,26 +199,39 @@ class KnowledgeService:
                             catalog,
                             self.settings.alignment_min_confidence,
                         )
+                        # A derived graph is a versioned input: retain its accepted
+                        # annotations while exposing fresh retrieval evidence.
+                        inherited = node.get("boid")
+                        candidate = reviewable_candidate(trace, catalog)
                         nodes.append(
                             {
                                 "id": node["id"],
                                 "name": node["name"],
-                                "boid": trace.selected.id if trace.status == "matched" else None,
+                                "boid": inherited
+                                or (
+                                    candidate.id
+                                    if candidate and trace.status == "matched"
+                                    else None
+                                ),
                                 "trace": trace.model_dump(),
                             }
                         )
-                    await asyncio.to_thread(
-                        self.store.mutate,
-                        identifier,
-                        lambda v: v.update(
-                            progress=f"已匹配 {len(nodes)}/{len(graph['nodes'])} 个节点"
-                        ),
-                    )
+
+                    def checkpoint(current):
+                        current.update(
+                            nodes=nodes,
+                            progress=f"已匹配 {len(nodes)}/{len(graph['nodes'])} 个节点",
+                        )
+                        self.summarize(current)
+
+                    await asyncio.to_thread(self.store.mutate, identifier, checkpoint)
             value["nodes"] = nodes
             value["edges"] = await asyncio.to_thread(self.edge_matches, value, catalog)
             self.summarize(value)
             value.update(
-                status="ready", progress="匹配完成；仅追加 BOID 与边类型，可人工复核", revision=1
+                status="ready",
+                progress="匹配方案已就绪，可整体采纳建议或按需修改；原图属性保留",
+                revision=1,
             )
             await asyncio.to_thread(self.store.mutate, identifier, lambda v: v.update(value))
         except asyncio.CancelledError:
@@ -254,26 +284,51 @@ class KnowledgeService:
                 for key in ("type", "name", "relation_type", "edge_type")
             }
             exact = [candidate for candidate in candidates if candidate in declared]
-            selected = exact[0] if len(exact) == 1 else None
+            exact_match = exact[0] if len(exact) == 1 else None
+            selected = edge.get("edge_type") or exact_match
+            proposed = exact_match or (candidates[0] if len(candidates) == 1 else None)
             detail = (
                 "原边类型与本体方向及两端 BOID 一致"
-                if selected
+                if exact_match
+                else "本体两端及方向只有一个候选关系，可核对后采纳；原始关系描述保留"
+                if proposed
                 else "请结合原边证据人工选择类型；原始关系描述保留"
             )
             if not candidates:
                 detail = "两端尚未匹配或本体无对应方向的关系，保留原边待核对"
+            if edge.get("edge_type"):
+                detail = "保留所选图谱版本已挂载的边类型；本次候选供核对"
             results.append(
                 {
                     "id": edge["id"],
                     "source": edge["source"],
                     "target": edge["target"],
                     "edge_type": selected,
+                    "proposed_edge_type": proposed,
                     "candidates": candidates,
                     "detail": detail,
                     "status": "matched" if selected else "review" if candidates else "unmatched",
                 }
             )
         return results
+
+    def refresh_edges(self, value, catalog, node_ids=None):
+        """Refresh dependent suggestions without overwriting a person's decision."""
+        refreshed = {edge["id"]: edge for edge in self.edge_matches(value, catalog)}
+        for edge in value["edges"]:
+            if node_ids is not None and not node_ids.intersection((edge["source"], edge["target"])):
+                continue
+            fresh = refreshed[edge["id"]]
+            edge.update(
+                candidates=fresh["candidates"],
+                proposed_edge_type=fresh["proposed_edge_type"],
+            )
+            if edge["edge_type"] not in edge["candidates"]:
+                edge.update(
+                    edge_type=None,
+                    status="review" if edge["candidates"] else "unmatched",
+                    detail="端点 BOID 已修改，请重新审核边类型",
+                )
 
     @staticmethod
     def summarize(value):
@@ -291,6 +346,84 @@ class KnowledgeService:
     def concepts(self, identifier, query):
         return self.editable(self.store.get(identifier)).search(query)
 
+    @staticmethod
+    def reviewed_items(value):
+        # Legacy manual decisions may predate the explicit reviewed flag.
+        return {
+            (audit["target"], audit["target_id"])
+            for audit in value.get("audits", [])
+            if audit.get("action") != "refresh_endpoints"
+        }
+
+    @staticmethod
+    def audit(value, target, before, after, payload, action="review"):
+        value["audits"].append(
+            {
+                "id": str(uuid4()),
+                "action": action,
+                "target": target,
+                "target_id": after["id"],
+                "before": before,
+                "after": copy.deepcopy(after),
+                "reviewer": payload.reviewer,
+                "note": payload.note,
+                "created_at": now(),
+                "revision": value["revision"],
+            }
+        )
+
+    def accept_proposals(self, identifier, payload):
+        def change(value):
+            catalog = self.editable(value)
+            reviewed = self.reviewed_items(value)
+            changes, changed_nodes = [], set()
+            for node in value["nodes"]:
+                if node.get("reviewed") or ("node", node["id"]) in reviewed or node["boid"]:
+                    continue
+                candidate = reviewable_candidate(
+                    RetrievalTrace.model_validate(node["trace"]), catalog
+                )
+                if candidate is None:
+                    continue
+                before = copy.deepcopy(node)
+                node.update(boid=candidate.id, reviewed=True)
+                changes.append(("node", before, node, "accept_proposal"))
+                changed_nodes.add(node["id"])
+            # Compute the edge plan after accepting nodes. A relation remains a
+            # proposal until this explicit action; ontology presence is not a fact.
+            edge_before = {edge["id"]: copy.deepcopy(edge) for edge in value["edges"]}
+            self.refresh_edges(value, catalog, changed_nodes)
+            refreshed = {edge["id"]: edge for edge in self.edge_matches(value, catalog)}
+            for edge in value["edges"]:
+                fresh = refreshed[edge["id"]]
+                edge.update(
+                    candidates=fresh["candidates"],
+                    proposed_edge_type=fresh["proposed_edge_type"],
+                )
+                if (
+                    not edge["edge_type"]
+                    and not edge.get("reviewed")
+                    and ("edge", edge["id"]) not in reviewed
+                    and fresh["proposed_edge_type"]
+                ):
+                    edge.update(
+                        edge_type=fresh["proposed_edge_type"],
+                        reviewed=True,
+                        status="matched",
+                        detail="已整体采纳本体关系建议；原始关系描述保留",
+                    )
+                    changes.append(("edge", edge_before[edge["id"]], edge, "accept_proposal"))
+                elif edge_before[edge["id"]]["edge_type"] != edge["edge_type"]:
+                    changes.append(("edge", edge_before[edge["id"]], edge, "refresh_endpoints"))
+            if changes:
+                value["revision"] += 1
+                for target, before, after, action in changes:
+                    self.audit(value, target, before, after, payload, action)
+                value["progress"] = "已整体采纳匹配建议；可继续查看匹配过程或按需修改"
+            self.summarize(value)
+
+        return self.store.public(self.store.mutate(identifier, change, payload.expected_revision))
+
     def review(self, identifier, payload):
         def change(value):
             catalog = self.editable(value)
@@ -306,18 +439,7 @@ class KnowledgeService:
                 item["boid"] = payload.boid
                 # Keep the original retrieve trace and store review separately.
                 item["reviewed"] = True
-                refreshed = {e["id"]: e for e in self.edge_matches(value, catalog)}
-                for edge in value["edges"]:
-                    if key not in (edge["source"], edge["target"]):
-                        continue
-                    fresh = refreshed[edge["id"]]
-                    edge["candidates"] = fresh["candidates"]
-                    if edge["edge_type"] not in edge["candidates"]:
-                        edge.update(
-                            edge_type=None,
-                            status="review" if edge["candidates"] else "unmatched",
-                            detail="端点 BOID 已修改，请重新审核边类型",
-                        )
+                self.refresh_edges(value, catalog, {key})
             else:
                 if payload.edge_type is not None and payload.edge_type not in item["candidates"]:
                     raise AlignmentError("边类型必须符合本体中两端 BOID 的方向约束")
@@ -327,19 +449,7 @@ class KnowledgeService:
                     status="matched" if payload.edge_type else "review",
                 )
             value["revision"] += 1
-            value["audits"].append(
-                {
-                    "id": str(uuid4()),
-                    "target": target,
-                    "target_id": key,
-                    "before": before,
-                    "after": copy.deepcopy(item),
-                    "reviewer": payload.reviewer,
-                    "note": payload.note,
-                    "created_at": now(),
-                    "revision": value["revision"],
-                }
-            )
+            self.audit(value, target, before, item, payload)
             self.summarize(value)
 
         return self.store.public(self.store.mutate(identifier, change, payload.expected_revision))

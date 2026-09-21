@@ -1,6 +1,7 @@
 """Full-graph evidence preservation, reversible review and conflict-safe concurrency."""
 
 import asyncio
+import json
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from uuid import uuid4
@@ -57,6 +58,12 @@ def source(kind="graphrag", count=3):
                 "properties": {"original": i},
             }
         )
+    if kind == "graphrag":
+        for node in nodes:
+            node["source_context"] = f"合成测试原文：{node['name']}。" + json.dumps(
+                node["properties"], ensure_ascii=False, sort_keys=True
+            )
+            node["source_text_unit_ids"] = [f"unit-{node['id']}"]
     edges = [
         {
             "id": "e1",
@@ -103,7 +110,7 @@ def source(kind="graphrag", count=3):
     }
 
 
-def ready(tmp_path, graph=None, model=None):
+def ready(tmp_path, graph=None, model=None, options=None):
     graph = graph or source()
     service = ResolutionService(
         Settings(_env_file=None, data_dir=tmp_path), lambda kind, key: deepcopy(graph)
@@ -113,7 +120,11 @@ def ready(tmp_path, graph=None, model=None):
 
     async def run():
         started = await service.start(
-            StartRequest(source_kind=graph["source_kind"], source_id=graph["source_id"])
+            StartRequest(
+                source_kind=graph["source_kind"],
+                source_id=graph["source_id"],
+                options=options or {},
+            )
         )
         await asyncio.gather(*service.tasks)
         result = service.get(started.id)
@@ -139,6 +150,84 @@ def decide(service, run, ids, action="merge", canonical=None):
             note="核对来源",
         ),
     )
+
+
+@pytest.mark.parametrize("kind", ["graphrag", "database"])
+def test_identity_conflicts_and_missing_scope_block_candidate_and_manual_merges(tmp_path, kind):
+    graph = source(kind)
+    for record, name in zip(
+        graph["nodes"], ["甲公司2025年年报", "甲公司年报", "甲公司2026年年报"], strict=True
+    ):
+        record.update(name=name, type="财务指标", properties={})
+    service, run = ready(tmp_path, graph)
+    assert candidate(run, "a", "c").status == "excluded"
+    assert run.summary.pending_count == 0 and run.summary.excluded_count == 3
+    assert not run.audits and run.revision == 0
+    with pytest.raises(AlignmentError, match="身份字段冲突"):
+        decide(service, run, ("a", "c"))
+    for action in ("reject", "reset"):
+        with pytest.raises(AlignmentError, match="无需人工审核"):
+            decide(service, run, ("a", "c"), action=action)
+    with pytest.raises(AlignmentError, match="身份字段冲突"):
+        service.manual(run.id, ManualRequest(node_ids=["a", "c"], expected_revision=0))
+    # A missing year also keeps records separate; no manual or transitive bridge.
+    for ids in (("a", "b"), ("b", "c")):
+        for action in ("merge", "reset", "reject"):
+            with pytest.raises(AlignmentError, match="缺少证明为同一实体的依据"):
+                decide(service, run, ids, action=action)
+        with pytest.raises(AlignmentError, match="缺少证明为同一实体的依据"):
+            service.manual(run.id, ManualRequest(node_ids=list(ids), expected_revision=0))
+    assert service.get(run.id).revision == 0
+    assert service.store.original(run.id) == graph
+    assert run.summary.node_count == 3
+
+
+def test_historical_conflicts_leave_review_queue_without_rewriting_original_decisions(tmp_path):
+    graph = source()
+    for record, name in zip(
+        graph["nodes"], ["甲公司2025年年报", "甲公司年报", "甲公司2026年年报"], strict=True
+    ):
+        record.update(name=name, type="财务指标", properties={})
+    service, run = ready(tmp_path, graph)
+    stored = run.model_dump()
+    for row in stored["candidates"]:
+        row.update(status="pending", evidence={"proposal": "same", "verdict": "uncertain"})
+    stored["summary"].update(pending_count=3, excluded_count=0)
+    raw = json.dumps(stored, ensure_ascii=False)
+    with service.store.connect() as db:
+        db.execute("UPDATE resolution_runs SET metadata=? WHERE id=?", (raw, run.id))
+    current = service.get(run.id)
+    assert current.summary.excluded_count == 3 and current.summary.pending_count == 0
+    assert "3 组自动不合并" in current.progress
+    assert candidate(current, "a", "c").evidence["proposal"] == "same"
+    assert candidate(current, "a", "b").status == "excluded"
+    listed = service.list()[0]
+    assert listed.summary == current.summary
+    assert current.revision == 0 and current.audits == []
+    assert service.graph(run.id)["nodes"] == graph["nodes"]
+    with service.store.connect() as db:
+        assert (
+            db.execute("SELECT metadata FROM resolution_runs WHERE id=?", (run.id,)).fetchone()[0]
+            == raw
+        )
+
+
+@pytest.mark.parametrize("kind", ["graphrag", "database"])
+def test_missing_scope_in_imported_merge_history_cannot_be_hidden_by_canonical_name(tmp_path, kind):
+    graph = source(kind)
+    for row in graph["nodes"][:2]:
+        row.update(name="甲公司2025年年报", type="财务指标", properties={})
+    graph["nodes"][1]["resolution"] = {
+        "source_nodes": [
+            {"id": "old-record", "name": "甲公司年报", "type": "财务指标", "properties": {}}
+        ]
+    }
+    service, run = ready(tmp_path, graph)
+    assert candidate(run, "a", "b").status == "not_recommended"
+    with pytest.raises(AlignmentError, match="缺少证明为同一实体的依据"):
+        service.manual(run.id, ManualRequest(node_ids=["a", "b"], expected_revision=0))
+    assert service.get(run.id).revision == 0
+    assert service.graph(run.id)["nodes"] == graph["nodes"]
 
 
 @pytest.mark.parametrize("kind", ["graphrag", "database"])
@@ -288,6 +377,7 @@ def test_model_proposals_have_grounded_quotes_and_never_auto_merge(tmp_path):
     assert run.summary.merged_count == 0
     assert all(item.evidence["proposal"] == "same" for item in run.candidates)
     assert all(item.evidence["left_quote"] for item in run.candidates)
+    assert run.summary.pending_count == 3 and run.summary.not_recommended_count == 0
     assert service.store.original(run.id)["nodes"][0]["name"] == "合成甲银行"
 
 
@@ -308,7 +398,274 @@ def test_invalid_model_quotes_remain_reviewable_and_do_not_destroy_graph(tmp_pat
     service, run = ready(tmp_path, model=Model())
     assert run.summary.node_count == 3 and run.diagnostics["judge_failures"] == 3
     assert all(item.evidence["reason"] == "JUDGE_FAILED" for item in run.candidates)
+    assert run.summary.pending_count == 0 and run.summary.not_recommended_count == 3
+    assert all(item.status == "not_recommended" for item in run.candidates)
     assert len(service.graph(run.id)["edges"]) == 3
+
+
+def test_only_grounded_model_same_results_enter_confirmation_queue(tmp_path):
+    calls = []
+
+    class Model:
+        configured = True
+
+        async def complete(self, system, user):
+            pair = json.loads(user)
+            ids = frozenset(pair[side]["mention_id"] for side in ("left", "right"))
+            calls.append(ids)
+            verdict = {frozenset(("a", "b")): "same", frozenset(("a", "c")): "different"}.get(
+                ids, "uncertain"
+            )
+            return {
+                "verdict": verdict,
+                "reason": "按合成原文证据判定",
+                "left_quote": pair["left"]["context"],
+                "right_quote": pair["right"]["context"],
+            }
+
+    service, run = ready(tmp_path, model=Model())
+    assert len(calls) == 3
+    assert candidate(run, "a", "b").status == "pending"
+    assert candidate(run, "a", "c").status == "not_recommended"
+    assert candidate(run, "b", "c").status == "not_recommended"
+    assert run.summary.pending_count == 1 and run.summary.not_recommended_count == 2
+    assert service.list()[0].summary == run.summary
+    assert run.summary.merged_count == 0 and run.summary.node_count == 3
+    assert "1 组模型合并建议待确认" in run.progress
+    approved = decide(service, run, ("a", "b"))
+    assert approved.summary.pending_count == 0
+    undone = decide(service, approved, ("a", "b"), action="reset")
+    assert undone.summary.pending_count == 1 and undone.summary.node_count == 3
+
+
+def test_without_model_does_not_present_name_similarity_as_merge_suggestions(tmp_path):
+    service, run = ready(tmp_path)
+    assert run.summary.pending_count == 0
+    assert run.summary.not_recommended_count == len(run.candidates)
+    assert any("尚未配置聊天模型" in w for w in run.diagnostics["warnings"])
+    assert service.graph(run.id)["nodes"] == service.store.original(run.id)["nodes"]
+
+
+def test_graphrag_generated_title_cannot_validate_a_document_quote(tmp_path):
+    graph = source()
+    graph["nodes"][0]["source_context"] = "BIS于2019年发布规则。"
+    # The extracted title is intentionally absent from the real text.
+    calls = []
+
+    class Model:
+        configured = True
+
+        async def complete(self, system, user):
+            pair = json.loads(user)
+            calls.append(pair)
+            return {
+                "verdict": "same",
+                "reason": "错误引用了抽取后的名称",
+                "left_quote": pair["left"]["name"],
+                "right_quote": pair["right"]["name"],
+            }
+
+    service, run = ready(tmp_path, graph, Model())
+    row = candidate(run, "a", "b")
+    assert row.status == "not_recommended"
+    assert row.evidence["error_code"] == "UNSUPPORTED_SOURCE_QUOTE"
+    assert all(
+        record["context"] == "BIS于2019年发布规则。"
+        for pair in calls
+        for record in pair.values()
+        if record["mention_id"] == "a"
+    )
+    assert service.graph(run.id)["nodes"] == graph["nodes"]
+
+
+def test_historical_generated_quote_is_relabelled_and_cannot_be_accepted(tmp_path):
+    graph = source()
+    graph["nodes"][0]["source_context"] = "BIS于2019年发布规则。"
+    service, run = ready(tmp_path, graph)
+    row = candidate(run, "a", "b")
+    row.status = "pending"
+    row.evidence = {
+        "origin": "model",
+        "left": "a",
+        "right": "b",
+        "proposal": "same",
+        "verdict": "uncertain",
+        "left_quote": graph["nodes"][0]["name"],
+        "right_quote": graph["nodes"][1]["name"],
+        "model_reason": "历史模型判断",
+    }
+    raw = run.model_dump_json()
+    with service.store.connect() as db:
+        db.execute("UPDATE resolution_runs SET metadata=? WHERE id=?", (raw, run.id))
+    current = service.get(run.id)
+    reviewed = candidate(current, "a", "b")
+    proof = reviewed.evidence["quote_validation"]
+    assert reviewed.status == "not_recommended" and proof["supported"] is False
+    assert proof["left"]["origin"] == "node_attribute" and "title" in proof["left"]["fields"]
+    assert proof["right"]["origin"] == "source_text"
+    assert reviewed.evidence["model_reason"] == "历史模型判断"
+    assert service.list()[0].summary.pending_count == 0
+    with pytest.raises(AlignmentError, match="来源校验"):
+        decide(service, current, ("a", "b"))
+    with service.store.connect() as db:
+        assert (
+            db.execute("SELECT metadata FROM resolution_runs WHERE id=?", (run.id,)).fetchone()[0]
+            == raw
+        )
+    assert service.graph(run.id)["nodes"] == graph["nodes"]
+    assert current.revision == 0 and not current.audits
+
+
+def test_missing_document_text_is_not_replaced_by_generated_properties(tmp_path):
+    graph = source()
+    for node in graph["nodes"]:
+        node.pop("source_context")
+
+    class Model:
+        configured = True
+
+        async def complete(self, system, user):
+            raise AssertionError("不能用生成属性替代缺失原文调用模型")
+
+    _, run = ready(tmp_path, graph, Model())
+    assert run.summary.pending_count == 0
+    assert all(c.status == "not_recommended" for c in run.candidates)
+    assert all(c.evidence["reason"] == "缺少文档原文，未生成合并建议" for c in run.candidates)
+
+
+def test_database_quotes_are_labelled_as_source_fields(tmp_path):
+    class Model:
+        configured = True
+
+        async def complete(self, system, user):
+            pair = json.loads(user)
+            return {
+                "verdict": "same",
+                "reason": "合成记录依据",
+                "left_quote": pair["left"]["context"],
+                "right_quote": pair["right"]["context"],
+            }
+
+    _, run = ready(tmp_path, source("database"), Model())
+    proof = candidate(run, "a", "b").evidence["quote_validation"]
+    assert proof["supported"] is True
+    assert proof["left"]["origin"] == proof["right"]["origin"] == "source_record"
+
+
+@pytest.mark.parametrize("kind", ["graphrag", "database"])
+def test_candidate_sources_return_full_frozen_evidence_with_separate_description(tmp_path, kind):
+    graph = source(kind)
+    if kind == "graphrag":
+        graph["nodes"][0]["source_context"] = "原文开头\n" + "BIS发布规则。" * 300 + "\n原文末尾"
+    service, run = ready(tmp_path, graph)
+    pair = candidate(run, "a", "b")
+    pair.evidence.update(origin="model", left="a", right="b", left_quote=graph["nodes"][0]["name"])
+    raw = run.model_dump_json()
+    with service.store.connect() as db:
+        db.execute("UPDATE resolution_runs SET metadata=? WHERE id=?", (raw, run.id))
+    service.graph_loader = lambda *_: pytest.fail("历史依据不能读取当前索引")
+    result = service.store.candidate_sources(run.id, pair.id)
+    assert result["source_name"] == graph["name"] and result["source_kind"] == kind
+    assert [n["node_id"] for n in result["nodes"]] == pair.node_ids
+    for node in result["nodes"]:
+        original = next(n for n in graph["nodes"] if n["id"] == node["node_id"])
+        record = node["records"][0]
+        assert record["description"] == original["properties"]["description"]
+        if kind == "graphrag":
+            assert record["source_text"] == original["source_context"]
+            assert record["text_unit_ids"] == original["source_text_unit_ids"]
+            assert record["fields"] is None
+        else:
+            assert record["source_text"] is None
+            assert record["fields"] == original["properties"]
+    left = next(n for n in result["nodes"] if n["node_id"] == "a")
+    assert left["quote_location"]["origin"] == (
+        "node_attribute" if kind == "graphrag" else "source_record"
+    )
+    with service.store.connect() as db:
+        assert (
+            db.execute("SELECT metadata FROM resolution_runs WHERE id=?", (run.id,)).fetchone()[0]
+            == raw
+        )
+
+
+def test_candidate_sources_do_not_invent_missing_source_text(tmp_path):
+    graph = source()
+    graph["nodes"][0].pop("source_context")
+    service, run = ready(tmp_path, graph)
+    pair = candidate(run, "a", "b")
+    result = service.store.candidate_sources(run.id, pair.id)
+    left = next(n for n in result["nodes"] if n["node_id"] == "a")
+    assert left["records"][0]["source_text"] is None
+    assert left["records"][0]["description"]
+    started, _ = service.store.create("graphrag", "pending-source")
+    with pytest.raises(AlignmentError, match="分析完成"):
+        service.store.candidate_sources(started.id, pair.id)
+
+
+def test_analysis_reports_completed_items_while_other_model_requests_are_pending(tmp_path):
+    import json
+
+    async def exercise():
+        release_aliases, release_pairs = asyncio.Event(), asyncio.Event()
+
+        class Model:
+            configured = True
+
+            async def complete(self, system, user):
+                payload = json.loads(user)
+                if "alternate names" in system:
+                    if payload["mention_id"] != "a":
+                        await release_aliases.wait()
+                    return {"aliases": []}
+                pair = {payload[side]["mention_id"] for side in ("left", "right")}
+                if pair != {"a", "b"}:
+                    await release_pairs.wait()
+                return {"verdict": "uncertain", "reason": "需要人工核对原文"}
+
+        service = ResolutionService(
+            Settings(_env_file=None, data_dir=tmp_path), lambda *args: source()
+        )
+        service.model = Model()
+        started = await service.start(
+            StartRequest(
+                source_kind="graphrag",
+                source_id="source-version",
+                options={"method": "synonym_llm_v1"},
+            )
+        )
+
+        async def wait_progress(text):
+            while True:
+                run = await asyncio.to_thread(service.get, started.id)
+                assert run.status == "analyzing", run.error
+                if text in run.progress:
+                    return run
+                await asyncio.sleep(0.01)
+
+        try:
+            aliases = await asyncio.wait_for(wait_progress("别名检查 1/3"), 3)
+            assert "已用时" in aliases.progress
+            assert aliases.candidates == []
+            release_aliases.set()
+            pairs = await asyncio.wait_for(wait_progress("候选比较 1/3"), 3)
+            assert "失败 0，预算跳过 0" in pairs.progress
+            assert len(pairs.candidates) == 1
+            assert pairs.diagnostics["analysis"]["partial"] is True
+            assert pairs.summary.original_node_count == 3
+            with pytest.raises(AlignmentError, match="等待候选分析完成"):
+                service.manual(started.id, ManualRequest(node_ids=["a", "b"], expected_revision=0))
+            release_pairs.set()
+            await asyncio.gather(*service.tasks)
+            finished = service.get(started.id)
+            assert finished.status == "ready" and len(finished.candidates) == 3
+            assert finished.summary.node_count == 3
+        finally:
+            release_aliases.set()
+            release_pairs.set()
+            await service.close()
+
+    asyncio.run(exercise())
 
 
 def test_source_grounded_alias_expansion_retrieves_different_language_names(tmp_path):
@@ -353,7 +710,7 @@ def test_source_grounded_alias_expansion_retrieves_different_language_names(tmp_
                 "reason": "原文直接说明中英文名",
             }
 
-    service, run = ready(tmp_path, graph, Model())
+    service, run = ready(tmp_path, graph, Model(), options={"method": "synonym_llm_v1"})
     pair = candidate(run, "a", "b")
     assert pair.score == 1 and pair.evidence["proposal"] == "same"
     assert pair.evidence["sources"][0]["text_unit_ids"] == ["text-a"]
@@ -447,7 +804,7 @@ def test_second_resolution_uses_previous_members_aliases_context_and_conflicts(t
     anchor = next(mention for mention in corpus.mentions if mention.mention_id == "a")
     assert {"BBBB", "CCCC"} <= set(anchor.aliases)
     assert "BBBB和CCCC是同一公司的两个名称。" in anchor.context
-    assert anchor.identifiers[0].value == "00042"
+    assert not anchor.identifiers  # 抽取字段中的编号不在原文里，不能充当原文身份凭据。
     _, second = ready(tmp_path / "second", derivative)
     suggestion = candidate(second, "a", "c")
     assert suggestion.score == 1

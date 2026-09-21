@@ -160,6 +160,36 @@
   display: block;
   margin-bottom: 8px;
 }
+.retrieval-evidence {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.retrieval-evidence h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.retrieval-evidence p {
+  margin: 8px 0;
+  line-height: 1.8;
+}
+.retrieval-evidence-details {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+.retrieval-evidence-details > div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 12px;
+}
+.retrieval-evidence-details dt {
+  color: var(--muted);
+}
+.retrieval-evidence-details dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
 .manual-edits {
   padding-left: 20px;
 }

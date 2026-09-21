@@ -47,6 +47,8 @@ def update_run(run, graph):
         pending_count=sum(c.status == "pending" for c in run.candidates),
         merged_count=sum(c.status == "merged" for c in run.candidates),
         rejected_count=sum(c.status == "rejected" for c in run.candidates),
+        excluded_count=sum(c.status == "excluded" for c in run.candidates),
+        not_recommended_count=sum(c.status == "not_recommended" for c in run.candidates),
     )
     run.merges = [
         Merge(

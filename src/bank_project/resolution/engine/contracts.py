@@ -7,8 +7,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, field
 from typing import Any
+
+# Completed items, total items, failed requests, items skipped by the model budget.
+ProgressCallback = Callable[[int, int, int, int], Awaitable[None]]
+DecisionCallback = Callable[[dict], Awaitable[None]]
 
 
 def require(condition: bool, message: str) -> None:
@@ -65,6 +70,34 @@ class Mention:
     description: str = ""
     aliases: tuple[str, ...] = ()
     identifiers: tuple[Identifier, ...] = ()
+    source_span: tuple[int, int] | None = None
+    evidence_kind: str = "source"
+
+    def __post_init__(self) -> None:
+        """Validate optional grounding without changing legacy record requirements."""
+        require(
+            self.evidence_kind in ("source", "catalog"),
+            f"{self.mention_id}.evidence_kind must be source or catalog",
+        )
+        if self.source_span is None:
+            return
+        require(
+            isinstance(self.source_span, tuple) and len(self.source_span) == 2,
+            f"{self.mention_id}.source_span must be a pair of integer offsets",
+        )
+        start, end = self.source_span
+        require(
+            type(start) is int and type(end) is int,
+            f"{self.mention_id}.source_span offsets must be integers",
+        )
+        require(
+            isinstance(self.context, str) and 0 <= start < end <= len(self.context),
+            f"{self.mention_id}.source_span is outside the source context",
+        )
+        require(
+            self.context[start:end] == self.name,
+            f"{self.mention_id}.source_span does not match the mention name",
+        )
 
 
 @dataclass(frozen=True)
@@ -91,6 +124,12 @@ class Corpus:
     def to_dict(self) -> dict:
         """Serialize the public corpus schema."""
         data = {"schema_version": "er-corpus-v1", **asdict(self)}
+        for row in data["mentions"]:
+            # Preserve the canonical representation and hashes of legacy corpora.
+            if row["source_span"] is None:
+                del row["source_span"]
+            if row["evidence_kind"] == "source":
+                del row["evidence_kind"]
         data["constraints"] = [{**asdict(item), "reviewed": True} for item in self.constraints]
         return json.loads(json.dumps(data, ensure_ascii=False, allow_nan=False))
 
@@ -121,6 +160,8 @@ class Corpus:
             "description",
             "aliases",
             "identifiers",
+            "source_span",
+            "evidence_kind",
         }
         for row in rows:
             require(isinstance(row, dict), "Mention must be an object")
@@ -133,6 +174,13 @@ class Corpus:
             seen.add(mid)
             name = text(row.get("name"), f"{mid}.name")
             context = text(row.get("context"), f"{mid}.context")
+            source_span = row.get("source_span")
+            if source_span is not None:
+                require(
+                    isinstance(source_span, list) and len(source_span) == 2,
+                    f"{mid}.source_span must be a pair of integer offsets",
+                )
+                source_span = tuple(source_span)
             aliases = row.get("aliases", [])
             require(isinstance(aliases, list), f"{mid}.aliases must be a list")
             for alias in aliases:
@@ -171,6 +219,8 @@ class Corpus:
                     description=text(row.get("description", ""), f"{mid}.description", empty=True),
                     aliases=tuple(aliases),
                     identifiers=tuple(identifiers),
+                    source_span=source_span,
+                    evidence_kind=row.get("evidence_kind", "source"),
                 )
             )
         constraints, pairs = [], set()
@@ -231,6 +281,7 @@ class ResolverConfig:
     """Bound the pilot resolver's work and explicitly control model decisions."""
 
     candidate_limit: int = 30
+    retrieval_policy: str = "original"
     max_block_size: int = 500
     max_pairs: int = 20_000
     max_model_calls: int = 2_000
@@ -244,6 +295,7 @@ class ResolverConfig:
 
     def __post_init__(self) -> None:
         """Reject ambiguous or unbounded operational settings."""
+        require(self.retrieval_policy in ("original", "balanced"), "Unknown retrieval policy")
         for name in (
             "candidate_limit",
             "max_block_size",

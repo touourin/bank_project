@@ -42,7 +42,7 @@ bank-project = "bank_project.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-bank_project = ["graphrag/LICENSE", "resolution/engine/LICENSE"]
+bank_project = ["graphrag/LICENSE", "graphrag/profiles/*/*.txt", "resolution/engine/LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

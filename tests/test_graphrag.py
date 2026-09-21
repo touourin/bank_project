@@ -80,7 +80,7 @@ def test_index_launch_reuses_active_job_and_passes_explicit_settings(settings, m
     service = GraphRagService(settings)
     job = service.upload(b"a document", "sample.txt")
     launches = []
-    monkeypatch.setattr(runtime, "initialize", lambda *args: None)
+    monkeypatch.setattr(runtime, "initialize", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         runtime, "worker_environment", lambda _: {"BANK_DATA_DIR": str(settings.data_dir)}
     )
@@ -101,7 +101,7 @@ def test_index_launch_reuses_active_job_and_passes_explicit_settings(settings, m
 def test_index_launch_failure_is_persisted(settings, monkeypatch):
     service = GraphRagService(settings)
     job = service.upload(b"a document", "sample.txt")
-    monkeypatch.setattr(runtime, "initialize", lambda *args: None)
+    monkeypatch.setattr(runtime, "initialize", lambda *args, **kwargs: None)
     monkeypatch.setattr(runtime, "worker_environment", lambda _: {})
 
     def launch(*args, **kwargs):

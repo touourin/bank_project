@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Button, Input, Modal, Select, Table, Tabs } from "antd";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Button, Input, Modal, Select, Tabs } from "antd";
 import { errorMessage } from "../../api/request";
 import { useResource } from "../../hooks/useResource";
 import { EmptyState, ErrorNotice, LoadingState } from "../../ui/Feedback";
+import { Panel } from "../../ui/Panel";
 import { knowledgeApi } from "./api";
 import { KnowledgeGraphPanel } from "./KnowledgeGraphPanel";
-import { AuditTable, JsonDetails, StatusTag, usePolling } from "./shared";
+import { MatchResults, matchProposalCounts } from "./MatchResults";
+import { AuditTable, StatusTag, usePolling } from "./shared";
 import type { ConceptDetail, MatchEdge, MatchNode, MatchRun } from "./types";
 
 export function MatchingPanel({
@@ -47,7 +49,12 @@ export function MatchingPanel({
     updated?.id === runId && (!remote || updated.revision > remote.revision)
       ? updated
       : remote;
+  const proposals = useMemo(
+    () => (run ? matchProposalCounts(run) : { nodes: 0, edges: 0 }),
+    [run],
+  );
   const [busy, setBusy] = useState(false);
+  const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState("");
   const inFlight = useRef(false);
   const [editing, setEditing] = useState<
@@ -165,6 +172,7 @@ export function MatchingPanel({
       setEditing(undefined);
       resource.refresh();
       history.refresh();
+      sources.refresh();
     } catch (reason) {
       setError(errorMessage(reason));
       setUpdated(undefined);
@@ -172,6 +180,30 @@ export function MatchingPanel({
     } finally {
       inFlight.current = false;
       setBusy(false);
+    }
+  }
+  async function acceptProposals() {
+    if (!run || inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    setAccepting(true);
+    setError("");
+    try {
+      const result = await knowledgeApi.matchAccept(token, run.id, {
+        expected_revision: run.revision,
+      });
+      setUpdated(result);
+      resource.refresh();
+      history.refresh();
+      sources.refresh();
+    } catch (reason) {
+      setError(errorMessage(reason));
+      setUpdated(undefined);
+      resource.refresh();
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+      setAccepting(false);
     }
   }
   const conceptOptions = concepts.map((concept) => ({
@@ -189,8 +221,8 @@ export function MatchingPanel({
       <Alert
         type="info"
         showIcon
-        title="复用现有本体检索与匹配流程"
-        description="仅挂载节点 boid 和边类型；保留节点 ID、名称、原始类型、所有属性以及边端点。低分结果可人工修订或清除挂载。"
+        title="复用本体对齐与图谱生成的匹配流程"
+        description="自动展示节点与边的匹配建议，核对后可整体采纳，也可按需修改。节点 ID、名称、原始类型、属性和边端点均保留。"
       />
       <div className="knowledge-toolbar">
         <label className="knowledge-field" style={{ flex: 1, marginBottom: 0 }}>
@@ -232,6 +264,7 @@ export function MatchingPanel({
           value={runId || undefined}
           placeholder="选择匹配历史"
           style={{ minWidth: 220, maxWidth: "100%" }}
+          disabled={busy}
           onChange={(value) => {
             setRunId(value);
             setUpdated(undefined);
@@ -245,8 +278,8 @@ export function MatchingPanel({
         />
         <Button
           type="primary"
-          loading={busy}
-          disabled={run?.status === "running"}
+          loading={busy && !accepting && !editing}
+          disabled={busy || run?.status === "running"}
           onClick={() => void start()}
         >
           开始节点与边匹配
@@ -278,9 +311,7 @@ export function MatchingPanel({
               <StatusTag status={run.status} />
               {run.progress}
             </span>
-            <span className="hint">
-              本体版本 {run.ontology_revision || "—"} · 修订 {run.revision}
-            </span>
+            <span className="hint">修订 {run.revision}</span>
           </div>
           {run.status === "running" && (
             <LoadingState label="正在检索本体并匹配节点与关系…" />
@@ -293,157 +324,105 @@ export function MatchingPanel({
               </strong>
             </div>
             <div>
+              <span>待采纳节点建议</span>
+              <strong>{proposals.nodes}</strong>
+            </div>
+            <div>
               <span>边类型挂载</span>
               <strong>
                 {run.summary.matched_edges} / {run.summary.edge_count}
               </strong>
             </div>
           </div>
-          <Tabs
-            items={[
-              {
-                key: "nodes",
-                label: "节点匹配过程",
-                children: (
-                  <Table
-                    rowKey="id"
-                    size="small"
-                    dataSource={run.nodes}
-                    scroll={{ x: 650 }}
-                    pagination={{ pageSize: 10 }}
-                    columns={[
-                      { title: "原始节点", dataIndex: "name" },
-                      {
-                        title: "挂载 boid",
-                        dataIndex: "boid",
-                        render: (value: string) => value || "未挂载",
-                      },
-                      {
-                        title: "检索结果",
-                        render: (_, node) => (
-                          <StatusTag status={node.trace.status} />
-                        ),
-                      },
-                      {
-                        title: "人工调整",
-                        render: (_, node) => (
-                          <Button
-                            disabled={run.status !== "ready" || busy}
-                            size="small"
-                            onClick={() =>
-                              edit({ target: "node", value: node })
-                            }
-                          >
-                            修改节点
-                          </Button>
-                        ),
-                      },
-                    ]}
-                    expandable={{
-                      expandedRowRender: (node) => (
-                        <div>
-                          <p>
-                            <strong>检索语义：</strong>
-                            {node.trace.query}
-                          </p>
-                          <p>{node.trace.detail}</p>
-                          <Table
-                            rowKey="id"
-                            size="small"
-                            dataSource={node.trace.candidates}
-                            pagination={false}
-                            locale={{ emptyText: "未找到本体候选" }}
-                            columns={[
-                              { title: "候选概念", dataIndex: "name" },
-                              { title: "boid", dataIndex: "id" },
-                              {
-                                title: "原检索得分",
-                                dataIndex: "score",
-                                render: (value: number) =>
-                                  value == null ? "—" : value.toFixed(3),
-                              },
-                            ]}
-                          />
-                          <JsonDetails
-                            value={node.trace}
-                            label="完整匹配过程"
-                          />
-                        </div>
-                      ),
-                    }}
-                  />
-                ),
-              },
-              {
-                key: "edges",
-                label: "边类型匹配",
-                children: (
-                  <Table
-                    rowKey="id"
-                    size="small"
-                    dataSource={run.edges}
-                    scroll={{ x: 650 }}
-                    pagination={{ pageSize: 10 }}
-                    columns={[
-                      { title: "起点", dataIndex: "source", ellipsis: true },
-                      { title: "终点", dataIndex: "target", ellipsis: true },
-                      {
-                        title: "边类型",
-                        dataIndex: "edge_type",
-                        render: (value: string) => value || "未挂载",
-                      },
-                      {
-                        title: "状态",
-                        render: (_, edge) => <StatusTag status={edge.status} />,
-                      },
-                      {
-                        title: "人工调整",
-                        render: (_, edge) => (
-                          <Button
-                            size="small"
-                            disabled={run.status !== "ready" || busy}
-                            onClick={() =>
-                              edit({ target: "edge", value: edge })
-                            }
-                          >
-                            修改边类型
-                          </Button>
-                        ),
-                      },
-                    ]}
-                    expandable={{
-                      expandedRowRender: (edge) => (
-                        <>
-                          <p>{edge.detail}</p>
-                          <p>
-                            可选边类型：
-                            {edge.candidates.join("、") || "暂无候选"}
-                          </p>
-                          <JsonDetails value={edge} label="完整关系匹配信息" />
-                        </>
-                      ),
-                    }}
-                  />
-                ),
-              },
-              {
-                key: "audits",
-                label: `人工修改记录（${run.audits.length}）`,
-                children: <AuditTable audits={run.audits} />,
-              },
-              {
-                key: "graph",
-                label: "匹配后图谱",
-                children: graph.error ? (
-                  <ErrorNotice message={graph.error} onRetry={graph.refresh} />
-                ) : graph.data ? (
-                  <KnowledgeGraphPanel graph={graph.data} />
-                ) : (
-                  <EmptyState title="匹配完成后展示图谱" />
-                ),
-              },
-            ]}
-          />
+          <Panel
+            className="knowledge-matching-panel"
+            title="匹配结果"
+            eyebrow="核对匹配方案"
+            description="自动展示节点与关系的本体匹配建议。低分候选可整体采纳，匹配有误时按需修改；展开行可查看匹配过程与检索依据。"
+            padded
+            actions={
+              <Button
+                type="primary"
+                loading={accepting}
+                aria-label="整体采纳匹配建议"
+                disabled={
+                  run.status !== "ready" ||
+                  busy ||
+                  proposals.nodes + proposals.edges === 0
+                }
+                onClick={() => void acceptProposals()}
+              >
+                整体采纳匹配建议
+              </Button>
+            }
+          >
+            <details className="mapping-metadata">
+              <summary>本体版本与匹配说明</summary>
+              <p className="hint ontology-revision">
+                本体版本：
+                <code>{run.ontology_revision || "历史任务未记录"}</code>
+              </p>
+              <p className="hint">
+                节点复用本体对齐的 retrieve 检索、候选得分与版本校验。
+                {run.confidence_threshold != null
+                  ? `自动采用阈值：${run.confidence_threshold.toFixed(3)}。`
+                  : "历史任务未记录自动采用阈值。"}
+                原检索得分不代表正确概率。
+              </p>
+              <p className="hint">
+                整体采纳会挂载有效的节点建议，并重新校验边的方向与类型；多种关系候选需手动选择。已人工修改或清除的结果保持不变，未匹配对象保留原始信息。
+              </p>
+            </details>
+            <Tabs
+              items={[
+                {
+                  key: "nodes",
+                  label: "节点匹配过程",
+                  children: (
+                    <MatchResults
+                      key={`${run.id}:nodes`}
+                      run={run}
+                      target="node"
+                      disabled={run.status !== "ready" || busy}
+                      onEdit={edit}
+                    />
+                  ),
+                },
+                {
+                  key: "edges",
+                  label: "边类型匹配",
+                  children: (
+                    <MatchResults
+                      key={`${run.id}:edges`}
+                      run={run}
+                      target="edge"
+                      disabled={run.status !== "ready" || busy}
+                      onEdit={edit}
+                    />
+                  ),
+                },
+                {
+                  key: "audits",
+                  label: `人工修改记录（${run.audits.length}）`,
+                  children: <AuditTable audits={run.audits} />,
+                },
+                {
+                  key: "graph",
+                  label: "匹配后图谱",
+                  children: graph.error ? (
+                    <ErrorNotice
+                      message={graph.error}
+                      onRetry={graph.refresh}
+                    />
+                  ) : graph.data ? (
+                    <KnowledgeGraphPanel graph={graph.data} />
+                  ) : (
+                    <EmptyState title="匹配完成后展示图谱" />
+                  ),
+                },
+              ]}
+            />
+          </Panel>
         </>
       )}
       <Modal

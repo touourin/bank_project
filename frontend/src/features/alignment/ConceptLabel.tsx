@@ -14,7 +14,7 @@ export function ConceptLabel({
       {parents && "parents" in concept && (
         <small>
           直属上级：
-          {concept.parents.length
+          {Array.isArray(concept.parents) && concept.parents.length
             ? concept.parents.map((p) => `${p.name}（${p.id}）`).join("、")
             : "该版本未记录上级"}
         </small>

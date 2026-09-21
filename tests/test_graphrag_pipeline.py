@@ -39,6 +39,69 @@ def make_settings(path):
     importlib.util.find_spec("graphrag"), "GraphRAG optional runtime not installed"
 )
 class NativeGraphRagTests(unittest.TestCase):
+    def test_language_adaptation_preserves_native_prompt_fields_and_chinese_graph(self):
+        from string import Formatter
+
+        from graphrag.cli.initialize import initialize_project_at
+        from graphrag.index.operations.extract_graph.graph_extractor import GraphExtractor
+
+        from bank_project.graphrag.prompts import (
+            INDEX_LANGUAGE_POLICY,
+            INDEX_PROMPTS,
+            QUERY_LANGUAGE_POLICY,
+            configure_prompt_languages,
+        )
+
+        def fields(value):
+            return {field for _, field, _, _ in Formatter().parse(value)}
+
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory) / "adapted"
+            baseline = Path(directory) / "native"
+            initialize_project_at(baseline, force=True)
+            runtime.initialize(folder, make_settings(directory), 1200, 100)
+            for path in (folder / "prompts").glob("*.txt"):
+                original = (baseline / "prompts" / path.name).read_text()
+                adapted = path.read_text()
+                policy = (
+                    INDEX_LANGUAGE_POLICY if path.stem in INDEX_PROMPTS else QUERY_LANGUAGE_POLICY
+                )
+                self.assertTrue(adapted.startswith(policy), path.name)
+                self.assertNotIn("Return output in English", adapted)
+                self.assertEqual(fields(original), fields(adapted), path.name)
+            before = {path.name: path.read_text() for path in (folder / "prompts").glob("*.txt")}
+            configure_prompt_languages(folder)
+            self.assertEqual(
+                before,
+                {path.name: path.read_text() for path in (folder / "prompts").glob("*.txt")},
+            )
+
+            class Model:
+                async def achat(self, prompt):
+                    assert INDEX_LANGUAGE_POLICY in prompt
+                    assert "科大讯飞与合肥示例银行开展合作。" in prompt
+                    return SimpleNamespace(
+                        output=SimpleNamespace(
+                            content='("entity"<|>科大讯飞<|>ORGANIZATION<|>科大讯飞参与合作。)'
+                            '##("entity"<|>合肥示例银行<|>ORGANIZATION<|>银行参与合作。)'
+                            '##("relationship"<|>科大讯飞<|>合肥示例银行<|>双方开展合作。<|>8)'
+                            "<|COMPLETE|>"
+                        )
+                    )
+
+            extractor = GraphExtractor(
+                model_invoker=Model(),
+                prompt=(folder / "prompts/extract_graph.txt").read_text(),
+                max_gleanings=0,
+            )
+            result = asyncio.run(
+                extractor(["科大讯飞与合肥示例银行开展合作。"], {"entity_types": ["organization"]})
+            )
+            self.assertEqual(set(result.output.nodes), {"科大讯飞", "合肥示例银行"})
+            self.assertEqual(
+                result.output.edges["科大讯飞", "合肥示例银行"]["description"], "双方开展合作。"
+            )
+
     def test_compatible_provider_limits_and_worker_timeout(self):
         with tempfile.TemporaryDirectory() as directory:
             settings = make_settings(directory)
