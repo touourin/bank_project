@@ -10,7 +10,7 @@ from dataclasses import asdict
 from typing import Protocol
 from uuid import NAMESPACE_URL, uuid5
 
-from bank_project.resolution.engine.candidates import identity_signals, retrieve
+from bank_project.resolution.engine.candidates import recall_priority, retrieve
 from bank_project.resolution.engine.concurrency import bounded_map
 from bank_project.resolution.engine.contracts import (
     Corpus,
@@ -100,7 +100,8 @@ async def resolve_evidence(
     candidates, overflow = (
         candidate_data
         if candidate_data is not None
-        else retrieve(
+        else await asyncio.to_thread(
+            retrieve,
             retrieval_corpus or corpus,
             config,
             semantic_neighbors,
@@ -236,7 +237,7 @@ async def resolve_evidence(
         initial_pairs.sort(
             key=lambda pair: (
                 -int(pair in constraints),
-                *(-float(v) for v in identity_signals(hints[pair[0]], hints[pair[1]])),
+                *(-float(v) for v in recall_priority(hints[pair[0]], hints[pair[1]])),
                 pair,
             )
         )

@@ -87,6 +87,8 @@ def judgment_record(mention: Mention, side: str) -> dict:
     from bank_project.resolution.engine.evidence import target_window
 
     record = asdict(mention)
+    # Blocking keys select a pair; they are not quotable identity evidence.
+    record.pop("recall", None)
     context = mention.context
     span = mention.source_span
     if span is not None:
@@ -416,6 +418,7 @@ class LLMJudge:
     async def expand_aliases(self, mention: Mention) -> dict:
         """Extract source-grounded names, with a task-specific versioned cache key."""
         payload = asdict(mention)
+        payload.pop("recall", None)
         key = digest(
             {
                 "task": "aliases",

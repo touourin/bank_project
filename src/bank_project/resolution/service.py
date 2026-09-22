@@ -24,7 +24,7 @@ from .adapter import (
     model_recommends_merge,
     validate_graph,
 )
-from .engine.contracts import Corpus, ResolverConfig, digest
+from .engine.contracts import CandidateBudgetExceeded, Corpus, ResolverConfig, digest
 from .engine.model_judge import JUDGE_REVISION, LLMJudge
 from .engine.runner import compare_methods
 from .experiments import load_experiment
@@ -166,6 +166,13 @@ class ResolutionService:
             run.status, run.progress = "failed", "分析未完成"
             if isinstance(exc, AlignmentError):
                 run.error = exc.message
+            elif isinstance(exc, CandidateBudgetExceeded):
+                run.error = str(exc)
+                run.diagnostics["candidate_budget"] = {
+                    "selected_pairs_at_least": exc.selected_pairs,
+                    "max_pairs": exc.max_pairs,
+                    "complete": False,
+                }
             elif isinstance(exc, ValueError):
                 # Engine validation errors contain no provider response or credentials.
                 run.error = f"消歧输入或候选预算校验失败：{exc}"
@@ -378,7 +385,17 @@ class ResolutionService:
         }
         if config.retrieval_policy == "balanced":
             diagnostics["warnings"].append(
-                "精筛候选按名称、别名、编号、类型及稀有描述词召回；未召回不代表确认不同，原始节点均保留，可切换原始宽召回或人工补充"
+                "精筛候选使用真实名称、别名、编号、类型及稀有描述词；数据库事件按参与方、事件类型和发生时间召回，行号展示名称不参与匹配。未召回不代表确认不同，原始节点均保留，可人工补充"
+            )
+        missing_hints = sum(
+            m.recall is not None and not m.recall.names and not m.recall.keys and not m.identifiers
+            for m in corpus.mentions
+        )
+        diagnostics["records_without_recall_hints"] = missing_hints
+        if missing_hints:
+            diagnostics["warnings"].append(
+                f"{missing_hints:,} 个节点缺少可用的名称、身份编号或完整事件线索；"
+                "已保留原节点，未按行号或参与方编号猜测身份，可补充字段或人工指定匹配"
             )
         errors = {}
         for decision in resolution.decisions:

@@ -23,7 +23,12 @@ def display_name(fields, concept, row, fallback="") -> str:
     ):
         if values.get(key):
             return values[key][:200]
-    event = values.get("事件名称") or values.get("eventname") or values.get("evttype")
+    event = (
+        values.get("事件名称")
+        or values.get("eventname")
+        or values.get("事件类型")
+        or values.get("evttype")
+    )
     if event:
         date = values.get("occurdt") or values.get("发生日期")
         return (f"{event} · {date}" if date else event)[:200]

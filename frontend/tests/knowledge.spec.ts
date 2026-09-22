@@ -1477,6 +1477,44 @@ test("original graph traversal keeps the center and ranks its strongest neighbor
   expect(JSON.stringify(graph)).toEqual(before);
 });
 
+test("resolution candidate budget failure stays actionable without allowing merges", async ({
+  page,
+}) => {
+  const error =
+    "候选对已达到 20,001 对，超过上限 20,000 对；尚未进行候选对模型判断，原图未修改。请缩小分析范围，或在高级参数中调整候选对总上限后重新分析";
+  const requests = await mockKnowledge(page, true, (run) => {
+    run.status = "failed";
+    run.error = error;
+    run.progress = "分析未完成";
+    run.candidates = [];
+    run.summary.pending_count = 0;
+    run.diagnostics = {
+      candidate_budget: {
+        selected_pairs_at_least: 20001,
+        max_pairs: 20000,
+        complete: false,
+      },
+    };
+  });
+  await page.goto("/");
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
+  await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
+  await expect(page.getByText(error, { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "人工指定合并", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "分析消歧候选", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "分析消歧候选", exact: true }),
+  ).toHaveAttribute("aria-busy", "false");
+  await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
+  await expect
+    .poll(() => requests.filter((r) => r.path === "/resolution/runs").length)
+    .toBe(2);
+});
+
 test("resolution method and review policy reach the analysis API", async ({
   page,
 }) => {

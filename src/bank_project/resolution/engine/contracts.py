@@ -59,6 +59,42 @@ class Identifier:
 
 
 @dataclass(frozen=True)
+class RecallProfile:
+    """Source-aware recall hints, never identity assertions or merge evidence."""
+
+    names: tuple[str, ...] = ()
+    keys: tuple[str, ...] = ()
+    use_description: bool = False
+
+    @classmethod
+    def from_dict(cls, data: Any) -> RecallProfile:
+        require(isinstance(data, dict), "recall must be an object")
+        require(not (data.keys() - {"names", "keys", "use_description"}), "Unknown recall field")
+        for key in ("names", "keys"):
+            require(isinstance(data.get(key, []), list), f"recall.{key} must be a list")
+            for value in data.get(key, []):
+                text(value, f"recall.{key}")
+        require(type(data.get("use_description", False)) is bool, "Invalid recall.use_description")
+        return cls(
+            names=tuple(data.get("names", [])),
+            keys=tuple(data.get("keys", [])),
+            use_description=data.get("use_description", False),
+        )
+
+
+class CandidateBudgetExceeded(ValueError):
+    """Preserve actionable counts when recall stops before model calls."""
+
+    def __init__(self, selected_pairs: int, max_pairs: int):
+        self.selected_pairs = selected_pairs
+        self.max_pairs = max_pairs
+        super().__init__(
+            f"候选对已达到 {selected_pairs:,} 对，超过上限 {max_pairs:,} 对；"
+            "尚未进行候选对模型判断，原图未修改。请缩小分析范围，或在高级参数中调整候选对总上限后重新分析"
+        )
+
+
+@dataclass(frozen=True)
 class Mention:
     """One raw extracted entity record or independently annotated mention."""
 
@@ -72,6 +108,7 @@ class Mention:
     identifiers: tuple[Identifier, ...] = ()
     source_span: tuple[int, int] | None = None
     evidence_kind: str = "source"
+    recall: RecallProfile | None = None
 
     def __post_init__(self) -> None:
         """Validate optional grounding without changing legacy record requirements."""
@@ -130,6 +167,8 @@ class Corpus:
                 del row["source_span"]
             if row["evidence_kind"] == "source":
                 del row["evidence_kind"]
+            if row["recall"] is None:
+                del row["recall"]
         data["constraints"] = [{**asdict(item), "reviewed": True} for item in self.constraints]
         return json.loads(json.dumps(data, ensure_ascii=False, allow_nan=False))
 
@@ -162,6 +201,7 @@ class Corpus:
             "identifiers",
             "source_span",
             "evidence_kind",
+            "recall",
         }
         for row in rows:
             require(isinstance(row, dict), "Mention must be an object")
@@ -221,6 +261,7 @@ class Corpus:
                     identifiers=tuple(identifiers),
                     source_span=source_span,
                     evidence_kind=row.get("evidence_kind", "source"),
+                    recall=RecallProfile.from_dict(row["recall"]) if "recall" in row else None,
                 )
             )
         constraints, pairs = [], set()

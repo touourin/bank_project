@@ -25,6 +25,10 @@ def test_labels_prefer_subject_name_never_a_participant_or_internal_table_id():
         display_name({"EVT_TYPE": "YWJC0002", "OCCUR_DT": "20260920"}, "事件", 4)
         == "YWJC0002 · 20260920"
     )
+    assert (
+        display_name({"事件类型": "YWJC0002", "发生日期": "20260920"}, "事件", 4)
+        == "YWJC0002 · 20260920"
+    )
     node = GraphNode(
         id="instance",
         name="table",

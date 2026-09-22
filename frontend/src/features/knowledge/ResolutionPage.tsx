@@ -266,6 +266,8 @@ export function ResolutionPage({
             <Button
               type="primary"
               block
+              aria-label="分析消歧候选"
+              aria-busy={busy}
               loading={busy}
               disabled={!source || run?.status === "analyzing"}
               onClick={start}

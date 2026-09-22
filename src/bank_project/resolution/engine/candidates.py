@@ -12,7 +12,7 @@ from bank_project.resolution.engine.candidate_identity import (
     financial_conflicts,
     financial_dimensions,
 )
-from bank_project.resolution.engine.contracts import Corpus, ResolverConfig, require
+from bank_project.resolution.engine.contracts import CandidateBudgetExceeded, Corpus, ResolverConfig
 
 
 def normalize(value: str) -> str:
@@ -30,6 +30,36 @@ def terms(value: str) -> set[str]:
     return words
 
 
+def recall_names(mention):
+    return mention.recall.names if mention.recall is not None else (mention.name, *mention.aliases)
+
+
+def recall_description(mention):
+    return mention.description if mention.recall is None or mention.recall.use_description else ""
+
+
+def shared_record_key(left, right):
+    return bool(left.recall and right.recall and set(left.recall.keys) & set(right.recall.keys))
+
+
+def recall_features(mention):
+    names = {normalize(name) for name in recall_names(mention)} - {""}
+    keys = {f"name:{name}" for name in names}
+    keys.update(
+        f"term:{term}"
+        for term in terms(" ".join((*recall_names(mention), recall_description(mention))))
+    )
+    keys.update(f"id:{item.namespace}:{item.value}" for item in mention.identifiers)
+    if mention.recall is not None:
+        keys.update(f"record:{key}" for key in mention.recall.keys)
+    return names, keys
+
+
+def check_budget(pairs, config):
+    if len(pairs) > config.max_pairs:
+        raise CandidateBudgetExceeded(len(pairs), config.max_pairs)
+
+
 def retrieve_original(
     corpus: Corpus,
     config: ResolverConfig,
@@ -39,13 +69,7 @@ def retrieve_original(
     mentions = {m.mention_id: m for m in corpus.mentions}
     names, features, postings = {}, {}, defaultdict(set)
     for mid, mention in mentions.items():
-        names[mid] = {normalize(name) for name in (mention.name, *mention.aliases)} - {""}
-        keys = {f"name:{name}" for name in names[mid]}
-        keys.update(
-            f"term:{term}"
-            for term in terms(" ".join((mention.name, *mention.aliases, mention.description)))
-        )
-        keys.update(f"id:{item.namespace}:{item.value}" for item in mention.identifiers)
+        names[mid], keys = recall_features(mention)
         features[mid] = keys
         for key in keys:
             postings[key].add(mid)
@@ -78,7 +102,8 @@ def retrieve_original(
                 ),
                 default=0,
             )
-            return (other in forced[mid], identifier, exact, similarity, len(shared))
+            record_key = shared_record_key(mentions[mid], mentions[other])
+            return (other in forced[mid], identifier, record_key, exact, similarity, len(shared))
 
         ranked = sorted(
             pool,
@@ -98,6 +123,7 @@ def retrieve_original(
                 return (
                     -int(other in forced[mid]),
                     -int(any(key.startswith("id:") for key in features[mid] & features[other])),
+                    -int(shared_record_key(mentions[mid], mentions[other])),
                     -int(bool(names[mid] & names[other])),
                     -rrf,
                     other,
@@ -108,10 +134,7 @@ def retrieve_original(
             overflow.add(mid)
         candidates[mid] = sorted(set(ranked[: config.candidate_limit]) | forced[mid])
         pairs.update(tuple(sorted((mid, other))) for other in candidates[mid])
-        require(
-            len(pairs) <= config.max_pairs,
-            "Candidate pair budget exceeded; split the experiment or increase max_pairs explicitly",
-        )
+        check_budget(pairs, config)
     return candidates, overflow
 
 
@@ -161,8 +184,8 @@ def compatible_types(left, right):
 
 def identity_signals(left, right):
     """Ranking signals are recall hints, never proof of a shared identity."""
-    a = {normalize(n) for n in (left.name, *left.aliases)} - {""}
-    b = {normalize(n) for n in (right.name, *right.aliases)} - {""}
+    a = {normalize(n) for n in recall_names(left)} - {""}
+    b = {normalize(n) for n in recall_names(right)} - {""}
     exact = bool(a & b)
     identifier = bool(
         {(i.namespace, i.value) for i in left.identifiers}
@@ -170,6 +193,11 @@ def identity_signals(left, right):
     )
     similarity = max((SequenceMatcher(None, x, y).ratio() for x in a for y in b), default=0)
     return identifier, exact, similarity
+
+
+def recall_priority(left, right):
+    identifier, exact, similarity = identity_signals(left, right)
+    return identifier, shared_record_key(left, right), exact, similarity
 
 
 def retrieve(corpus, config, semantic_neighbors=None, *, diagnostics=None):
@@ -183,11 +211,8 @@ def retrieve(corpus, config, semantic_neighbors=None, *, diagnostics=None):
     postings, names, descriptions, features = defaultdict(set), {}, {}, {}
     financial = {mid: financial_dimensions(m) for mid, m in mentions.items()}
     for mid, m in mentions.items():
-        names[mid] = {normalize(n) for n in (m.name, *m.aliases)} - {""}
-        descriptions[mid] = terms(m.description)
-        keys = {"name:" + n for n in names[mid]}
-        keys |= {"term:" + t for t in terms(" ".join((m.name, *m.aliases, m.description)))}
-        keys |= {f"id:{i.namespace}:{i.value}" for i in m.identifiers}
+        names[mid], keys = recall_features(m)
+        descriptions[mid] = terms(recall_description(m))
         features[mid] = keys
         for key in keys:
             postings[key].add(mid)
@@ -221,7 +246,8 @@ def retrieve(corpus, config, semantic_neighbors=None, *, diagnostics=None):
             identifier, exact, similarity = identity_signals(mentions[mid], mentions[other])
             compatible = compatible_types(mentions[mid], mentions[other])
             shared_rare = len(rare[mid] & rare[other])
-            strong = other in forced[mid] or identifier or exact
+            record_key = shared_record_key(mentions[mid], mentions[other])
+            strong = other in forced[mid] or identifier or exact or record_key
             eligible = strong or (
                 compatible
                 and (
@@ -245,6 +271,7 @@ def retrieve(corpus, config, semantic_neighbors=None, *, diagnostics=None):
             rank = (
                 -int(other in forced[mid]),
                 -int(identifier),
+                -int(record_key),
                 -int(exact),
                 -similarity,
                 -int(other in vector_ids),
@@ -259,10 +286,7 @@ def retrieve(corpus, config, semantic_neighbors=None, *, diagnostics=None):
             {other for _, other in ranked[: config.candidate_limit]} | forced[mid]
         )
         pairs.update(tuple(sorted((mid, other))) for other in candidates[mid])
-        require(
-            len(pairs) <= config.max_pairs,
-            "Candidate pair budget exceeded; split the experiment or increase max_pairs explicitly",
-        )
+        check_budget(pairs, config)
     if diagnostics is not None:
         diagnostics.update(
             policy="balanced",
@@ -275,5 +299,7 @@ def retrieve(corpus, config, semantic_neighbors=None, *, diagnostics=None):
             selected_pairs=len(pairs),
             rare_term_max_frequency=frequency_limit,
             recall_quality="not_measured_without_gold",
+            structured_recall_records=sum(m.recall is not None for m in mentions.values()),
+            records_without_recall_hints=sum(not keys for keys in features.values()),
         )
     return candidates, overflow

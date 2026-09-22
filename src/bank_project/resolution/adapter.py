@@ -7,10 +7,11 @@ from itertools import combinations
 
 from bank_project.alignment.models import AlignmentError
 
-from .engine.candidates import normalize, terms
+from .engine.candidates import normalize, recall_names, shared_record_key, terms
 from .engine.contracts import Corpus, digest, require
 from .engine.identity_guard import assess_identity
 from .models import Candidate, Conflict, NodeBrief
+from .record_recall import EVENT_ID_FIELDS, database_recall, field_key, is_event
 
 IDENTIFIER_FIELDS = {
     "cust_id",
@@ -119,9 +120,10 @@ def corpus_from_graph(graph):
     """Make a comparison view, leaving evidence and identity strings unchanged."""
     mentions = []
     for node in graph["nodes"]:
+        records = source_records(node)
         contexts, aliases, descriptions, assertions = [], [], [], {}
         context_offsets, located_spans = {}, set()
-        for record in source_records(node):
+        for record in records:
             props = record["properties"]
             context = json.dumps(props, ensure_ascii=False, sort_keys=True)
             source_context = record.get("source_context")
@@ -162,13 +164,12 @@ def corpus_from_graph(graph):
                 )
             descriptions.append(str(props.get("description", "") or ""))
             # Arbitrary source fields are retrieval hints, never trusted assertions.
+            event = graph["source_kind"] == "database" and is_event(record)
             for key, value in attributes(record).items():
-                if (
-                    key.lower() in IDENTIFIER_FIELDS
-                    and isinstance(value, str)
-                    and value.strip()
-                    and value in context
-                ):
+                own_identifier = (
+                    field_key(key) in EVENT_ID_FIELDS if event else key.lower() in IDENTIFIER_FIELDS
+                )
+                if own_identifier and isinstance(value, str) and value.strip() and value in context:
                     quote = json.dumps(value, ensure_ascii=False)
                     assertions[key.lower(), value] = {
                         "namespace": key.lower(),
@@ -186,6 +187,10 @@ def corpus_from_graph(graph):
             "aliases": list(dict.fromkeys(aliases)),
             "identifiers": list(assertions.values()),
         }
+        if graph["source_kind"] == "database":
+            recall = database_recall(records)
+            if recall is not None:
+                mention["recall"] = recall
         if len(located_spans) == 1:
             start, end = next(iter(located_spans))
             # A merged node can retain differently named source observations;
@@ -240,8 +245,8 @@ def candidate_from_decision(decision, by_id, mentions, source_kind):
     ids = [decision["left"], decision["right"]]
     nodes = [by_id[key] for key in ids]
     left, right = (mentions[key] for key in ids)
-    left_names = {normalize(name) for name in (left.name, *left.aliases)} - {""}
-    right_names = {normalize(name) for name in (right.name, *right.aliases)} - {""}
+    left_names = {normalize(name) for name in recall_names(left)} - {""}
+    right_names = {normalize(name) for name in recall_names(right)} - {""}
     score = max(
         (SequenceMatcher(None, a, b).ratio() for a in left_names for b in right_names), default=0
     )
@@ -255,6 +260,8 @@ def candidate_from_decision(decision, by_id, mentions, source_kind):
     }
     if common_ids:
         reasons.append("存在相同的来源标识字段，编号域与可靠性仍需人工核验")
+    if shared_record_key(left, right):
+        reasons.append("参与方、事件类型和发生时间一致，仅为疑似重复事件，仍需核对来源证据")
     if terms(left.description) & terms(right.description):
         reasons.append("描述存在共同词项，可用于定位上下文")
     reasons.append(REASONS.get(decision["reason"], decision["reason"]))
