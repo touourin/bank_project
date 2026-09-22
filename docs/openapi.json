@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Bank project",
-    "description": "数据接入、本体对齐与图谱生成、TXT GraphRAG 索引问答、实体消歧及 BOID 挂载。",
+    "description": "数据接入、本体对齐与图谱生成、TXT GraphRAG 索引问答、实体消歧、BOID 挂载及 WHY 风险规则审核执行。",
     "version": "0.1.0"
   },
   "paths": {
@@ -2965,6 +2965,483 @@
           }
         }
       }
+    },
+    "/api/v1/risk/catalog": {
+      "get": {
+        "tags": [
+          "WHY 风险规则与人工审核"
+        ],
+        "summary": "Catalog",
+        "operationId": "catalog_api_v1_risk_catalog_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/sources": {
+      "get": {
+        "tags": [
+          "WHY 风险规则与人工审核"
+        ],
+        "summary": "Sources",
+        "operationId": "sources_api_v1_risk_sources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/risk/propagations": {
+      "get": {
+        "tags": [
+          "WHY 风险规则与人工审核"
+        ],
+        "summary": "Propagations",
+        "operationId": "propagations_api_v1_risk_propagations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "WHY 风险规则与人工审核"
+        ],
+        "summary": "Propagate",
+        "operationId": "propagate_api_v1_risk_propagations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropagationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/risk/propagations/{job_id}": {
+      "get": {
+        "tags": [
+          "WHY 风险规则与人工审核"
+        ],
+        "summary": "Propagation",
+        "operationId": "propagation_api_v1_risk_propagations__job_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/cases": {
+      "get": {
+        "tags": [
+          "WHY 风险规则与人工审核"
+        ],
+        "summary": "Cases",
+        "operationId": "cases_api_v1_risk_cases_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/risk/cases/{case_id}": {
+      "get": {
+        "tags": [
+          "WHY 风险规则与人工审核"
+        ],
+        "summary": "Case",
+        "operationId": "case_api_v1_risk_cases__case_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/cases/{case_id}/review": {
+      "post": {
+        "tags": [
+          "WHY 风险规则与人工审核"
+        ],
+        "summary": "Review",
+        "operationId": "review_api_v1_risk_cases__case_id__review_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/cases/{case_id}/fields": {
+      "get": {
+        "tags": [
+          "WHY 风险规则与人工审核"
+        ],
+        "summary": "Fields",
+        "operationId": "fields_api_v1_risk_cases__case_id__fields_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "graph_version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Graph Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/cases/{case_id}/executions": {
+      "post": {
+        "tags": [
+          "WHY 风险规则与人工审核"
+        ],
+        "summary": "Execute",
+        "operationId": "execute_api_v1_risk_cases__case_id__executions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "WHY 风险规则与人工审核"
+        ],
+        "summary": "Executions",
+        "operationId": "executions_api_v1_risk_cases__case_id__executions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3662,6 +4139,61 @@
           "expected_revision"
         ],
         "title": "DecisionRequest"
+      },
+      "ExecutionRequest": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "expected_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Hash"
+          },
+          "graph_version": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Graph Version"
+          },
+          "field_mapping": {
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 512,
+              "minLength": 1
+            },
+            "propertyNames": {
+              "maxLength": 128,
+              "minLength": 1
+            },
+            "type": "object",
+            "maxProperties": 12,
+            "minProperties": 1,
+            "title": "Field Mapping"
+          },
+          "start": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "End"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "expected_hash",
+          "graph_version",
+          "field_mapping",
+          "start",
+          "end"
+        ],
+        "title": "ExecutionRequest"
       },
       "ForeignKey": {
         "properties": {
@@ -4771,6 +5303,60 @@
         ],
         "title": "NodeBrief"
       },
+      "PropagationRequest": {
+        "properties": {
+          "anchor_node_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Anchor Node Ids"
+          },
+          "brief": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Brief",
+            "default": "请基于 WHY 与本体传导路径生成可审核的风险规则"
+          },
+          "dataset_revision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Revision"
+          },
+          "max_depth": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Max Depth",
+            "default": 5
+          },
+          "max_candidates": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Max Candidates",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "anchor_node_ids"
+        ],
+        "title": "PropagationRequest"
+      },
       "PurgeResult": {
         "properties": {
           "status": {
@@ -5218,6 +5804,47 @@
           "status"
         ],
         "title": "RetrievalTrace"
+      },
+      "ReviewRequest": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "expected_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Hash"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "reject"
+            ],
+            "title": "Action"
+          },
+          "evidence_confirmed": {
+            "type": "boolean",
+            "title": "Evidence Confirmed",
+            "default": false
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "expected_hash",
+          "action"
+        ],
+        "title": "ReviewRequest"
       },
       "Run": {
         "properties": {

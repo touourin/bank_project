@@ -25,6 +25,7 @@ from bank_project.api.health import router as health_router
 from bank_project.api.intake import router as intake_router
 from bank_project.api.knowledge import router as knowledge_router
 from bank_project.api.resolution import router as resolution_router
+from bank_project.api.risk import router as risk_router
 from bank_project.graphrag import GraphRagError, GraphRagService
 from bank_project.intake.lifecycle import BatchLifecycle
 from bank_project.intake.models import IntakeError
@@ -33,6 +34,7 @@ from bank_project.intake.service import IntakeService
 from bank_project.intake.store import BatchStore
 from bank_project.knowledge.service import KnowledgeService
 from bank_project.resolution.service import ResolutionService
+from bank_project.risk.service import RiskService
 from bank_project.settings import Settings
 
 
@@ -98,9 +100,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         app.state.resolution = ResolutionService(config, app.state.knowledge.load_graph)
         app.state.knowledge.resolution = app.state.resolution
+        app.state.risk = RiskService(config, app.state.alignment.graph)
         try:
             yield
         finally:
+            await app.state.risk.close()
             await app.state.alignment.close()
             await app.state.knowledge.close()
             await app.state.resolution.close()
@@ -108,7 +112,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="Bank project",
         version=__version__,
-        description="数据接入、本体对齐与图谱生成、TXT GraphRAG 索引问答、实体消歧及 BOID 挂载。",
+        description="数据接入、本体对齐与图谱生成、TXT GraphRAG 索引问答、实体消歧、BOID 挂载及 WHY 风险规则审核执行。",
         lifespan=lifespan,
     )
     app.add_middleware(BodyLimitMiddleware)
@@ -118,6 +122,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(graphrag_router)
     app.include_router(knowledge_router)
     app.include_router(resolution_router)
+    app.include_router(risk_router)
 
     @app.exception_handler(GraphRagError)
     async def graphrag_error(request, exc: GraphRagError):

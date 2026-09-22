@@ -18,6 +18,7 @@ class BodyLimitMiddleware:
                 "/api/v1/graphrag",
                 "/api/v1/resolution",
                 "/api/v1/knowledge",
+                "/api/v1/risk",
             )
         ):
             return await self.app(scope, receive, send)

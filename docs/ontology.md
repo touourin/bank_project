@@ -21,3 +21,5 @@ make ontology-down
 浏览器端口 7478，Bolt 端口 7691。此环境与业务 Neo4j 独立。
 
 第二步通过 `alignment/catalog.py` 读取本地快照，不混合不同版本的概念或连接。分析时必须调用配置的 retrieve 服务匹配节点，本地快照提供目录和版本校验；不会写入本体库，业务实例使用独立业务 Neo4j。检索配置与限制见 [第二步说明](alignment.md)。
+
+第五步风险规则还需要同版本 WHY 正文。当前已提交快照仅含概念与关系，不含 WHY；`risk/catalog.py` 支持快照属性中的原始维度内容，`scripts/import_risk_why.py` 提供版本与哈希校验后的独立补齐导入。无需更换本体库或业务图存储结构，具体输入格式与使用见 [风险规则](risk.md)。

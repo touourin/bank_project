@@ -1,6 +1,6 @@
 # bank_project
 
-数据与图谱工作台：① Excel / CSV、TXT 或只读 MySQL 接入；② 表格数据对齐本体并生成业务图谱；③ TXT 按 GraphRAG 路径建立索引、浏览图谱、问答及 BOID / 边类型匹配；④ 对 GraphRAG / DB 图谱进行实体消歧及人工校验。
+数据与图谱工作台：① Excel / CSV、TXT 或只读 MySQL 接入；② 表格数据对齐本体并生成业务图谱；③ TXT 按 GraphRAG 路径建立索引、浏览图谱、问答及 BOID / 边类型匹配；④ 对 GraphRAG / DB 图谱进行实体消歧及人工校验；⑤ 从本体 WHY 生成风险规则，经审核后查询交易实例。
 
 ## 启动
 
@@ -35,6 +35,8 @@ TXT 使用独立的文档接入通道（单文件 20 MiB，UTF-8 / GB18030），
 
 消歧后的版本可继续本体匹配，匹配后的版本也可继续消歧；版本选择会保留前一步结果及来源记录。
 
+5. **风险规则**：选择固定本体版本的 BO 节点，沿 IS_A 和明确方向的业务关系寻找 WHY，生成包含来源、路径与实例作用域的 RulePack。人工核对并批准后，选择同本体版本的 DB 图谱、映射原始交易字段及分析时间，执行现金累计阈值、对手地区或概念范围聚合规则。当前随仓库提供的本体快照不含 WHY，需先通过同版本维度导入工具补齐；[风险规则说明](docs/risk.md) 包含数据前提、导入和审核执行契约。
+
 消歧和匹配会保存独立结果与审核记录；原 Neo4j 版本、GraphRAG Parquet、原始节点/边属性均保留。匹配只追加 `boid` / `edge_type`。问答继续依据原 GraphRAG 索引；派生图不会自动重建社区报告和向量索引。操作、数据契约与迁移范围见 [文档图谱与实体消歧](docs/knowledge-workflow.md)。
 
 ## 结构
@@ -47,13 +49,14 @@ TXT 使用独立的文档接入通道（单文件 20 MiB，UTF-8 / GB18030），
 | `src/bank_project/graphrag/` | 迁入的文档解析、后台索引、原生 GraphRAG 查询与完整图适配 |
 | `src/bank_project/resolution/` | 迁入的消歧引擎、图谱证据适配、人工审核、可撤销合并与审计 |
 | `src/bank_project/knowledge/` | DB 全量图读取、复用 retrieve 的 BOID/边类型挂载 |
+| `src/bank_project/risk/` | 版本化 WHY 传导、RulePack 校验、人工审核、当前 DB 图谱风险查询 |
 | `frontend/` | React、TypeScript、Ant Design 数据工作台 |
 | `compose.yaml` | API、worker、前端、MySQL及可选业务 Neo4j |
 | `compose.ontology.yaml` | 独立本地本体数据库 |
 | `examples/mock/` | 最终 mock 文件及字段说明 |
 | `scripts/` | mock 工具、暂存初始化、旧批次迁移、接口导出 |
 
-外部源与内部暂存分别使用 `BANK_MYSQL_*` / `BANK_STAGING_MYSQL_*`，不共享账号。密码不提交到 Git。MySQL 数据在 `mysql-data` 卷；上传原件、加密凭据密钥、分析记录、GraphRAG 索引、消歧/匹配快照及审计在 `intake-data` 卷。备份需保留两者；请勿通过 `docker compose down -v` 清空持久数据。旧批次与旧图谱均保留。
+外部源与内部暂存分别使用 `BANK_MYSQL_*` / `BANK_STAGING_MYSQL_*`，不共享账号。密码不提交到 Git。MySQL 数据在 `mysql-data` 卷；上传原件、加密凭据密钥、分析记录、GraphRAG 索引、消歧/匹配快照、风险规则及证据与审计在 `intake-data` 卷。备份需保留两者；请勿通过 `docker compose down -v` 清空持久数据。旧批次与旧图谱均保留。
 
 ## 验证
 

@@ -419,6 +419,30 @@
   }
   .workspace-tabs > .ant-tabs-nav .ant-tabs-tab {
     font-size: 12px;
+    margin: 0 !important;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+  }
+  /* Keep every workflow step visible; focusing a clipped tab must not move it
+     between pointer down and click as the overflow navigation scrolls. */
+  .workspace-tabs > .ant-tabs-nav .ant-tabs-nav-wrap {
+    overflow: visible;
+  }
+  .workspace-tabs > .ant-tabs-nav .ant-tabs-nav-list {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0 20px;
+    transform: none !important;
+    transition: none;
+  }
+  .workspace-tabs > .ant-tabs-nav .ant-tabs-nav-operations,
+  .workspace-tabs > .ant-tabs-nav .ant-tabs-nav-wrap::before,
+  .workspace-tabs > .ant-tabs-nav .ant-tabs-nav-wrap::after,
+  .workspace-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
+    display: none;
+  }
+  .workspace-tabs > .ant-tabs-nav .ant-tabs-tab-active {
+    border-bottom-color: var(--accent);
   }
   .mapping-title {
     gap: 6px;

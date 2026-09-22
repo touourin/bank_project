@@ -12,6 +12,7 @@ import { IntakePage } from "./features/intake/IntakePage";
 import { AlignmentPage } from "./features/alignment/AlignmentPage";
 import { GraphRagPage } from "./features/knowledge/GraphRagPage";
 import { ResolutionPage } from "./features/knowledge/ResolutionPage";
+import { RiskPage } from "./features/risk/RiskPage";
 import { getHealth } from "./api/client";
 import { useResource } from "./hooks/useResource";
 import { useTheme } from "./hooks/useTheme";
@@ -179,6 +180,14 @@ export function App() {
             key: "resolution",
             label: "04 实体消歧",
             children: <ResolutionPage key={token} token={token} />,
+          },
+          {
+            key: "risk",
+            label: "05 风险规则",
+            disabled: isDemoMode,
+            children: isDemoMode ? null : (
+              <RiskPage key={token} token={token} />
+            ),
           },
         ]}
       />
