@@ -1280,6 +1280,54 @@
         ]
       }
     },
+    "/api/v1/alignment/graph/{version}/overview": {
+      "get": {
+        "tags": [
+          "第二步 · 本体对齐与图谱生成"
+        ],
+        "summary": "Graph Version Overview",
+        "operationId": "graph_version_overview_api_v1_alignment_graph__version__overview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphOverview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/alignment/graph/{version}/nodes": {
       "get": {
         "tags": [
@@ -2138,6 +2186,66 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/knowledge/graph": {
+      "get": {
+        "tags": [
+          "图谱来源与 GraphRAG 本体匹配"
+        ],
+        "summary": "Source Graph",
+        "operationId": "source_graph_api_v1_knowledge_graph_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "graphrag",
+                "database"
+              ],
+              "type": "string",
+              "title": "Source Kind"
+            }
+          },
+          {
+            "name": "source_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/knowledge/matches": {
@@ -3442,6 +3550,96 @@
           }
         }
       }
+    },
+    "/api/v1/ontology/graph": {
+      "get": {
+        "tags": [
+          "共享 BFO 本体"
+        ],
+        "summary": "Graph",
+        "operationId": "graph_api_v1_ontology_graph_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ontology/concepts/{node_id}/dimensions": {
+      "get": {
+        "tags": [
+          "共享 BFO 本体"
+        ],
+        "summary": "Dimensions",
+        "operationId": "dimensions_api_v1_ontology_concepts__node_id__dimensions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Revision"
+            }
+          },
+          {
+            "name": "snapshot_sha256",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "title": "Snapshot Sha256"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4005,6 +4203,22 @@
             },
             "type": "array",
             "title": "Parents"
+          },
+          "semantic_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semantic Type"
+          },
+          "has_why": {
+            "type": "boolean",
+            "title": "Has Why",
+            "default": false
           }
         },
         "type": "object",
@@ -4514,6 +4728,17 @@
             "type": "string",
             "title": "Revision"
           },
+          "ontology_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ontology Id"
+          },
           "node_count": {
             "type": "integer",
             "title": "Node Count"
@@ -4785,9 +5010,36 @@
       },
       "MappingEdit": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "created_at": {
             "type": "string",
             "title": "Created At"
+          },
+          "reviewer": {
+            "type": "string",
+            "title": "Reviewer",
+            "default": ""
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
           },
           "column": {
             "anyOf": [
@@ -4869,6 +5121,13 @@
             "maxLength": 1000,
             "minLength": 1,
             "title": "Reason"
+          },
+          "reviewer": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Reviewer",
+            "default": "人工审核"
           }
         },
         "additionalProperties": false,
@@ -4899,6 +5158,17 @@
           "snapshot_sha256": {
             "type": "string",
             "title": "Snapshot Sha256"
+          },
+          "ontology_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ontology Id"
           },
           "tables": {
             "items": {
@@ -5960,6 +6230,22 @@
             },
             "type": "array",
             "title": "Parents"
+          },
+          "semantic_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semantic Type"
+          },
+          "has_why": {
+            "type": "boolean",
+            "title": "Has Why",
+            "default": false
           },
           "score": {
             "anyOf": [

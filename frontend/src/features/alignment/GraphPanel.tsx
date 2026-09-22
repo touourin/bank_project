@@ -16,20 +16,31 @@ export function GraphPanel({
   token,
   onRefresh,
   selectedRunId,
+  title = "当前已发布图谱",
+  onAnalyze,
 }: {
   graph: GraphOverview;
   token: string;
   onRefresh: () => void;
   selectedRunId?: string;
+  title?: string;
+  onAnalyze?: () => void;
 }) {
   return (
     <Panel
-      title="当前已发布图谱"
+      title={title}
       padded
       actions={
-        <Button size="small" onClick={onRefresh}>
-          刷新图谱
-        </Button>
+        <>
+          {onAnalyze && (
+            <Button size="small" onClick={onAnalyze}>
+              前往图谱分析
+            </Button>
+          )}
+          <Button size="small" onClick={onRefresh}>
+            刷新图谱
+          </Button>
+        </>
       }
     >
       {!graph.summary ? (

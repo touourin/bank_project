@@ -1,0 +1,47 @@
+.conversion-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  padding: 20px 0;
+  margin: 0 0 16px;
+  list-style: none;
+  border-bottom: 1px solid var(--border);
+}
+.conversion-steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.conversion-steps li > span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--accent);
+}
+.conversion-steps strong,
+.conversion-steps small {
+  display: block;
+}
+.conversion-steps strong {
+  font-size: 14px;
+  font-weight: 550;
+}
+.conversion-steps small {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.conversion-sources > .ant-tabs-nav {
+  margin-bottom: 24px;
+}
+@media (max-width: 760px) {
+  .conversion-steps {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}

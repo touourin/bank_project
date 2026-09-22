@@ -1,11 +1,14 @@
 """Version-pinned browsing against a separate disposable graph, plus display contracts."""
 
 import os
+from contextlib import contextmanager
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
+from bank_project.alignment.browsing import GraphBrowser
 from bank_project.alignment.display import display_name, readable_node
 from bank_project.alignment.graph import VersionedGraph
 from bank_project.alignment.models import AlignmentError, GraphNode, GraphSummary
@@ -49,6 +52,13 @@ def test_browse_api_retains_auth_and_validates_bounded_parameters(tmp_path):
             "groups": [],
         }
         version = str(uuid4())
+        version_url = f"/api/v1/alignment/graph/{version}/overview"
+        assert client.get(version_url).status_code == 401
+        assert client.get(version_url, headers=headers).status_code == 503
+        assert (
+            client.get("/api/v1/alignment/graph/invalid/overview", headers=headers).status_code
+            == 422
+        )
         for params in (
             {"limit": 201},
             {"limit": 0},
@@ -62,6 +72,53 @@ def test_browse_api_retains_auth_and_validates_bounded_parameters(tmp_path):
                 ).status_code
                 == 422
             )
+
+
+def test_selected_overview_stays_on_requested_version_and_never_reads_instance_properties(
+    monkeypatch,
+):
+    selected, current = str(uuid4()), str(uuid4())
+    summaries = {
+        version: GraphSummary(
+            version=version,
+            run_id=str(uuid4()),
+            revision="r1",
+            node_count=count,
+            edge_count=0,
+            created_at="2026-09-21T00:00:00Z",
+        )
+        for version, count in [(selected, 4), (current, 9)]
+    }
+    browser = GraphBrowser(SimpleNamespace(configured=True))
+
+    @contextmanager
+    def session():
+        yield object()
+
+    def query(_session, text, **params):
+        assert "BankAlignmentState" not in text
+        assert "n.data" not in text
+        version = params["version"]
+        if "BankAlignmentVersion" in text:
+            return (
+                [{"summary": summaries[version].model_dump_json()}] if version in summaries else []
+            )
+        return [
+            {
+                "concept_id": "customer",
+                "concept_name": "客户",
+                "count": summaries[version].node_count,
+            }
+        ]
+
+    monkeypatch.setattr(browser, "session", session)
+    monkeypatch.setattr(browser, "query", query)
+    result = browser.overview(selected)
+    assert result.summary.version == selected
+    assert result.summary.node_count == result.groups[0].count == 4
+    with pytest.raises(AlignmentError) as missing:
+        browser.overview(str(uuid4()))
+    assert missing.value.status == 404
 
 
 @pytest.mark.skipif(not os.getenv("BANK_TEST_NEO4J_URI"), reason="requires a disposable Neo4j")

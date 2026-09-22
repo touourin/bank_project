@@ -4,10 +4,11 @@ import asyncio
 import logging
 from contextlib import suppress
 
+from bank_project.conversion.review import require_reviewable, review_catalog
+from bank_project.ontology.service import OntologyService
 from bank_project.settings import Settings
 
 from .analyzer import Analyzer
-from .catalog import Catalog
 from .editing import revise_mapping
 from .models import AlignmentError
 from .retrieval import RetrievalFailure
@@ -19,17 +20,26 @@ logger = logging.getLogger(__name__)
 
 class AlignmentService:
     def __init__(
-        self, settings: Settings, sources: StagedSources, store: RunStore, analyzer: Analyzer, graph
+        self,
+        settings: Settings,
+        sources: StagedSources,
+        store: RunStore,
+        analyzer: Analyzer,
+        graph,
+        *,
+        ontology=None,
     ):
         self.settings, self.sources, self.store = settings, sources, store
         self.analyzer, self.graph = analyzer, graph
+        self.ontology = ontology or OntologyService(settings)
         self.tasks: set[asyncio.Task] = set()
 
     def config(self):
-        error, revision, count = None, None, 0
+        error, revision, count, source = None, None, 0, None
         try:
-            catalog = Catalog.load(self.settings.ontology_snapshot, self.settings.ontology_revision)
+            catalog = self.ontology.current()
             revision, count = catalog.revision, len(catalog.names)
+            source = self.ontology.info(catalog)
         except AlignmentError as exc:
             error = exc.message
         return {
@@ -38,6 +48,7 @@ class AlignmentService:
             "catalog_error": error,
             "revision": revision,
             "concept_count": count,
+            "ontology_source": source,
             "matching_mode": "retrieve",
             "retrieve_configured": bool(self.settings.retrieve_base_url),
             "verification_mode": "external_retrieve",
@@ -47,9 +58,7 @@ class AlignmentService:
     async def analyze(self, selections):
         if not self.settings.model_api_key:
             raise AlignmentError("请先配置大模型密钥，再开始分析", 503)
-        catalog = await asyncio.to_thread(
-            Catalog.load, self.settings.ontology_snapshot, self.settings.ontology_revision
-        )
+        catalog = await asyncio.to_thread(self.ontology.current)
         try:
             await self.analyzer.retriever.check_revision(catalog.revision)
         except RetrievalFailure as exc:
@@ -80,11 +89,10 @@ class AlignmentService:
 
     def _editable_catalog(self, run_id):
         run = self.store.get(run_id)
-        if run.status != "ready" or run.result is None or run.graph_status == "building":
-            raise AlignmentError("请等待当前任务完成后再修改匹配", 409)
-        catalog = Catalog.load(self.settings.ontology_snapshot, run.result.revision)
-        if catalog.sha256 != run.result.snapshot_sha256:
-            raise AlignmentError("本体快照已变化，请重新分析后再修改，避免混用版本", 409)
+        require_reviewable(run.status, blocked=run.result is None or run.graph_status == "building")
+        catalog = review_catalog(
+            self.ontology, run.result.revision, run.result.snapshot_sha256, run.result.ontology_id
+        )
         return run, catalog
 
     def concepts(self, run_id, query):

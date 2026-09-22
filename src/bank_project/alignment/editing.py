@@ -1,6 +1,6 @@
 """Human mapping revisions preserve model evidence and source data."""
 
-from datetime import UTC, datetime
+from bank_project.conversion.audit import review_record
 
 from .catalog import Catalog
 from .models import (
@@ -69,11 +69,13 @@ def revise_mapping(
             result.template.note = "映射已修改，请重新核对实体分组及字段归属并确认图模板。"
     table.manual_edits.append(
         MappingEdit(
-            created_at=datetime.now(UTC).isoformat(),
-            column=request.column,
-            before=before,
-            after=after,
-            reason=request.reason.strip(),
+            **review_record(
+                column=request.column,
+                before=before,
+                after=after,
+                reviewer=request.reviewer,
+                reason=request.reason.strip(),
+            ),
         )
     )
     # Recheck availability and exact joins; manual concept selection cannot invent edges.

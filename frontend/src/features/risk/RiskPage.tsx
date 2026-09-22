@@ -10,7 +10,13 @@ import { RiskJson, RiskStatus } from "./shared";
 import type { PropagationJob, RiskNode } from "./types";
 import "./risk.css";
 
-export function RiskPage({ token }: { token: string }) {
+export function RiskPage({
+  token,
+  active,
+}: {
+  token: string;
+  active: boolean;
+}) {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [anchors, setAnchors] = useState<string[]>([]);
@@ -42,6 +48,17 @@ export function RiskPage({ token }: { token: string }) {
     useCallback((signal: AbortSignal) => riskApi.cases(token, signal), [token]),
     true,
   );
+  const refreshCatalog = catalog.refresh;
+  const refreshHistory = history.refresh;
+  const refreshCases = cases.refresh;
+  useEffect(() => {
+    if (active) {
+      refreshCatalog();
+      refreshHistory();
+      refreshCases();
+      setPollRevision((value) => value + 1);
+    }
+  }, [active, refreshCatalog, refreshHistory, refreshCases]);
   useEffect(() => {
     if (!job && history.data?.[0]) setJob(history.data[0]);
   }, [job, history.data]);
@@ -148,6 +165,20 @@ export function RiskPage({ token }: { token: string }) {
             {catalog.error && (
               <ErrorNotice message={catalog.error} onRetry={catalog.refresh} />
             )}
+            {catalog.loading && !catalog.data && (
+              <LoadingState label="正在读取本体与 WHY…" />
+            )}
+            {catalog.data?.source && (
+              <p className="hint">
+                {catalog.data.source.kind === "remote"
+                  ? "远端本体"
+                  : "本地本体"}
+                {" · "}
+                {catalog.data.source.node_count.toLocaleString()} 个概念
+                {" · "}
+                {catalog.data.source.why_node_count.toLocaleString()} 个含 WHY
+              </p>
+            )}
             <label className="risk-field">
               搜索 BO 节点
               <Input
@@ -169,7 +200,7 @@ export function RiskPage({ token }: { token: string }) {
                 placeholder="选择一个或多个 BO 节点"
                 options={options.map((node) => ({
                   value: node.id,
-                  label: `${node.name} · ${node.id}${node.has_why ? " · 有 WHY" : ""}`,
+                  label: `${node.name} · ${node.id}${node.semantic_type && node.semantic_type !== "bfo_concept" ? ` · ${node.semantic_type}` : ""}${node.has_why ? " · 有 WHY" : ""}`,
                 }))}
                 onChange={(value: string[]) => {
                   setAnchors(value);
@@ -204,6 +235,8 @@ export function RiskPage({ token }: { token: string }) {
                 !anchors.length ||
                 !brief.trim() ||
                 !catalog.data ||
+                catalog.loading ||
+                Boolean(catalog.error) ||
                 job?.status === "running"
               }
               onClick={() => void generate()}
@@ -348,6 +381,7 @@ export function RiskPage({ token }: { token: string }) {
             <RiskCasePanel
               key={caseId}
               token={token}
+              active={active}
               caseId={caseId}
               predicates={catalog.data?.predicates ?? []}
               onChanged={cases.refresh}

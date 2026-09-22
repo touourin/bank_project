@@ -1,8 +1,8 @@
-import type { KnowledgeGraph, QueryEvidence } from "./types";
+import type { GraphData, QueryEvidence } from "./types";
 
 /** Original company-graph traversal: ranked BFS or highest-degree induced core. */
 export function selectGraph(
-  graph: KnowledgeGraph,
+  graph: GraphData,
   mode: string,
   center: string,
   depth: number,

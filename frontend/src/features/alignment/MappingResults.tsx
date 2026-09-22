@@ -6,10 +6,12 @@ import { PagePagination } from "../../ui/PagePagination";
 import { ConceptLabel } from "./ConceptLabel";
 import { ColumnHandling } from "./ColumnHandling";
 import { MatchingProcess } from "./MatchingProcess";
+import { MappingHistory } from "./MappingHistory";
 import { MappingEditor } from "./MappingEditor";
 import { matchStatus } from "./RetrievalProcess";
 import { tableLabel } from "./workflow";
 import type { Run, TableMapping } from "./types";
+import { canReviewTable } from "../conversion/taskState";
 
 const statuses = {
   mapped: "可生成实例",
@@ -176,8 +178,7 @@ export function MappingResults({
     table: TableMapping;
     column: string | null;
   }>();
-  const disabled =
-    locked || run.status !== "ready" || run.graph_status === "building";
+  const disabled = locked || !canReviewTable(run);
   const tableName = (id: string) => {
     const table = result.tables.find((t) => t.table_id === id);
     return table ? tableLabel(table) : "未选目标表";
@@ -275,40 +276,7 @@ export function MappingResults({
                   {
                     key: "edits",
                     label: `人工修改记录（${table.manual_edits?.length || 0}）`,
-                    children: table.manual_edits?.length ? (
-                      <ol className="manual-edits">
-                        {table.manual_edits.map((edit, index) => (
-                          <li key={index}>
-                            <p>
-                              <Tag color="blue">
-                                {edit.column === null
-                                  ? "整表节点"
-                                  : `字段：${edit.column}`}
-                              </Tag>
-                              <time>
-                                {new Date(edit.created_at).toLocaleString()}
-                              </time>
-                            </p>
-                            <p className="hint">
-                              原匹配：
-                              {edit.before
-                                ? `${edit.before.name}（${edit.before.id}）`
-                                : "未匹配"}
-                            </p>
-                            {edit.after ? (
-                              <ConceptLabel concept={edit.after} parents />
-                            ) : (
-                              <p>已取消属性概念匹配，字段保留</p>
-                            )}
-                            <p>修改依据：{edit.reason}</p>
-                          </li>
-                        ))}
-                      </ol>
-                    ) : (
-                      <p className="hint">
-                        尚无人工修改，当前保留原始匹配建议。
-                      </p>
-                    ),
+                    children: <MappingHistory table={table} />,
                   },
                 ]}
               />

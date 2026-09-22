@@ -3,13 +3,16 @@
 import asyncio
 import copy
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from uuid import uuid4
 
-from bank_project.alignment.catalog import Catalog
 from bank_project.alignment.matching import decide, reviewable_candidate
 from bank_project.alignment.models import AlignmentError, RetrievalTrace
 from bank_project.alignment.retrieval import RetrievalFailure, RetrieveClient
+from bank_project.conversion.audit import review_record
+from bank_project.conversion.review import require_reviewable, review_catalog
+from bank_project.conversion.versions import GraphVersion, require_revision
 from bank_project.graphrag.runtime import GraphRagError
+from bank_project.ontology.service import OntologyService
 
 from .database import DatabaseGraphs
 from .store import MatchStore
@@ -20,8 +23,9 @@ def now():
 
 
 class KnowledgeService:
-    def __init__(self, settings, graphrag, database_graph):
+    def __init__(self, settings, graphrag, database_graph, *, ontology=None):
         self.settings, self.graphrag = settings, graphrag
+        self.ontology = ontology or OntologyService(settings)
         self.database = DatabaseGraphs(database_graph)
         self.store = MatchStore(settings.data_dir / "knowledge" / "matches.sqlite3")
         self.retriever = RetrieveClient(
@@ -67,7 +71,7 @@ class KnowledgeService:
                 sources.append(
                     {
                         "kind": run["source_kind"],
-                        "id": f"match:{run['id']}:{run['revision']}",
+                        "id": GraphVersion("match", run["id"], run["revision"]).reference,
                         "name": f"{run['name']} · 匹配修订 {run['revision']}",
                         "root_source_id": run.get("root_source_id", run["source_id"]),
                     }
@@ -78,7 +82,7 @@ class KnowledgeService:
                     sources.append(
                         {
                             "kind": run.source_kind,
-                            "id": f"resolution:{run.id}:{run.revision}",
+                            "id": GraphVersion("resolution", run.id, run.revision).reference,
                             "name": f"{run.name} · 消歧修订 {run.revision}",
                             "root_source_id": run.diagnostics.get("root_source_id", run.source_id),
                         }
@@ -106,16 +110,16 @@ class KnowledgeService:
             raise AlignmentError("图谱文件或数据格式不完整，请修复来源后重试", 503) from exc
 
     def derived_graph(self, kind, identifier):
-        parts = identifier.split(":")
-        if len(parts) != 3 or not parts[2].isdigit():
-            raise AlignmentError("派生图版本标识无效")
-        prefix, run_id, revision = parts[0], str(UUID(parts[1])), int(parts[2])
-        if prefix == "match":
-            graph = self.result_graph(run_id, expected_revision=revision)
-        elif prefix == "resolution" and self.resolution:
-            graph = self.resolution.graph(run_id)
-            if graph["resolution"]["revision"] != revision:
-                raise AlignmentError("消歧版本已更新，请刷新来源并重新选择", 409)
+        version = GraphVersion.parse(identifier)
+        if version.stage == "match":
+            graph = self.result_graph(version.run_id, expected_revision=version.revision)
+        elif version.stage == "resolution" and self.resolution:
+            graph = self.resolution.graph(version.run_id)
+            require_revision(
+                graph["resolution"]["revision"],
+                version.revision,
+                "消歧版本已更新，请刷新来源并重新选择",
+            )
         else:
             raise AlignmentError("派生图来源不可用", 404)
         if graph["source_kind"] != kind:
@@ -143,9 +147,7 @@ class KnowledgeService:
     async def start_match(self, kind, identifier):
         if kind != "graphrag":
             raise AlignmentError("追加 BOID 的匹配适用于 GraphRAG 图谱")
-        catalog = await asyncio.to_thread(
-            Catalog.load, self.settings.ontology_snapshot, self.settings.ontology_revision
-        )
+        catalog = await asyncio.to_thread(self.ontology.current)
         try:
             await self.retriever.check_revision(catalog.revision)
         except RetrievalFailure as exc:
@@ -163,6 +165,7 @@ class KnowledgeService:
             "revision": 0,
             "created_at": now(),
             "ontology_revision": catalog.revision,
+            "ontology_id": catalog.ontology_id,
             "snapshot_sha256": catalog.sha256,
             "confidence_threshold": self.settings.alignment_min_confidence,
             "summary": {
@@ -336,12 +339,13 @@ class KnowledgeService:
         value["summary"]["matched_edges"] = sum(bool(e["edge_type"]) for e in value["edges"])
 
     def editable(self, value):
-        if value["status"] != "ready":
-            raise AlignmentError("请等待匹配完成后再审核", 409)
-        catalog = Catalog.load(self.settings.ontology_snapshot, value["ontology_revision"])
-        if catalog.sha256 != value["snapshot_sha256"]:
-            raise AlignmentError("本体快照已变化，请重新匹配，避免混用版本", 409)
-        return catalog
+        require_reviewable(value["status"])
+        return review_catalog(
+            self.ontology,
+            value["ontology_revision"],
+            value["snapshot_sha256"],
+            value.get("ontology_id"),
+        )
 
     def concepts(self, identifier, query):
         return self.editable(self.store.get(identifier)).search(query)
@@ -358,18 +362,16 @@ class KnowledgeService:
     @staticmethod
     def audit(value, target, before, after, payload, action="review"):
         value["audits"].append(
-            {
-                "id": str(uuid4()),
-                "action": action,
-                "target": target,
-                "target_id": after["id"],
-                "before": before,
-                "after": copy.deepcopy(after),
-                "reviewer": payload.reviewer,
-                "note": payload.note,
-                "created_at": now(),
-                "revision": value["revision"],
-            }
+            review_record(
+                action=action,
+                target=target,
+                target_id=after["id"],
+                before=before,
+                after=after,
+                reviewer=payload.reviewer,
+                note=payload.note,
+                revision=value["revision"],
+            )
         )
 
     def accept_proposals(self, identifier, payload):
@@ -458,8 +460,9 @@ class KnowledgeService:
         value = self.store.get(identifier)
         if value["status"] != "ready":
             raise AlignmentError("匹配结果尚未完成", 409)
-        if expected_revision is not None and value["revision"] != expected_revision:
-            raise AlignmentError("匹配版本已更新，请刷新来源并重新选择", 409)
+        require_revision(
+            value["revision"], expected_revision, "匹配版本已更新，请刷新来源并重新选择"
+        )
         graph = copy.deepcopy(value["graph"])
         graph["parent_graph"] = {
             "id": graph["id"],
@@ -484,6 +487,7 @@ class KnowledgeService:
             "run_id": identifier,
             "revision": value["revision"],
             "ontology_revision": value["ontology_revision"],
+            "ontology_id": value.get("ontology_id"),
             "snapshot_sha256": value["snapshot_sha256"],
         }
         return graph

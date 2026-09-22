@@ -72,7 +72,15 @@ class RiskExecutor:
         self.graph = graph
         self.compiler = RuleCompiler()
 
-    def _read(self, graph_version, bo_scope, *, sample=False, expected_revision=None):
+    def _read(
+        self,
+        graph_version,
+        bo_scope,
+        *,
+        sample=False,
+        expected_revision=None,
+        expected_ontology_id=None,
+    ):
         bo_scope = scope_ids(bo_scope)
         if not isinstance(graph_version, str) or not graph_version:
             raise AlignmentError("必须指定已发布的业务图谱版本")
@@ -84,6 +92,11 @@ class RiskExecutor:
                 raise AlignmentError(
                     "业务图谱采用的本体版本与规则依据不一致，请选择使用相同本体版本的图谱", 409
                 )
+            # Legacy publications did not persist ontology IDs; their revision
+            # remains the compatibility boundary. New publications bind both.
+            ontology_id = summary.ontology_id
+            if expected_ontology_id and ontology_id and ontology_id != expected_ontology_id:
+                raise AlignmentError("业务图谱与规则依据来自不同本体，请选择相同本体的图谱", 409)
             count_rows = browser.query(
                 session, _SCOPE_COUNT, version=graph_version, bo_scope=bo_scope
             )
@@ -135,10 +148,14 @@ class RiskExecutor:
                 raise AlignmentError("图谱作用域读取不完整，未计算部分结果", 409)
         return nodes, total, revision
 
-    def fields(self, graph_version, bo_scope, *, expected_revision=None):
+    def fields(self, graph_version, bo_scope, *, expected_revision=None, expected_ontology_id=None):
         bo_scope = scope_ids(bo_scope)
         nodes, total, revision = self._read(
-            graph_version, bo_scope, sample=True, expected_revision=expected_revision
+            graph_version,
+            bo_scope,
+            sample=True,
+            expected_revision=expected_revision,
+            expected_ontology_id=expected_ontology_id,
         )
         fields = {}
         for node in nodes:
@@ -187,7 +204,15 @@ class RiskExecutor:
         return str(value)
 
     def execute(
-        self, rule_pack, graph_version, field_mapping, start, end, *, expected_revision=None
+        self,
+        rule_pack,
+        graph_version,
+        field_mapping,
+        start,
+        end,
+        *,
+        expected_revision=None,
+        expected_ontology_id=None,
     ):
         first, last = window(start, end)
         working = self.compiler.validate(rule_pack)
@@ -201,7 +226,10 @@ class RiskExecutor:
         required = required_fields(predicate, params)
         self._mapping(field_mapping, required)
         nodes, total, revision = self._read(
-            graph_version, bo_scope, expected_revision=expected_revision
+            graph_version,
+            bo_scope,
+            expected_revision=expected_revision,
+            expected_ontology_id=expected_ontology_id,
         )
         groups = defaultdict(list)
         region_hits, within_window, matched = [], 0, 0

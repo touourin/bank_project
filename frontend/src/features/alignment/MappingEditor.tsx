@@ -1,9 +1,10 @@
 import { useCallback, useState } from "react";
 import { Button, Checkbox, Input } from "antd";
-import { useResource } from "../../hooks/useResource";
+import { useConceptSearch } from "../conversion/useConceptSearch";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { ErrorNotice, LoadingState } from "../../ui/Feedback";
+import { ReviewNoteFields } from "../conversion/ReviewNoteFields";
 import { alignmentApi } from "./api";
 import { ConceptLabel } from "./ConceptLabel";
 import type { ConceptDetail, Run, TableMapping } from "./types";
@@ -23,10 +24,10 @@ export function MappingEditor({
   onClose: () => void;
   onSaved: (run: Run) => void;
 }) {
-  const [query, setQuery] = useState<string | null>(null);
   const [selected, setSelected] = useState<ConceptDetail>();
   const [clear, setClear] = useState(false);
   const [reason, setReason] = useState("");
+  const [reviewer, setReviewer] = useState("");
   const initialCandidates =
     table.trace?.method === "retrieve"
       ? table.trace.retrievals?.find((m) =>
@@ -37,14 +38,14 @@ export function MappingEditor({
       : column === null
         ? table.trace?.candidates
         : table.trace?.attribute_candidates;
-  const concepts = useResource(
+  const concepts = useConceptSearch(
     useCallback(
-      (signal: AbortSignal) =>
-        query === null && initialCandidates?.length
-          ? Promise.resolve(initialCandidates)
-          : alignmentApi.concepts(token, runId, query ?? "", signal),
-      [token, runId, query, initialCandidates],
+      (query: string, signal: AbortSignal) =>
+        alignmentApi.concepts(token, runId, query, signal),
+      [token, runId],
     ),
+    initialCandidates,
+    0,
   );
   const current =
     column === null ? table : table.columns.find((c) => c.column === column)!;
@@ -61,6 +62,7 @@ export function MappingEditor({
           column,
           concept_id: clear ? null : selected!.id,
           reason,
+          reviewer: reviewer.trim() || undefined,
         });
         onSaved(updated);
       }}
@@ -80,7 +82,7 @@ export function MappingEditor({
         placeholder="输入节点名称或完整 ID"
         enterButton="查找"
         allowClear
-        onSearch={setQuery}
+        onSearch={concepts.search}
       />
       {concepts.error ? (
         <ErrorNotice message={concepts.error} onRetry={concepts.refresh} />
@@ -89,8 +91,8 @@ export function MappingEditor({
       ) : (
         <div className="editor-candidates">
           <p className="hint">
-            {query === null && initialCandidates?.length
-              ? `本次${table.trace?.method === "retrieve" ? "检索" : "模型"}候选，共 ${initialCandidates.length} 个；可在上方查找本体中的其他节点。`
+            {concepts.showingCandidates
+              ? `本次${table.trace?.method === "retrieve" ? "检索" : "模型"}候选，共 ${initialCandidates?.length ?? 0} 个；可在上方查找本体中的其他节点。`
               : "查找结果最多 50 个；支持节点名称或完整 ID。"}
           </p>
           <DataTable
@@ -151,17 +153,14 @@ export function MappingEditor({
           <ConceptLabel concept={selected} parents />
         </div>
       )}
-      <label className="edit-reason">
-        修改依据
-        <Input.TextArea
-          aria-label="修改依据"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="说明为什么选择这个节点"
-          maxLength={1000}
-          rows={2}
-        />
-      </label>
+      <ReviewNoteFields
+        reviewer={reviewer}
+        note={reason}
+        onReviewer={setReviewer}
+        onNote={setReason}
+        noteLabel="修改依据"
+        maxLength={1000}
+      />
     </ConfirmDialog>
   );
 }

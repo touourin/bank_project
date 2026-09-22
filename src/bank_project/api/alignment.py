@@ -82,6 +82,11 @@ def graph_overview(alignment: Service):
     return alignment.graph.browser.overview()
 
 
+@router.get("/graph/{version}/overview", response_model=GraphOverview)
+def graph_version_overview(version: UUID, alignment: Service):
+    return alignment.graph.browser.overview(str(version))
+
+
 @router.get("/graph/{version}/nodes", response_model=GraphPage)
 def graph_page(
     version: UUID,

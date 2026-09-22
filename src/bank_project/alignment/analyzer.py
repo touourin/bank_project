@@ -52,6 +52,7 @@ class Analyzer:
         result = MappingResult(
             revision=catalog.revision,
             snapshot_sha256=catalog.sha256,
+            ontology_id=catalog.ontology_id,
             tables=mappings,
             relations=[],
             warnings=[

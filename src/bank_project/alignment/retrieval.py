@@ -65,7 +65,7 @@ class RetrieveClient:
         async with self.session(revision) as session:
             value = await session.request("GET", "/ready", params={"expected_revision": revision})
             if value.get("dataset_revision") != revision:
-                raise RetrievalFailure("retrieve 与本地本体版本不一致，请同步本体配置", "mismatch")
+                raise RetrievalFailure("retrieve 与任务本体版本不一致，请核对本体配置", "mismatch")
 
 
 class RetrievalSession:
@@ -75,7 +75,7 @@ class RetrievalSession:
 
     async def request(self, method: str, path: str, **kwargs) -> dict:
         if not self.adapter.base_url:
-            raise RetrievalFailure("请先配置 BANK_RETRIEVE_BASE_URL")
+            raise RetrievalFailure("请先配置 BANK_ONTOLOGY_BASE_URL")
         url = self.adapter.base_url.rstrip("/") + path
         try:
             async with self.adapter.slots, asyncio.timeout(self.adapter.timeout):
@@ -122,7 +122,7 @@ class RetrievalSession:
             )
             response = RetrieveResponse.model_validate(value)
             if response.dataset_revision != self.revision:
-                raise RetrievalFailure("retrieve 返回的本体版本与本地不一致", "mismatch")
+                raise RetrievalFailure("retrieve 返回的本体版本与任务不一致", "mismatch")
             ids = [c.node_id for c in response.candidates]
             if len(ids) != len(set(ids)) or (response.node_id and response.node_id not in ids):
                 raise RetrievalFailure("retrieve 命中节点与候选列表不一致，未采用结果")

@@ -147,6 +147,15 @@ async function mockKnowledge(
             "\n",
         });
       }
+      if (path === "/knowledge/graph") {
+        const source = url.searchParams.get("source_id") || "";
+        if (
+          resolution &&
+          source === `resolution:${resolution.id}:${resolution.revision}`
+        )
+          return send({ ...derivedGraph, source_id: source });
+        return send({ detail: "所选图谱版本已更新" }, 409);
+      }
       if (path === "/knowledge/sources")
         return send([
           {
@@ -537,6 +546,13 @@ test("TXT ingestion, graph details and all four streaming query methods", async 
 }) => {
   const requests = await mockKnowledge(page, false);
   await page.goto("/");
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
+  await page.getByRole("tab", { name: "TXT 文本", exact: true }).click();
+  await expect(page.getByText("暂无文本", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "图谱问答", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("tab", { name: "01 数据接入" }).click();
   await page.getByRole("tab", { name: "TXT 文本", exact: true }).click();
   await page.getByLabel("选择 TXT 文本文件").setInputFiles({
     name: "企业关系.txt",
@@ -547,10 +563,11 @@ test("TXT ingestion, graph details and all four streaming query methods", async 
   await expect(
     page.getByText("已保存 1 个文本", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("tab", { name: "03 GraphRAG 图谱与问答" }).click();
-  await page.getByRole("button", { name: "开始 GraphRAG 索引" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
+  await page.getByRole("tab", { name: "TXT 文本", exact: true }).click();
+  await page.getByRole("button", { name: "开始文本转换" }).click();
   await expect(
-    page.getByRole("tab", { name: "生成图谱", exact: true }),
+    page.getByRole("tab", { name: "转换结果", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "原始属性", exact: true })
@@ -561,6 +578,7 @@ test("TXT ingestion, graph details and all four streaming query methods", async 
   );
   await expect(page.getByRole("dialog")).toContainText("0000123");
   await page.getByRole("button", { name: "关闭", exact: true }).click();
+  await page.getByRole("button", { name: "前往图谱分析", exact: true }).click();
   await page.getByRole("tab", { name: "图谱问答", exact: true }).click();
   await expect(page.getByText(/问答依据原始 GraphRAG 索引/)).toBeVisible();
   await page.getByLabel("你的问题").fill("甲企业与乙企业有什么关系？");
@@ -593,7 +611,8 @@ test("GraphRAG matching exposes retrieval scores, manual annotations and origina
 }) => {
   const requests = await mockKnowledge(page);
   await page.goto("/");
-  await page.getByRole("tab", { name: "03 GraphRAG 图谱与问答" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
+  await page.getByRole("tab", { name: "TXT 文本", exact: true }).click();
   await page.getByRole("tab", { name: "节点与边匹配", exact: true }).click();
   await page.getByRole("button", { name: "开始节点与边匹配" }).click();
   await expect(
@@ -678,7 +697,8 @@ test("GraphRAG proposals can be accepted together while retaining evidence and m
     },
   });
   await page.goto("/");
-  await page.getByRole("tab", { name: "03 GraphRAG 图谱与问答" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
+  await page.getByRole("tab", { name: "TXT 文本", exact: true }).click();
   await page.getByRole("tab", { name: "节点与边匹配", exact: true }).click();
   await page.getByRole("button", { name: "开始节点与边匹配" }).click();
   await page.screenshot({
@@ -769,7 +789,8 @@ test("GraphRAG bulk acceptance refreshes a conflicting revision and respects a c
     acceptConflictOnce: true,
   });
   await page.goto("/");
-  await page.getByRole("tab", { name: "03 GraphRAG 图谱与问答" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
+  await page.getByRole("tab", { name: "TXT 文本", exact: true }).click();
   await page.getByRole("tab", { name: "节点与边匹配", exact: true }).click();
   await page.getByRole("button", { name: "开始节点与边匹配" }).click();
   const accept = page.getByRole("button", {
@@ -808,7 +829,7 @@ test("both graph sources combine merge review and support cancellation, rollback
   const requests = await mockKnowledge(page);
   const resets = () => requests.filter((item) => item.body.action === "reset");
   await page.goto("/");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   for (const source of ["GraphRAG · 企业关系.txt", "数据库 · 客户数据库"]) {
     await page.getByRole("combobox", { name: "待消歧图谱" }).click();
     await page.getByText(source, { exact: true }).last().click();
@@ -1013,7 +1034,7 @@ test("resolution rollback keeps a conflicting merge and refreshes before retryin
     { resetConflictOnce: true },
   );
   await page.goto("/");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
   await page.getByRole("button", { name: "确认合并", exact: true }).click();
   await page.getByRole("tab", { name: "合并与审核（1）", exact: true }).click();
@@ -1076,7 +1097,7 @@ test("resolution rollback keeps a conflicting merge and refreshes before retryin
   ]);
 
   await page.reload();
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByRole("tab", { name: "合并与审核（2）", exact: true }).click();
   await expect(page.getByText("3 → 3", { exact: true })).toBeVisible();
   await expect(
@@ -1101,7 +1122,7 @@ test("rejected resolution decisions retain their direct undo action", async ({
 }) => {
   const requests = await mockKnowledge(page);
   await page.goto("/");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
   await page
     .getByRole("button", { name: "保留为不同实体", exact: true })
@@ -1187,7 +1208,7 @@ test("resolution differences compare readable content and preserve collapsed Gra
     ];
   });
   await page.goto("/");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
   const differences = page.getByRole("region", { name: "差异对照" });
   await expect(
@@ -1302,7 +1323,7 @@ for (const viewport of [
       ];
     });
     await page.goto("/");
-    await page.getByRole("tab", { name: "04 实体消歧" }).click();
+    await page.getByRole("tab", { name: "03 实体消歧" }).click();
     await page.getByRole("combobox", { name: "待消歧图谱" }).click();
     await page.getByText("数据库 · 客户数据库", { exact: true }).last().click();
     await page
@@ -1394,14 +1415,15 @@ test("resolution output flows into matching and matching output stays selectable
 }) => {
   const requests = await mockKnowledge(page);
   await page.goto("/");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByRole("button", { name: "分析消歧候选" }).click();
   await page.getByRole("button", { name: "确认合并", exact: true }).click();
   await expect(page.getByText("3 → 2", { exact: true })).toBeVisible();
   expect(
     requests.find((item) => item.path.endsWith("/decisions"))?.body,
   ).not.toHaveProperty("reviewer");
-  await page.getByRole("tab", { name: "03 GraphRAG 图谱与问答" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
+  await page.getByRole("tab", { name: "TXT 文本", exact: true }).click();
   await page.getByRole("tab", { name: "节点与边匹配", exact: true }).click();
   await page.getByRole("combobox", { name: "待匹配图谱版本" }).click();
   await page
@@ -1413,7 +1435,7 @@ test("resolution output flows into matching and matching output stays selectable
   expect(
     requests.find((item) => item.path === "/knowledge/matches")?.body.source_id,
   ).toBe("resolution:resolution1:2");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByRole("button", { name: "刷新来源" }).click();
   await page.getByRole("combobox", { name: "待消歧图谱" }).click();
   await page
@@ -1460,7 +1482,7 @@ test("resolution method and review policy reach the analysis API", async ({
 }) => {
   const requests = await mockKnowledge(page);
   await page.goto("/");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByText("消歧方法与参数", { exact: true }).click();
   await page.getByRole("combobox", { name: "消歧方法", exact: true }).click();
   await page.getByText("原方法 · 同义词＋大模型", { exact: true }).click();
@@ -1577,7 +1599,7 @@ test("resolution previews completed candidates while review stays locked until f
     }),
   );
   await page.goto("/");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
   await expect(page.getByRole("tab", { name: "建议预览（1）" })).toBeVisible();
   await expect(page.getByText(/分析中预览：已处理 1\/3 对/)).toBeVisible();
@@ -1669,7 +1691,7 @@ for (const state of [
             };
     });
     await page.goto("/");
-    await page.getByRole("tab", { name: "04 实体消歧" }).click();
+    await page.getByRole("tab", { name: "03 实体消歧" }).click();
     await page
       .getByRole("button", { name: "分析消歧候选", exact: true })
       .click();
@@ -1769,7 +1791,7 @@ test("default confirmation queue contains only grounded model merge suggestions"
     run.summary.not_recommended_count = 3;
   });
   await page.goto("/");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
   await expect(
     page.getByRole("tab", { name: "合并建议（1）", exact: true }),
@@ -1837,7 +1859,7 @@ test("generated node attributes are not presented as document quotations", async
     run.summary.not_recommended_count = 1;
   });
   await page.goto("/");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
   await expect(
     page.getByText("暂无大模型建议合并的节点", { exact: true }),
@@ -1927,7 +1949,7 @@ test("source panel automatically loads full original text, retries and expands w
     });
   });
   await page.goto("/");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
   const sources = page.getByRole("region", { name: "原文与引用", exact: true });
   await expect(sources).toBeVisible();
@@ -2008,7 +2030,7 @@ test("source panel identifies database fields without inventing document text", 
     }),
   );
   await page.goto("/");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
   const sources = page.getByRole("region", { name: "原文与引用", exact: true });
   await expect(
@@ -2087,7 +2109,7 @@ test("source panel shows missing text explicitly and keeps long content within a
     }),
   );
   await page.goto("/");
-  await page.getByRole("tab", { name: "04 实体消歧" }).click();
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
   await page.getByRole("button", { name: "分析消歧候选", exact: true }).click();
   const sources = page.getByRole("region", { name: "原文与引用", exact: true });
   const left = sources.getByRole("region", { name: "来源节点 1" });
@@ -2113,4 +2135,183 @@ test("source panel shows missing text explicitly and keeps long content within a
       () => document.documentElement.scrollWidth <= window.innerWidth + 1,
     ),
   ).toBe(true);
+});
+
+test("analysis pins derived versions and enables questions only on the original document index", async ({
+  page,
+}) => {
+  const requests = await mockKnowledge(page);
+  await page.goto("/");
+  await page.getByRole("tab", { name: "03 实体消歧" }).click();
+  await page.getByRole("button", { name: "分析消歧候选" }).click();
+  await expect(
+    page.getByRole("tab", { name: "合并建议（1）", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "前往图谱分析", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "图谱浏览与分析", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("当前版本提供图谱浏览与导出，尚未建立独立的问答索引。", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "图谱问答", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("tab", { name: "社区报告", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "查看原始索引", exact: true }).click();
+  await expect(
+    page.getByRole("tab", { name: "图谱问答", exact: true }),
+  ).toBeVisible();
+  expect(
+    requests.filter((request) => request.path.includes("/query")),
+  ).toHaveLength(0);
+});
+
+test("database analysis uses version-pinned pagination without fetching the entire graph", async ({
+  page,
+}) => {
+  await mockKnowledge(page);
+  const read: string[] = [];
+  await page.route("**/api/v1/alignment/graph/db1/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    read.push(path);
+    return route.fulfill({
+      json: path.endsWith("/overview")
+        ? {
+            summary: {
+              version: "db1",
+              run_id: "source-task",
+              revision: "r1",
+              node_count: 1,
+              edge_count: 0,
+              created_at: "2026-09-21T00:00:00Z",
+            },
+            groups: [
+              { concept_id: "customer", concept_name: "客户", count: 1 },
+            ],
+          }
+        : {
+            nodes: [
+              {
+                id: "row-1",
+                name: "数据库客户",
+                concept_id: "customer",
+                concept_name: "客户",
+                table_name: "客户表",
+                source_row: 1,
+              },
+            ],
+            edges: [],
+            total: 1,
+            next_cursor: null,
+          },
+    });
+  });
+  const wholeGraphRequests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/v1/knowledge/graph")
+      wholeGraphRequests.push(request.url());
+  });
+  await page.goto("/");
+  await page.getByRole("tab", { name: "04 图谱浏览与分析" }).click();
+  await page.getByRole("combobox", { name: "分析图谱版本" }).click();
+  await page.getByText("表格 · 原始图谱 · 客户数据库", { exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "查看 数据库客户", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "图谱问答", exact: true }),
+  ).toHaveCount(0);
+  expect(read).toContain("/api/v1/alignment/graph/db1/overview");
+  expect(read).toContain("/api/v1/alignment/graph/db1/nodes");
+  expect(wholeGraphRequests).toHaveLength(0);
+});
+
+test("demo navigation supports the merged workflow and legacy links without API requests", async ({
+  page,
+}) => {
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/"))
+      requests.push(request.url());
+  });
+  await page.goto("/?demo=1&workspace=conversion");
+  await expect(
+    page.getByRole("heading", { name: "数据转换", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "表格 / MySQL", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("tab", { name: "转换结果", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "前往图谱分析", exact: true }).click();
+  await expect(
+    page.getByRole("tab", { name: "图谱问答", exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(390);
+  await page.screenshot({
+    path: "test-results/analysis-mobile.png",
+    fullPage: true,
+    animations: "disabled",
+  });
+  await page.goto("/?demo=1&step=4");
+  await expect(
+    page.getByRole("heading", { name: "实体消歧", exact: true }),
+  ).toBeVisible();
+  expect(requests).toHaveLength(0);
+});
+
+test("a stale task read cannot undo a successful matching review", async ({
+  page,
+}) => {
+  let stale: MatchRun;
+  const requests = await mockKnowledge(page, true, undefined, {
+    decorate: (run) => {
+      stale = structuredClone(run);
+    },
+  });
+  let serveStale = false;
+  let staleReads = 0;
+  await page.route("**/api/v1/knowledge/matches/match1", (route) => {
+    if (!serveStale) return route.fallback();
+    staleReads += 1;
+    return route.fulfill({ json: stale });
+  });
+  await page.goto("/");
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
+  await page.getByRole("tab", { name: "TXT 文本", exact: true }).click();
+  await page.getByRole("tab", { name: "节点与边匹配", exact: true }).click();
+  await page
+    .getByRole("button", { name: "开始节点与边匹配", exact: true })
+    .click();
+  await expect(page.getByText("修订 1", { exact: true })).toBeVisible();
+  serveStale = true;
+  await page
+    .getByRole("button", { name: "整体采纳匹配建议", exact: true })
+    .click();
+  await expect.poll(() => staleReads).toBeGreaterThan(0);
+  await expect(page.getByText("修订 2", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "整体采纳匹配建议", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "修改节点", exact: true })
+    .first()
+    .click();
+  const dialog = page.getByRole("dialog", { name: "修改节点 boid" });
+  await dialog.getByRole("button", { name: "保存修改", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByText("修订 3", { exact: true })).toBeVisible();
+  expect(
+    requests.filter((request) => request.path.endsWith("/decisions")).at(-1)
+      ?.body.expected_revision,
+  ).toBe(2);
 });

@@ -11,6 +11,9 @@ export function ConceptLabel({
     <span className="concept-label">
       <strong>{concept.name}</strong>
       <code>{concept.id}</code>
+      {"semantic_type" in concept && concept.semantic_type && (
+        <small>{concept.semantic_type}</small>
+      )}
       {parents && "parents" in concept && (
         <small>
           直属上级：

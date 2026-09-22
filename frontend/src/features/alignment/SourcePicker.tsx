@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button, Checkbox, Collapse } from "antd";
 import { useResource } from "../../hooks/useResource";
 import { ErrorNotice, EmptyState, LoadingState } from "../../ui/Feedback";
@@ -62,18 +62,24 @@ export function SourcePicker({
   selections,
   onChange,
   disabled,
+  active,
 }: {
   token: string;
   selections: Selection[];
   onChange: (value: Selection[]) => void;
   disabled: boolean;
+  active: boolean;
 }) {
   const [offset, setOffset] = useState(0);
   const load = useCallback(
     (signal: AbortSignal) => intakeApi.batches(token, offset, signal),
     [token, offset],
   );
-  const batches = useResource(load);
+  const batches = useResource(load, true);
+  const { refresh } = batches;
+  useEffect(() => {
+    if (active && !disabled) refresh();
+  }, [active, disabled, refresh]);
   return (
     <Panel
       title="选择数据 · 发起新分析"

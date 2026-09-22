@@ -30,9 +30,12 @@ class DatabaseGraphs:
                     "name": f"DB 图谱 · {summary.get('created_at', row['id'])}",
                     "node_count": summary["node_count"],
                     "edge_count": summary["edge_count"],
+                    "created_at": summary.get("created_at", ""),
+                    "ontology_id": summary.get("ontology_id"),
+                    "ontology_revision": summary.get("revision"),
                 }
             )
-        return result
+        return sorted(result, key=lambda item: (item["created_at"], item["id"]), reverse=True)
 
     def load(self, version):
         try:
@@ -99,6 +102,8 @@ class DatabaseGraphs:
             "name": f"DB 图谱 · {summary.created_at}",
             "source_kind": "database",
             "source_id": version,
+            "ontology_id": summary.ontology_id,
+            "ontology_revision": summary.revision,
             "nodes": nodes,
             "edges": edges,
         }

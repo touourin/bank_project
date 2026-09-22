@@ -14,6 +14,7 @@
 | 原应用问答和图谱读取 | `graphrag/service.py`：原生 Local / Global / DRIFT / Basic、流式输出、问题生成与完整产物，替换 Streamlit 状态/缓存为 FastAPI 服务 |
 | `packages/graphrag/graphrag/entity_resolution/` | `resolution/engine/`：候选、契约、同义词、向量检索、证据判决及模型判决；外层新增图适配、人工审核、快照和可撤销合并 |
 | 当前项目 `alignment/retrieval.py`、`matching.py`、`catalog.py` | `knowledge/service.py` 直接复用传输、版本检查、候选评分门槛与本体目录 |
+| 公共转换审核 `conversion/` | 表格与 TXT 共用任务就绪、本体快照一致性、审核记录和派生版本检查；源格式解析及生成策略分别保留 |
 
 相关 MIT 许可证保存在迁入包内。源项目路径、密钥、虚拟环境和 Streamlit 不作为运行依赖。13 个企业提示词随 Python 包发布，消歧离线引擎、CLI、评测和报告校验代码完整迁入；本机 5 份已验证历史实验复制到运行数据目录供查看。React 页面使用本项目公共组件，接入完整后端流程；原项目的离线对比查看器不能执行实际图合并，因此新增了审核与派生图生成逻辑。
 
@@ -47,7 +48,7 @@ GraphRAG 的可引用 `context` 仅包含节点关联的文档原文，不再拼
 
 ## 本体匹配
 
-第三步的“节点与边匹配”固定本体 revision 和快照 SHA256，使用现有 retrieve 客户端及 `matching.decide`。高置信度节点追加 `boid`，低置信度候选作为匹配建议展示。界面复用第二步的检索依据组件，直接展示候选概念、原始得分与当前挂载，并支持筛选、展开查看候选和人工修改。用户可整体采纳有效的节点建议，随后按已采用的端点重新校验边；唯一有向关系可作为本次人工采纳的类型建议，多种候选仍需逐项选择。整体采纳按修订号原子提交并逐项记录审核，不覆盖已人工修改或清除的结果。关系类型只能来自匹配端点在本体中的显式有向关系；原边已有类型与其精确一致时自动采用，否则人工选择，不因只有一条本体关系就制造事实。
+第二步 TXT 工作区的“节点与边匹配”固定本体 revision 和快照 SHA256，使用现有 retrieve 客户端及 `matching.decide`。高置信度节点追加 `boid`，低置信度候选作为匹配建议展示。界面复用表格转换的检索依据组件，直接展示候选概念、原始得分与当前挂载，并支持筛选、展开查看候选和人工修改。用户可整体采纳有效的节点建议，随后按已采用的端点重新校验边；唯一有向关系可作为本次人工采纳的类型建议，多种候选仍需逐项选择。整体采纳按修订号原子提交并逐项记录审核，不覆盖已人工修改或清除的结果。关系类型只能来自匹配端点在本体中的显式有向关系；原边已有类型与其精确一致时自动采用，否则人工选择，不因只有一条本体关系就制造事实。
 
 过程、原始检索 trace 与审核分开保存到 `BANK_DATA_DIR/knowledge/matches.sqlite3`。人工修改节点 BOID 后重新校验关联边类型。结果只在节点包裹层追加 `boid`、边包裹层追加 `edge_type`，不改名称、ID、描述、权重、原类型、端点或证据；原生记录全部留在 `properties`。
 
@@ -60,7 +61,9 @@ GraphRAG 的可引用 `context` 仅包含节点关联的文档原文，不再拼
 | `/graphrag/uploads`、`/graphrag/datasets` | TXT 上传、数据集/任务列表 |
 | `/graphrag/datasets/{key}/index` | 开始/重试后台索引 |
 | `/graphrag/datasets/{key}/graph`、`/query` | 完整图、带上下文的 GraphRAG 问答 |
-| `/knowledge/sources` | 可用 GraphRAG 数据集及已发布 DB 版本 |
+| `/knowledge/sources` | 可用 GraphRAG 数据集、已发布 DB 版本及派生修订 |
+| `/knowledge/graph?source_kind=&source_id=` | 读取文档或派生图谱，强制核对指定修订；原始 DB 图谱使用分页接口 |
+| `/alignment/graph/{version}/overview` | 固定表格图谱版本的统计及分类概览，配合该版本节点分页 |
 | `/resolution/runs`、`/{id}/decisions`、`/{id}/manual` | 分析、候选审核、人工指定节点 |
 | `/resolution/runs/{id}/original`、`/graph` | 原始快照、完整消歧派生图 |
 | `/resolution/runs/{id}/candidates/{candidate_id}/sources` | 按需读取候选左右节点的完整来源快照、引用定位与独立描述 |
@@ -81,10 +84,10 @@ GraphRAG 的可引用 `context` 仅包含节点关联的文档原文，不再拼
 ## 原项目功能入口
 
 - **第一步 / TXT 文本**：选择“企业情报 · 原项目中文方案”或“通用文档 · 跟随原文语言”，可调分块大小和重叠。企业方案使用原 8 类实体、中文业务提示词、1000/150 分块和分步模型（抽取/问答为聊天模型，摘要/社区为 fast 模型）。提示词哈希保存在数据集 `profile.json`，密钥只在内存注入。
-- **第三步 / 生成图谱**：核心网络、中心实体邻域、1–3 层深度、节点上限、类型和名称筛选、度数相关大小；点击节点可以重新居中。绘图上限不影响全量表格与导出。
-- **第三步 / 图谱问答**：Local / Global / Basic 流式输出，DRIFT 完整返回；保留本次页面会话，四方法对比、生成推荐问题、检索过程、原文及社区证据。回答后切换“答案依据”，红色边框/边标记直接引用。社区报告单独提供层级、成员与报告全文。
-- **第四步 / 实体消歧**：可选生成后的 GraphRAG 图、聚合前记录、DB 发布版本及前序派生版本。原图与聚合前记录是不同输入，不把已合并节点冒充原始提及。聚合前导出仍以 chunk 内实体记录为单位，抽取器已经在单块内部混合的信息无法恢复；歧义关系端点原样放入 metadata，不猜连边。
-- **第四步 / 消歧方法与参数**：`evidence_v1`、`synonym_llm_v1`，review/apply、预算、并发、超时、候选/簇上限、同义词词表、向量输入及人工金标。输入 JSON 遵循原引擎契约；向量必须覆盖同一 corpus 的所有记录，金标仅用于评分，词表必须带审校来源。
+- **第二步 / TXT 转换结果，第四步 / 图谱浏览**：核心网络、中心实体邻域、1–3 层深度、节点上限、类型和名称筛选、度数相关大小；点击节点可以重新居中。绘图上限不影响全量表格与导出。
+- **第四步 / 图谱问答**：Local / Global / Basic 流式输出，DRIFT 完整返回；保留本次页面会话，四方法对比、生成推荐问题、检索过程、原文及社区证据。回答后切换“答案依据”，红色边框/边标记直接引用。社区报告单独提供层级、成员与报告全文。
+- **第三步 / 实体消歧**：可选生成后的 GraphRAG 图、聚合前记录、DB 发布版本及前序派生版本。原图与聚合前记录是不同输入，不把已合并节点冒充原始提及。聚合前导出仍以 chunk 内实体记录为单位，抽取器已经在单块内部混合的信息无法恢复；歧义关系端点原样放入 metadata，不猜连边。
+- **第三步 / 消歧方法与参数**：`evidence_v1`、`synonym_llm_v1`，review/apply、预算、并发、超时、候选/簇上限、同义词词表、向量输入及人工金标。输入 JSON 遵循原引擎契约；向量必须覆盖同一 corpus 的所有记录，金标仅用于评分，词表必须带审校来源。
 
 实验默认保存在 `BANK_DATA_DIR/resolution/experiments`，可用 `BANK_RESOLUTION_EXPERIMENTS_DIR` 指定其他目录。可复用的判决缓存按语料命名空间、模型版本/地址、原提示词及完整输入隔离。原 CLI 的 annotate / compare 命令同样可用：
 
@@ -95,3 +98,5 @@ GraphRAG 的可引用 `context` 仅包含节点关联的文档原文，不再拼
 ```
 
 新增 API：`POST /graphrag/datasets/{key}/query/stream`（NDJSON，status/token/result/error）、`GET .../records`、`GET .../reports`、`POST .../questions`；`GET /resolution/experiments`、`GET /resolution/experiments/{name}`、`GET .../{name}/download`。所有接口继承鉴权和同源约束。
+
+表格与 TXT 的目录、retrieve、人工搜索和风险依据统一配置 `BANK_ONTOLOGY_BASE_URL`。每次新匹配固定本体 ID、revision 和目录哈希；人工修订读取自动归档的原始目录，远端升级不改变历史结果。详见 [共享本体](ontology.md)。

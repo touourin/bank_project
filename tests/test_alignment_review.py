@@ -163,13 +163,14 @@ def test_review_api_forks_published_run_keeps_graph_and_survives_restart(tmp_pat
             client.post(base + "/mapping", json={**payload, "concept_id": None}).status_code == 422
         )
         assert len(store.list()) == 2
-        # A changed snapshot may not silently reinterpret an older run.
+        # Review remains tied to the archived version after the source changes.
         path.write_bytes(path.read_bytes() + b" ")
-        assert client.post(base + "/mapping", json=payload).status_code == 409
-        assert client.get(base + "/concepts").status_code == 409
+        assert client.post(base + "/mapping", json=payload).status_code == 201
+        assert client.get(base + "/concepts").status_code == 200
     with TestClient(create_app(settings)) as client:
         restored = client.get(f"/api/v1/alignment/runs/{updated['id']}").json()
         assert restored == updated
+        assert client.get(base + "/concepts?q=customer").json()[0]["id"] == "customer"
 
 
 def test_active_graph_build_cannot_be_revised(tmp_path):

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Button, Input, Select } from "antd";
 import { errorMessage } from "../../api/request";
 import { useResource } from "../../hooks/useResource";
@@ -23,11 +23,13 @@ function validWindow(start: string, end: string) {
 
 export function RiskExecutionPanel({
   token,
+  active,
   value,
   predicates,
   onStale,
 }: {
   token: string;
+  active: boolean;
   value: RiskCase;
   predicates: RiskPredicate[];
   onStale: () => void;
@@ -67,6 +69,14 @@ export function RiskExecutionPanel({
     ),
     true,
   );
+  const refreshSources = sources.refresh;
+  const refreshHistory = history.refresh;
+  useEffect(() => {
+    if (active) {
+      refreshSources();
+      refreshHistory();
+    }
+  }, [active, refreshSources, refreshHistory]);
   const body = value.rule_pack.body[0];
   const predicate = predicates.find(
     (item) => item.predicate === body?.predicate,
@@ -116,6 +126,18 @@ export function RiskExecutionPanel({
     <Panel
       title="查询交易实例"
       description="选择已发布数据库图谱，明确字段含义和时间窗口后执行。"
+      actions={
+        approved && (
+          <Button
+            size="small"
+            disabled={busy}
+            loading={sources.loading}
+            onClick={refreshSources}
+          >
+            刷新图谱列表
+          </Button>
+        )
+      }
       padded
     >
       {!approved && (

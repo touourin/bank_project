@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from bank_project.conversion.audit import ReviewStamp
 from bank_project.intake.models import BatchInfo, DataRow, TableInfo
 
 from .templates import EdgeSuggestion, EntitySuggestion, GraphTemplate
@@ -97,6 +98,8 @@ class ConceptRef(BaseModel):
 
 class ConceptDetail(ConceptRef):
     parents: list[ConceptRef] = Field(default_factory=list)
+    semantic_type: str | None = None
+    has_why: bool = False
 
 
 class ScoredConcept(ConceptDetail):
@@ -146,6 +149,7 @@ class MappingEditRequest(StrictModel):
     column: str | None = Field(default=None, max_length=512)
     concept_id: str | None = Field(max_length=200)
     reason: str = Field(min_length=1, max_length=1000)
+    reviewer: str = Field(default="人工审核", min_length=1, max_length=100)
 
     @model_validator(mode="after")
     def meaningful_edit(self):
@@ -156,8 +160,8 @@ class MappingEditRequest(StrictModel):
         return self
 
 
-class MappingEdit(BaseModel):
-    created_at: str
+class MappingEdit(ReviewStamp):
+    version: str | None = None
     column: str | None = None
     before: ConceptRef | None = None
     after: ConceptDetail | None = None
@@ -202,6 +206,7 @@ class MappingResult(BaseModel):
     template: GraphTemplate | None = None
     revision: str
     snapshot_sha256: str
+    ontology_id: str | None = None
     tables: list[TableMapping]
     relations: list[RelationMapping]
     warnings: list[str] = Field(default_factory=list)
@@ -224,6 +229,7 @@ class GraphSummary(BaseModel):
     version: str
     run_id: str
     revision: str
+    ontology_id: str | None = None
     node_count: int
     edge_count: int
     created_at: str

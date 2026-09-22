@@ -15,7 +15,7 @@ import { palettes } from "../../ui/theme";
 import { EmptyState } from "../../ui/Feedback";
 import { JsonDetails, pretty } from "./shared";
 import { selectGraph } from "./graphViews";
-import type { KnowledgeGraph, QueryEvidence, KnowledgeNode } from "./types";
+import type { GraphData, QueryEvidence, KnowledgeNode } from "./types";
 
 const enterpriseColors: Record<string, string> = {
   组织机构: "#4c6ef5",
@@ -31,8 +31,10 @@ const enterpriseColors: Record<string, string> = {
 export function KnowledgeGraphPanel({
   graph,
   evidence,
+  nodeLabel = "实体",
 }: {
-  graph: KnowledgeGraph;
+  graph: GraphData;
+  nodeLabel?: "实体" | "概念";
   evidence?: QueryEvidence;
 }) {
   const [mode, setMode] = useState("core");
@@ -272,15 +274,15 @@ export function KnowledgeGraphPanel({
             onChange={setMode}
             options={[
               { value: "core", label: "核心网络" },
-              { value: "ego", label: "以中心实体展开" },
+              { value: "ego", label: `以中心${nodeLabel}展开` },
               { value: "answer", label: "答案依据", disabled: !evidence },
             ]}
           />
         </label>
         <label>
-          中心实体
+          中心{nodeLabel}
           <Select
-            aria-label="中心实体"
+            aria-label={`中心${nodeLabel}`}
             showSearch
             optionFilterProp="label"
             value={center}
@@ -312,9 +314,9 @@ export function KnowledgeGraphPanel({
           />
         </label>
         <label>
-          实体类型
+          {nodeLabel}类型
           <Select
-            aria-label="实体类型筛选"
+            aria-label={`${nodeLabel}类型筛选`}
             mode="multiple"
             value={types}
             onChange={setTypes}
@@ -370,8 +372,9 @@ export function KnowledgeGraphPanel({
             aria-label={`知识图谱，当前显示 ${visible.length} 个节点；节点及边详情可通过下方表格查看`}
           />
           <p className="hint">
-            按原项目的关系权重、度数及邻域深度选取子图，最多显示 400
-            条关系。红色标记为回答直接引用。下方表格和导出包含完整数据。
+            画布按连接数量、关系权重和展开深度选取子图，最多显示 400
+            条关系。下方表格和导出包含完整数据。
+            {evidence && "红色标记为回答直接引用。"}
           </p>
         </>
       ) : (

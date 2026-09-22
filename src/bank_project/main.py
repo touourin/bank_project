@@ -24,6 +24,7 @@ from bank_project.api.graphrag import router as graphrag_router
 from bank_project.api.health import router as health_router
 from bank_project.api.intake import router as intake_router
 from bank_project.api.knowledge import router as knowledge_router
+from bank_project.api.ontology import router as ontology_router
 from bank_project.api.resolution import router as resolution_router
 from bank_project.api.risk import router as risk_router
 from bank_project.graphrag import GraphRagError, GraphRagService
@@ -33,6 +34,7 @@ from bank_project.intake.mysql import MysqlConnection, MysqlSource
 from bank_project.intake.service import IntakeService
 from bank_project.intake.store import BatchStore
 from bank_project.knowledge.service import KnowledgeService
+from bank_project.ontology.service import OntologyService
 from bank_project.resolution.service import ResolutionService
 from bank_project.risk.service import RiskService
 from bank_project.settings import Settings
@@ -43,6 +45,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         app.state.settings = settings if settings is not None else Settings()
         config = app.state.settings
+        app.state.ontology = OntologyService(config)
         limits = config.intake_limits()
         configured_mysql = (
             MysqlConnection(
@@ -92,15 +95,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 model_concurrency=config.alignment_model_concurrency,
             ),
             VersionedGraph(config, batch_store if database else None, key_index),
+            ontology=app.state.ontology,
         )
         app.state.batch_lifecycle = BatchLifecycle(batch_store, app.state.alignment.store)
         app.state.graphrag = GraphRagService(config)
         app.state.knowledge = KnowledgeService(
-            config, app.state.graphrag, app.state.alignment.graph
+            config, app.state.graphrag, app.state.alignment.graph, ontology=app.state.ontology
         )
         app.state.resolution = ResolutionService(config, app.state.knowledge.load_graph)
         app.state.knowledge.resolution = app.state.resolution
-        app.state.risk = RiskService(config, app.state.alignment.graph)
+        app.state.risk = RiskService(config, app.state.alignment.graph, ontology=app.state.ontology)
         try:
             yield
         finally:
@@ -123,6 +127,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(knowledge_router)
     app.include_router(resolution_router)
     app.include_router(risk_router)
+    app.include_router(ontology_router)
 
     @app.exception_handler(GraphRagError)
     async def graphrag_error(request, exc: GraphRagError):

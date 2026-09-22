@@ -1,3 +1,4 @@
+import { derivedGraphId } from "./graphSources";
 import type {
   ConceptDetail,
   Dataset,
@@ -243,7 +244,7 @@ function resolutionGraph(run: ResolutionRun): KnowledgeGraph {
       target: canonical(edge.target),
     }))
     .filter((edge) => edge.source !== edge.target);
-  graph.id = `resolution:${run.id}:${run.revision}`;
+  graph.id = derivedGraphId("resolution", run);
   graph.name = `${run.name} · 消歧结果`;
   return graph;
 }
@@ -257,7 +258,7 @@ function matchGraph(run: MatchRun): KnowledgeGraph {
     ...edge,
     edge_type: run.edges.find((item) => item.id === edge.id)?.edge_type ?? null,
   }));
-  graph.id = `match:${run.id}:${run.revision}`;
+  graph.id = derivedGraphId("match", run);
   graph.name = `${run.name} · 匹配结果`;
   return graph;
 }
@@ -488,6 +489,28 @@ export const demoKnowledgeApi = {
   },
   graph: (_token: string, key: string, _signal?: AbortSignal) =>
     reply({ ...baseGraph, source_id: key }),
+  sourceGraph: (
+    _token: string,
+    kind: SourceKind,
+    source: string,
+    _signal?: AbortSignal,
+  ) => {
+    const [prefix, runId, revision] = source.split(":");
+    if (prefix === "resolution" || prefix === "match") {
+      const run =
+        prefix === "resolution" ? getResolution(runId) : getMatch(runId);
+      if (run.source_kind !== kind || run.revision !== Number(revision))
+        return Promise.reject(
+          new Error("所选图谱版本已更新，请刷新来源列表。"),
+        );
+      return reply(
+        prefix === "resolution"
+          ? resolutionGraph(getResolution(runId))
+          : matchGraph(getMatch(runId)),
+      );
+    }
+    return reply({ ...baseGraph, source_kind: kind, source_id: source });
+  },
   query: (
     _token: string,
     _key: string,
@@ -496,7 +519,7 @@ export const demoKnowledgeApi = {
     _signal?: AbortSignal,
   ) =>
     reply({
-      answer: `【前端演示回答 · ${method.toUpperCase()}】\n\n当前展示的是固定示例结果，未调用模型或真实检索。\n\n本示例包含 ${baseGraph.nodes.length} 个节点、${baseGraph.edges.length} 条关系，覆盖企业、银行、人物、项目与贷款产品，并串联供应链、授信和担保关系。\n\n华星科技有限公司向远航制造有限公司提供工业软件，双方共同参与智能产线升级项目。城商银行为远航制造提供 800 万元示例授信，恒信担保提供融资担保。林明（示例）为华星科技法定代表人。\n\n图谱中还包含 ${candidatePairs.length} 组名称别名候选，可以进入第四步核验并体验合并、保留及撤销操作。`,
+      answer: `【前端演示回答 · ${method.toUpperCase()}】\n\n当前展示的是固定示例结果，未调用模型或真实检索。\n\n本示例包含 ${baseGraph.nodes.length} 个节点、${baseGraph.edges.length} 条关系，覆盖企业、银行、人物、项目与贷款产品，并串联供应链、授信和担保关系。\n\n华星科技有限公司向远航制造有限公司提供工业软件，双方共同参与智能产线升级项目。城商银行为远航制造提供 800 万元示例授信，恒信担保提供融资担保。林明（示例）为华星科技法定代表人。\n\n图谱中还包含 ${candidatePairs.length} 组名称别名候选，可以进入第三步核验并体验合并、保留及撤销操作。`,
       context: {
         mode: "frontend_demo",
         question,
@@ -515,13 +538,13 @@ export const demoKnowledgeApi = {
       { kind: "database", id: "demo-database", name: "客户数据库 · 示例" },
       ...resolutionRuns.map((run) => ({
         kind: run.source_kind,
-        id: `resolution:${run.id}:${run.revision}`,
+        id: derivedGraphId("resolution", run),
         name: `${run.name} · 消歧结果`,
         root_source_id: sourceId,
       })),
       ...matchRuns.map((run) => ({
         kind: run.source_kind,
-        id: `match:${run.id}:${run.revision}`,
+        id: derivedGraphId("match", run),
         name: `${run.name} · 匹配结果`,
         root_source_id: sourceId,
       })),

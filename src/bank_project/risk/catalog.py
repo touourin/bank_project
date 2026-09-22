@@ -3,52 +3,14 @@
 import hashlib
 import json
 from collections import defaultdict
-from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from bank_project.alignment.catalog import Catalog
 from bank_project.alignment.models import AlignmentError
+from bank_project.ontology.dimensions import object_value, read_dimension
 
 from .propagation import ConceptGraph, canonical_json
-
-
-def _object(value: Any) -> dict:
-    if isinstance(value, str):
-        value = json.loads(value)
-    if not isinstance(value, dict):
-        raise ValueError("dimension container must be an object")
-    return value
-
-
-def _why(properties: dict) -> Any:
-    """Read exported raw WHY; do not synthesize rules from names or metadata."""
-    values = []
-    if "why" in properties:
-        values.append(properties["why"])
-    for key in ("dimensions", "description"):
-        if properties.get(key) is not None:
-            container = _object(properties[key])
-            if "why" in container:
-                values.append(container["why"])
-            if "dimensions" in container:
-                nested = _object(container["dimensions"])
-                if "why" in nested:
-                    values.append(nested["why"])
-    decoded = []
-    for value in values:
-        if isinstance(value, str):
-            value = json.loads(value)
-        if value is None or value == {} or value == []:
-            continue
-        if not isinstance(value, (dict, list)):
-            raise ValueError("WHY must be an object or array")
-        # Validate JSON numbers and conflicting duplicate projections before hashing.
-        canonical_json(value)
-        decoded.append(value)
-    if any(value != decoded[0] for value in decoded[1:]):
-        raise ValueError("conflicting WHY projections")
-    return deepcopy(decoded[0]) if decoded else None
 
 
 class RiskCatalog(Catalog):
@@ -78,9 +40,9 @@ class RiskCatalog(Catalog):
                         if alias in aliases and aliases[alias] != key:
                             raise ValueError("ambiguous concept key")
                         aliases[alias] = key
-                why = _why(p)
+                why = read_dimension(p, "why")
                 digest = hashlib.sha256(canonical_json(why).encode()).hexdigest() if why else None
-                supplied_hashes = _object(p.get("dimension_hashes", {}))
+                supplied_hashes = object_value(p.get("dimension_hashes", {}))
                 supplied = supplied_hashes.get("why") or p.get("why_dimension_hash")
                 if supplied and supplied != digest:
                     raise ValueError("WHY dimension hash does not match its content")
@@ -139,6 +101,7 @@ class RiskCatalog(Catalog):
             {
                 **detail.model_dump(),
                 "has_why": self.graph.nodes[detail.id]["has_why"],
+                "semantic_type": self.graph.nodes[detail.id]["semantic_type"],
             }
             for detail in details
         ]

@@ -109,6 +109,9 @@ def test_preview_is_readonly_accepts_current_type_edits_and_preserves_ontology_v
         assert store.get(run.id) == run and len(store.list()) == 1
         with store.connect() as db:
             assert db.execute("SELECT COUNT(*) FROM jobs WHERE active=1").fetchone()[0] == 0
-        # Changing the snapshot blocks preset creation as well as adoption.
+        # New source bytes must not invalidate historical review evidence.
         path.write_bytes(path.read_bytes() + b" ")
+        assert client.post(url, json=current).status_code == 200
+        pinned = app.state.ontology.snapshots.path(run.result.snapshot_sha256)
+        pinned.write_bytes(pinned.read_bytes() + b" ")
         assert client.post(url, json=current).status_code == 409

@@ -1,14 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Input, Modal, Select, Tabs } from "antd";
-import { errorMessage } from "../../api/request";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, Button, Select, Tabs } from "antd";
 import { useResource } from "../../hooks/useResource";
+import { useTaskResource } from "../../hooks/useTaskResource";
+import { useAsyncAction } from "../../hooks/useAsyncAction";
+import { isRunningTask, taskRevision } from "../conversion/taskState";
+import {
+  MatchReviewDialog,
+  type MatchReviewTarget,
+  type MatchReviewValues,
+} from "./MatchReviewDialog";
 import { EmptyState, ErrorNotice, LoadingState } from "../../ui/Feedback";
 import { Panel } from "../../ui/Panel";
 import { knowledgeApi } from "./api";
 import { KnowledgeGraphPanel } from "./KnowledgeGraphPanel";
 import { MatchResults, matchProposalCounts } from "./MatchResults";
-import { AuditTable, StatusTag, usePolling } from "./shared";
-import type { ConceptDetail, MatchEdge, MatchNode, MatchRun } from "./types";
+import { AuditTable, StatusTag } from "./shared";
+import type { MatchRun } from "./types";
 
 export function MatchingPanel({
   token,
@@ -33,8 +40,7 @@ export function MatchingPanel({
   );
   const [selectedSource, setSelectedSource] = useState(sourceId);
   const [runId, setRunId] = useState("");
-  const [updated, setUpdated] = useState<MatchRun>();
-  const resource = useResource(
+  const resource = useTaskResource(
     useCallback(
       (signal: AbortSignal) =>
         runId
@@ -42,33 +48,18 @@ export function MatchingPanel({
           : Promise.resolve(null),
       [token, runId],
     ),
-    true,
+    { isRunning: isRunningTask, revision: taskRevision },
   );
-  const remote = resource.data?.id === runId ? resource.data : null;
-  const run =
-    updated?.id === runId && (!remote || updated.revision > remote.revision)
-      ? updated
-      : remote;
+  const run = resource.data;
   const proposals = useMemo(
     () => (run ? matchProposalCounts(run) : { nodes: 0, edges: 0 }),
     [run],
   );
-  const [busy, setBusy] = useState(false);
-  const [accepting, setAccepting] = useState(false);
-  const [error, setError] = useState("");
-  const inFlight = useRef(false);
-  const [editing, setEditing] = useState<
-    { target: "node"; value: MatchNode } | { target: "edge"; value: MatchEdge }
-  >();
-  const [selection, setSelection] = useState<string | undefined>();
-  const [concepts, setConcepts] = useState<ConceptDetail[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [reviewer, setReviewer] = useState("");
-  const [note, setNote] = useState("");
-  const searchRequest = useRef<AbortController | undefined>(undefined);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  );
+  const action = useAsyncAction();
+  const { busy, execute } = action;
+  const accepting = action.pending === "accept";
+  const error = action.error;
+  const [editing, setEditing] = useState<MatchReviewTarget>();
   const graph = useResource(
     useCallback(
       (signal: AbortSignal) =>
@@ -78,7 +69,6 @@ export function MatchingPanel({
       [token, run?.id, run?.status, run?.revision],
     ),
   );
-  usePolling(run?.status === "running", resource.refresh);
   useEffect(() => {
     if (!runId) {
       const item = history.data?.find(
@@ -90,132 +80,60 @@ export function MatchingPanel({
   useEffect(() => {
     if (run?.status === "ready" || run?.status === "failed") history.refresh();
   }, [run?.id, run?.status, history.refresh]);
-  useEffect(
-    () => () => {
-      searchRequest.current?.abort();
-      clearTimeout(searchTimer.current);
-    },
-    [],
-  );
   async function start() {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setBusy(true);
-    setError("");
-    try {
-      const created = await knowledgeApi.matchStart(token, selectedSource);
-      setRunId(created.id);
-      setUpdated(created);
-      history.refresh();
-    } catch (reason) {
-      setError(errorMessage(reason));
-      history.refresh();
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
-    }
-  }
-  function edit(target: typeof editing) {
-    searchRequest.current?.abort();
-    clearTimeout(searchTimer.current);
-    setSearching(false);
-    setEditing(target);
-    setSelection(
-      target?.target === "node"
-        ? (target.value.boid ?? undefined)
-        : (target?.value.edge_type ?? undefined),
+    await execute(
+      "start",
+      () => knowledgeApi.matchStart(token, selectedSource),
+      {
+        onSuccess: (created) => setRunId(created.id),
+        onSettled: history.refresh,
+      },
     );
-    setConcepts(target?.target === "node" ? target.value.trace.candidates : []);
-    setNote("");
-    setError("");
   }
-  function search(q: string) {
-    if (!run) return;
-    searchRequest.current?.abort();
-    clearTimeout(searchTimer.current);
-    const controller = new AbortController();
-    searchRequest.current = controller;
-    setSearching(true);
-    searchTimer.current = setTimeout(async () => {
-      try {
-        const values = await knowledgeApi.concepts(
-          token,
-          run.id,
-          q,
-          controller.signal,
-        );
-        if (!controller.signal.aborted) setConcepts(values);
-      } catch (reason) {
-        if (!controller.signal.aborted) setError(errorMessage(reason));
-      } finally {
-        if (!controller.signal.aborted) setSearching(false);
-      }
-    }, 250);
+  function edit(target: MatchReviewTarget) {
+    action.clearError();
+    setEditing(target);
   }
-  async function save() {
-    if (!run || !editing || inFlight.current) return;
-    inFlight.current = true;
-    setBusy(true);
-    setError("");
+  function reviewed(result: MatchRun) {
+    resource.accept(result);
+    resource.refresh();
+    history.refresh();
+    sources.refresh();
+  }
+  async function save({ selection, reviewer, note }: MatchReviewValues) {
+    if (!run || !editing) return;
     try {
-      const result = await knowledgeApi.matchDecision(token, run.id, {
-        target: editing.target,
-        target_id: editing.value.id,
-        expected_revision: run.revision,
-        ...(editing.target === "node"
-          ? { boid: selection ?? null }
-          : { edge_type: selection ?? null }),
-        reviewer: reviewer.trim() || undefined,
-        note,
-      });
-      setUpdated(result);
-      setEditing(undefined);
-      resource.refresh();
-      history.refresh();
-      sources.refresh();
+      reviewed(
+        await knowledgeApi.matchDecision(token, run.id, {
+          target: editing.target,
+          target_id: editing.value.id,
+          expected_revision: run.revision,
+          ...(editing.target === "node"
+            ? { boid: selection ?? null }
+            : { edge_type: selection ?? null }),
+          reviewer: reviewer.trim() || undefined,
+          note,
+        }),
+      );
     } catch (reason) {
-      setError(errorMessage(reason));
-      setUpdated(undefined);
       resource.refresh();
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
+      throw reason;
     }
   }
   async function acceptProposals() {
-    if (!run || inFlight.current) return;
-    inFlight.current = true;
-    setBusy(true);
-    setAccepting(true);
-    setError("");
-    try {
-      const result = await knowledgeApi.matchAccept(token, run.id, {
-        expected_revision: run.revision,
-      });
-      setUpdated(result);
-      resource.refresh();
-      history.refresh();
-      sources.refresh();
-    } catch (reason) {
-      setError(errorMessage(reason));
-      setUpdated(undefined);
-      resource.refresh();
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
-      setAccepting(false);
-    }
+    if (!run) return;
+    await execute(
+      "accept",
+      () =>
+        knowledgeApi.matchAccept(token, run.id, {
+          expected_revision: run.revision,
+        }),
+      {
+        onSuccess: reviewed,
+        onError: resource.refresh,
+      },
+    );
   }
-  const conceptOptions = concepts.map((concept) => ({
-    value: concept.id,
-    label: `${concept.name} · ${concept.id}${concept.score != null ? ` · ${concept.score.toFixed(3)}` : ""}`,
-  }));
-  if (
-    selection &&
-    editing?.target === "node" &&
-    !conceptOptions.some((item) => item.value === selection)
-  )
-    conceptOptions.unshift({ value: selection, label: selection });
   return (
     <div>
       <Alert
@@ -234,7 +152,6 @@ export function MatchingPanel({
             onChange={(value) => {
               setSelectedSource(value);
               setRunId("");
-              setUpdated(undefined);
             }}
             options={[
               { value: sourceId, label: "原始 GraphRAG 图谱" },
@@ -267,7 +184,6 @@ export function MatchingPanel({
           disabled={busy}
           onChange={(value) => {
             setRunId(value);
-            setUpdated(undefined);
           }}
           options={history.data
             ?.filter((entry) => entry.source_id === selectedSource)
@@ -425,61 +341,16 @@ export function MatchingPanel({
           </Panel>
         </>
       )}
-      <Modal
-        title={editing?.target === "node" ? "修改节点 boid" : "修改边类型"}
-        open={Boolean(editing)}
-        onCancel={() => {
-          if (!busy) edit(undefined);
-        }}
-        onOk={() => void save()}
-        confirmLoading={busy}
-        okText="保存修改"
-        cancelText="取消"
-        destroyOnHidden
-      >
-        <p className="hint">原始元素 ID：{editing?.value.id}</p>
-        <label className="knowledge-field">
-          {editing?.target === "node" ? "本体概念（可搜索）" : "关系类型"}
-          <Select
-            aria-label={
-              editing?.target === "node" ? "选择本体概念" : "选择边类型"
-            }
-            allowClear
-            showSearch
-            filterOption={editing?.target !== "node"}
-            loading={searching}
-            onSearch={editing?.target === "node" ? search : undefined}
-            value={selection}
-            onChange={setSelection}
-            placeholder="清除选择可移除挂载"
-            options={
-              editing?.target === "node"
-                ? conceptOptions
-                : editing?.value.candidates.map((value) => ({
-                    value,
-                    label: value,
-                  }))
-            }
-          />
-        </label>
-        <label className="knowledge-field">
-          审核人
-          <Input
-            value={reviewer}
-            maxLength={100}
-            onChange={(event) => setReviewer(event.target.value)}
-          />
-        </label>
-        <label className="knowledge-field">
-          修改原因
-          <Input.TextArea
-            value={note}
-            maxLength={2000}
-            onChange={(event) => setNote(event.target.value)}
-          />
-        </label>
-        {error && <ErrorNotice message={error} />}
-      </Modal>
+      {editing && run && (
+        <MatchReviewDialog
+          key={`${run.id}:${editing.target}:${editing.value.id}`}
+          token={token}
+          runId={run.id}
+          editing={editing}
+          onSave={save}
+          onClose={() => setEditing(undefined)}
+        />
+      )}
     </div>
   );
 }

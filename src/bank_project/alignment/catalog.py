@@ -6,13 +6,19 @@ import re
 import unicodedata
 from pathlib import Path
 
+from bank_project.ontology.dimensions import read_dimension
+
 from .models import AlignmentError, ConceptDetail, ConceptRef
 
 
 class Catalog:
     def __init__(self, content: bytes, revision: str | None = None):
         try:
-            graph = json.loads(content)["graph"]
+            document = json.loads(content)
+            graph = document["graph"]
+            self.content = content
+            self.source = document.get("ontology_source", {})
+            self.ontology_id = self.source.get("ontology_id")
             ready = {
                 n["properties"]["revision"]
                 for n in graph["nodes"]
@@ -28,6 +34,9 @@ class Catalog:
                 raise AlignmentError("配置的本体版本不存在或尚未就绪", 503)
             self.revision, self.sha256 = revision, hashlib.sha256(content).hexdigest()
             self.names = {}
+            self.metadata = {}
+            self.why_ids = set()
+            aliases = {}
             for n in graph["nodes"]:
                 p = n["properties"]
                 if n["label"] == "Concept" and p.get("dataset_revision") == revision:
@@ -35,26 +44,35 @@ class Catalog:
                     if not isinstance(key, str) or not isinstance(name, str) or key in self.names:
                         raise ValueError("invalid concept")
                     self.names[key] = name
+                    self.metadata[key] = p
+                    if "why" in p.get("nonempty_dimensions", []) or read_dimension(p, "why"):
+                        self.why_ids.add(key)
+                    for alias in (n.get("key"), f"Concept:{revision}:{key}", key):
+                        if alias is not None:
+                            if alias in aliases and aliases[alias] != key:
+                                raise ValueError("ambiguous concept key")
+                            aliases[alias] = key
             self.parents: dict[str, list[str]] = {}
             self.parent_ids: dict[str, set[str]] = {}
             self.relations = []
             for edge in graph["relationships"]:
-                start, end = edge["start"].rsplit(":", 1)[-1], edge["end"].rsplit(":", 1)[-1]
                 if edge["properties"].get("dataset_revision") != revision:
                     continue
+                if edge["start"] not in aliases or edge["end"] not in aliases:
+                    raise ValueError("relationship leaves pinned ontology")
+                start, end = aliases[edge["start"]], aliases[edge["end"]]
                 if start in self.names and end in self.names:
                     self.relations.append({"source": start, "target": end, "type": edge["type"]})
                 if (
                     edge["type"] == "IS_A"
                     and edge["properties"].get("dataset_revision") == revision
                 ):
-                    start, end = edge["start"].rsplit(":", 1)[-1], edge["end"].rsplit(":", 1)[-1]
                     if start in self.names and end in self.names:
                         self.parents.setdefault(start, []).append(self.names[end])
                         self.parent_ids.setdefault(start, set()).add(end)
             if not self.names:
                 raise ValueError("empty catalog")
-        except (ValueError, KeyError, TypeError) as exc:
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
             raise AlignmentError("本体快照格式不合法，无法进行匹配", 503) from exc
 
     @classmethod
@@ -131,6 +149,9 @@ class Catalog:
         return ConceptDetail(
             id=concept_id,
             name=self.names[concept_id],
+            semantic_type=self.metadata[concept_id].get("node_semantic_type")
+            or self.metadata[concept_id].get("semantic_type"),
+            has_why=concept_id in self.why_ids,
             parents=[
                 ConceptRef(id=key, name=self.names[key])
                 for key in sorted(self.parent_ids.get(concept_id, set()))

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, Button } from "antd";
-import { errorMessage } from "../../api/request";
+import { useAsyncAction } from "../../hooks/useAsyncAction";
+import { isTableTaskRunning } from "../conversion/taskState";
 import { useResource } from "../../hooks/useResource";
 import { Panel } from "../../ui/Panel";
 import { ErrorNotice, LoadingState } from "../../ui/Feedback";
@@ -10,37 +11,51 @@ import { GraphPanel } from "./GraphPanel";
 import { GenerationRules } from "./GenerationRules";
 import { GenerationPanel } from "./GenerationPanel";
 import { RunOverview } from "./RunOverview";
-import { generationPlan, tableLabel } from "./workflow";
+import { generationPlan } from "./workflow";
+import { GenerationConfirmation } from "./GenerationConfirmation";
 import { MappingResults } from "./MappingResults";
 import { SourcePicker } from "./SourcePicker";
 import { useRun } from "./useRun";
 import type { GraphTemplate, Selection } from "./types";
+import type { GraphSourceRef } from "../knowledge/types";
 import "./alignment.css";
 
-export function AlignmentPage({ token }: { token: string }) {
+export function TableConversionWorkspace({
+  token,
+  active,
+  onAnalyze,
+}: {
+  token: string;
+  active: boolean;
+  onAnalyze: (source: GraphSourceRef) => void;
+}) {
   const config = useResource(
     useCallback(
       (signal: AbortSignal) => alignmentApi.config(token, signal),
       [token],
     ),
+    true,
   );
   const history = useResource(
     useCallback(
       (signal: AbortSignal) => alignmentApi.runs(token, signal),
       [token],
     ),
+    true,
   );
   const graph = useResource(
     useCallback(
       (signal: AbortSignal) => alignmentApi.graph(token, signal),
       [token],
     ),
+    true,
   );
   const [selections, setSelections] = useState<Selection[]>([]);
   const [runId, setRunId] = useState("");
   const [revision, setRevision] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const analysis = useAsyncAction();
+  const error = analysis.error;
   const [confirm, setConfirm] = useState(false);
   const [templateDirty, setTemplateDirty] = useState(false);
   const [rulesSaving, setRulesSaving] = useState(false);
@@ -49,13 +64,9 @@ export function AlignmentPage({ token }: { token: string }) {
     template: GraphTemplate;
   }>();
   useEffect(() => setTemplateDirty(false), [runId]);
-  const inFlight = useRef(false);
   const { run, error: runError } = useRun(token, runId, revision);
   const busy =
-    submitting ||
-    rulesSaving ||
-    run?.status === "analyzing" ||
-    run?.graph_status === "building";
+    submitting || rulesSaving || analysis.busy || isTableTaskRunning(run);
   const result = run?.result
     ? {
         ...run.result,
@@ -73,6 +84,14 @@ export function AlignmentPage({ token }: { token: string }) {
   }, [history.data, runId]);
   const refreshGraph = graph.refresh;
   const refreshHistory = history.refresh;
+  const refreshConfig = config.refresh;
+  useEffect(() => {
+    if (active && !templateDirty) {
+      refreshHistory();
+      refreshGraph();
+      refreshConfig();
+    }
+  }, [active, templateDirty, refreshHistory, refreshGraph, refreshConfig]);
   useEffect(() => {
     if (run?.status === "ready" || run?.status === "failed") refreshHistory();
   }, [run?.id, run?.status, refreshHistory]);
@@ -81,61 +100,21 @@ export function AlignmentPage({ token }: { token: string }) {
   }, [run?.id, run?.graph_status, refreshGraph]);
 
   async function analyze() {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setSubmitting(true);
-    setError("");
-    try {
-      const created = await alignmentApi.analyze(token, selections);
-      setRunId(created.id);
-      setRevision((value) => value + 1);
-      history.refresh();
-    } catch (reason) {
-      setError(errorMessage(reason));
-      history.refresh();
-    } finally {
-      inFlight.current = false;
-      setSubmitting(false);
-    }
+    await analysis.execute(
+      "analyze",
+      () => alignmentApi.analyze(token, selections),
+      {
+        onSuccess: (created) => {
+          setRunId(created.id);
+          setRevision((value) => value + 1);
+        },
+        onSettled: history.refresh,
+      },
+    );
   }
 
   return (
-    <main className="alignment-page">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">DATA WORKSPACE / STEP 02</p>
-          <h1>本体对齐与图谱生成</h1>
-          <p className="description">
-            把数据表变成业务对象：自动给出匹配方案，整体采纳后生成可追溯的图谱。
-          </p>
-        </div>
-        <span className="step-badge">
-          <span>02</span> 第二步 · 匹配与构图
-        </span>
-      </div>
-      <ol className="alignment-steps" aria-label="第二步操作顺序">
-        <li>
-          <span>1</span>
-          <div>
-            <strong>选择数据</strong>
-            <small>勾选表，发起新分析</small>
-          </div>
-        </li>
-        <li>
-          <span>2</span>
-          <div>
-            <strong>查看匹配方案</strong>
-            <small>自动预填，按需修改</small>
-          </div>
-        </li>
-        <li>
-          <span>3</span>
-          <div>
-            <strong>生成并查看结果</strong>
-            <small>查看实例、关系及来源</small>
-          </div>
-        </li>
-      </ol>
+    <section aria-label="表格转换工作区">
       {config.error ? (
         <ErrorNotice message={config.error} onRetry={config.refresh} />
       ) : !config.data ? (
@@ -145,6 +124,7 @@ export function AlignmentPage({ token }: { token: string }) {
           <div className="alignment-sidebar">
             <SourcePicker
               token={token}
+              active={active}
               selections={selections}
               onChange={setSelections}
               disabled={Boolean(busy) || templateDirty}
@@ -169,19 +149,22 @@ export function AlignmentPage({ token }: { token: string }) {
                 />
               )}
               <p className="hint">
-                本地本体：{config.data.concept_count.toLocaleString()} 个概念
+                {config.data.ontology_source?.kind === "remote"
+                  ? "远端本体"
+                  : "本地本体"}
+                ：{config.data.concept_count.toLocaleString()} 个概念
                 <br />
                 匹配分数阈值：{config.data.confidence_threshold.toFixed(3)}
                 <br />
                 匹配方式：
                 {config.data.verification_mode === "external_retrieve"
-                  ? "retrieve 接口匹配＋本地版本校验"
+                  ? "retrieve 接口匹配＋固定版本校验"
                   : "本地目录校验"}
               </p>
               <Button
                 type="primary"
                 block
-                loading={submitting}
+                loading={analysis.busy}
                 disabled={
                   !selections.length ||
                   busy ||
@@ -262,6 +245,15 @@ export function AlignmentPage({ token }: { token: string }) {
                 token={token}
                 graph={graph.data}
                 selectedRunId={run?.id}
+                onAnalyze={
+                  graph.data.summary
+                    ? () =>
+                        onAnalyze({
+                          kind: "database",
+                          id: graph.data!.summary!.version,
+                        })
+                    : undefined
+                }
                 onRefresh={graph.refresh}
               />
             ) : (
@@ -292,38 +284,9 @@ export function AlignmentPage({ token }: { token: string }) {
             }
           }}
         >
-          <p>
-            任务 {run.id.slice(0, 8)} · 本次采用 {plan.included.length} 张表，共{" "}
-            {plan.rows.toLocaleString()} 行来源数据。
-          </p>
-          <ul>
-            {plan.included.map((table) => (
-              <li key={table.table_id}>
-                {tableLabel(table)} · {table.row_count.toLocaleString()} 行
-              </li>
-            ))}
-          </ul>
-          <p>
-            对象类型：{plan.concepts.join("、")}。关系规则：{plan.relationRules}{" "}
-            条。
-          </p>
-          <p>
-            {plan.suggestedNodes > 0 &&
-              `包含 ${plan.suggestedNodes} 个低分或未验证的对象建议；采纳后仍保留原始得分与依据。`}
-            普通字段未匹配时保留原始属性，无需逐项确认。
-          </p>
-          <p>
-            实际节点与关系数量在生成后统计。
-            {plan.relationRules === 0 && "当前未配置关系，将只生成节点。"}
-          </p>
-          {plan.excluded.length > 0 && (
-            <p>不参与生成：{plan.excluded.map(tableLabel).join("、")}。</p>
-          )}
-          <p>
-            按确认的规则识别对象并检查属性冲突。新图生成成功后切换当前版本，旧版本保留。
-          </p>
+          <GenerationConfirmation run={run} plan={plan} />
         </ConfirmDialog>
       )}
-    </main>
+    </section>
   );
 }

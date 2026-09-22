@@ -5,6 +5,7 @@ import sqlite3
 from contextlib import contextmanager
 
 from bank_project.alignment.models import AlignmentError
+from bank_project.conversion.versions import require_revision
 
 
 class MatchStore:
@@ -84,8 +85,9 @@ class MatchStore:
             if row is None:
                 raise AlignmentError("匹配任务不存在", 404)
             value = json.loads(row[0])
-            if expected_revision is not None and value["revision"] != expected_revision:
-                raise AlignmentError("其他操作已更新匹配结果，请刷新后重试", 409)
+            require_revision(
+                value["revision"], expected_revision, "其他操作已更新匹配结果，请刷新后重试"
+            )
             action(value)
             db.execute(
                 "UPDATE matches SET data=? WHERE id=?",

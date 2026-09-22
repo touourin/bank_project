@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Button,
@@ -10,14 +10,22 @@ import {
   Table,
   Tabs,
 } from "antd";
-import { errorMessage } from "../../api/request";
+import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { useResource } from "../../hooks/useResource";
+import { useTaskResource } from "../../hooks/useTaskResource";
+import { isRunningTask, taskRevision } from "../conversion/taskState";
 import { EmptyState, ErrorNotice, LoadingState } from "../../ui/Feedback";
 import { Panel } from "../../ui/Panel";
 import { knowledgeApi } from "./api";
+import { derivedGraphId } from "./graphSources";
 import { KnowledgeGraphPanel } from "./KnowledgeGraphPanel";
-import { JsonDetails, StatusTag, usePolling } from "./shared";
-import type { ResolutionCandidate, ResolutionRun, SourceKind } from "./types";
+import { JsonDetails, StatusTag } from "./shared";
+import type {
+  GraphSourceRef,
+  ResolutionCandidate,
+  ResolutionRun,
+  SourceKind,
+} from "./types";
 import {
   ResolutionOptionsPanel,
   defaultResolutionOptions,
@@ -27,7 +35,15 @@ import { ResolutionDifferences } from "./ResolutionDifferences";
 import { MergeFlow, ResolutionHistory } from "./ResolutionHistory";
 import "./knowledge.css";
 
-export function ResolutionPage({ token }: { token: string }) {
+export function ResolutionPage({
+  token,
+  active,
+  onAnalyze,
+}: {
+  token: string;
+  active: boolean;
+  onAnalyze: (source: GraphSourceRef) => void;
+}) {
   const sources = useResource(
     useCallback(
       (signal: AbortSignal) => knowledgeApi.sources(token, signal),
@@ -42,11 +58,14 @@ export function ResolutionPage({ token }: { token: string }) {
     ),
     true,
   );
+  const refreshSources = sources.refresh;
+  useEffect(() => {
+    if (active) refreshSources();
+  }, [active, refreshSources]);
   const [options, setOptions] = useState(defaultResolutionOptions);
   const [source, setSource] = useState("");
   const [runId, setRunId] = useState("");
-  const [updated, setUpdated] = useState<ResolutionRun>();
-  const resource = useResource(
+  const resource = useTaskResource(
     useCallback(
       (signal: AbortSignal) =>
         runId
@@ -54,13 +73,9 @@ export function ResolutionPage({ token }: { token: string }) {
           : Promise.resolve(null),
       [token, runId],
     ),
-    true,
+    { isRunning: isRunningTask, revision: taskRevision },
   );
-  const remote = resource.data?.id === runId ? resource.data : null;
-  const run =
-    updated?.id === runId && (!remote || updated.revision > remote.revision)
-      ? updated
-      : remote;
+  const run = resource.data;
   const graph = useResource(
     useCallback(
       (signal: AbortSignal) =>
@@ -70,9 +85,10 @@ export function ResolutionPage({ token }: { token: string }) {
       [token, run?.id, run?.status, run?.revision],
     ),
   );
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const inFlight = useRef(false);
+  const mutation = useAsyncAction();
+  const { busy } = mutation;
+  const [validationError, setError] = useState("");
+  const error = mutation.error || validationError;
   const [reviewer, setReviewer] = useState("");
   const [note, setNote] = useState("");
   const [filter, setFilter] = useState("all");
@@ -90,7 +106,6 @@ export function ResolutionPage({ token }: { token: string }) {
     candidate: ResolutionCandidate;
   }>();
   useEffect(() => setRollback(undefined), [runId]);
-  usePolling(run?.status === "analyzing", resource.refresh);
   useEffect(() => {
     if (!source) {
       const first = sources.data?.find((item) => item.id && !item.error);
@@ -104,30 +119,23 @@ export function ResolutionPage({ token }: { token: string }) {
     if (run?.status === "ready" || run?.status === "failed") history.refresh();
   }, [run?.id, run?.status, history.refresh]);
   async function mutate(action: () => Promise<ResolutionRun>, created = false) {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setBusy(true);
     setError("");
-    try {
-      const value = await action();
-      setUpdated(value);
-      if (created) {
-        setRunId(value.id);
-        setFilter("all");
-      } else resource.refresh();
-      setManual(false);
-      setRollback(undefined);
-      setNote("");
-      history.refresh();
-    } catch (reason) {
-      setError(errorMessage(reason));
-      setUpdated(undefined);
-      resource.refresh();
-      history.refresh();
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
-    }
+    await mutation.execute(created ? "analyze" : "review", action, {
+      onSuccess: (value) => {
+        if (created) {
+          setRunId(value.id);
+          setFilter("all");
+        } else {
+          resource.accept(value);
+          resource.refresh();
+        }
+        setManual(false);
+        setRollback(undefined);
+        setNote("");
+      },
+      onError: resource.refresh,
+      onSettled: history.refresh,
+    });
   }
   function start() {
     const selected = sources.data?.find(
@@ -147,6 +155,7 @@ export function ResolutionPage({ token }: { token: string }) {
     if (!run) return;
     if (action === "reset" && candidate.status === "merged") {
       setError("");
+      mutation.clearError();
       setRollback({ runId: run.id, revision: run.revision, candidate });
       return;
     }
@@ -196,14 +205,14 @@ export function ResolutionPage({ token }: { token: string }) {
     <main className="knowledge-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">DATA WORKSPACE / STEP 04</p>
+          <p className="eyebrow">DATA WORKSPACE / STEP 03</p>
           <h1>实体消歧</h1>
           <p className="description">
             统一核验文本图谱与数据库图谱中的重复实体，保留每次合并的证据和过程。
           </p>
         </div>
         <span className="step-badge">
-          <span>04</span> 实体 · 校验与合并
+          <span>03</span> 实体 · 校验与合并
         </span>
       </div>
       <div className="knowledge-layout">
@@ -287,8 +296,8 @@ export function ResolutionPage({ token }: { token: string }) {
                   disabled={busy}
                   onClick={() => {
                     setRunId(item.id);
-                    setUpdated(undefined);
                     setError("");
+                    mutation.clearError();
                   }}
                 >
                   <strong>{item.name}</strong>
@@ -316,6 +325,20 @@ export function ResolutionPage({ token }: { token: string }) {
             <>
               <Panel
                 title={run.name}
+                actions={
+                  run.status === "ready" && (
+                    <Button
+                      onClick={() =>
+                        onAnalyze({
+                          kind: run.source_kind,
+                          id: derivedGraphId("resolution", run),
+                        })
+                      }
+                    >
+                      前往图谱分析
+                    </Button>
+                  )
+                }
                 description={`${run.source_kind === "graphrag" ? "GraphRAG 文本图谱" : "数据库图谱"} · 修订 ${run.revision}`}
                 padded
               >

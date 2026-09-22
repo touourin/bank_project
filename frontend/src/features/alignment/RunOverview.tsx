@@ -3,6 +3,11 @@ import { Panel } from "../../ui/Panel";
 import { EmptyState, ErrorNotice, LoadingState } from "../../ui/Feedback";
 import { sameSources, taskStatus, tableLabel } from "./workflow";
 import type { Run, Selection } from "./types";
+import {
+  isTableTaskRunning,
+  tableTaskPhase,
+  taskColor,
+} from "../conversion/taskState";
 
 export function RunOverview({
   run,
@@ -66,21 +71,11 @@ export function RunOverview({
       ) : (
         <>
           <div className="run-progress" role="status">
-            {run.status === "analyzing" || run.graph_status === "building" ? (
+            {isTableTaskRunning(run) ? (
               <LoadingState label={taskStatus(run)} />
             ) : (
               <p>
-                <Tag
-                  color={
-                    run.graph_status === "ready"
-                      ? "success"
-                      : run.status === "failed" ||
-                          run.graph_status === "failed" ||
-                          run.result?.tables.some((t) => t.status === "failed")
-                        ? "error"
-                        : "processing"
-                  }
-                >
+                <Tag color={taskColor(tableTaskPhase(run))}>
                   {taskStatus(run)}
                 </Tag>
               </p>

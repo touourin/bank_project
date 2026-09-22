@@ -13,7 +13,7 @@ async function showRun(page: Page, run: Run) {
     route.fulfill({ json: { summary: null, nodes: [], edges: [] } }),
   );
   await page.goto("/");
-  await page.getByRole("tab", { name: "02 本体对齐与图谱生成" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
   await expect(
     page.getByRole("heading", { name: "当前分析任务", exact: true }),
   ).toBeVisible();
@@ -234,7 +234,7 @@ test("wide table progress and failed batches stay visible in the current task", 
     "第 7/42 批（第 193–224 列）失败：模型请求失败或超时";
   run.result!.tables[0].trace!.steps[0].status = "failed";
   await page.reload();
-  await page.getByRole("tab", { name: "02 本体对齐与图谱生成" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
   await expect(page.locator(".run-progress")).toContainText("1/1 张表失败");
   await expect(page.locator(".task-source-error")).toContainText(
     "第 193–224 列",
@@ -407,7 +407,7 @@ test("failed field retrieval defaults to a raw attribute while preserving failur
   table.columns[0].concept_id = "customer";
   table.columns[0].concept_name = "客户";
   await page.reload();
-  await page.getByRole("tab", { name: "02 本体对齐与图谱生成" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
   await page.getByRole("tab", { name: "匹配过程", exact: true }).click();
   await expect(field).toContainText("检索失败");
   await expect(field).toContainText("已指定节点");
@@ -487,6 +487,12 @@ test("default plan replaces grouping with all fields per row and can be restored
   await expect(
     page.getByRole("button", { name: "采纳方案并生成", exact: true }),
   ).toBeEnabled();
+  // Switching source workflows preserves the unsaved table template.
+  await page.getByRole("tab", { name: "TXT 文本", exact: true }).click();
+  await page.getByRole("tab", { name: "表格 / MySQL", exact: true }).click();
+  await expect(page.locator(".rule-card")).toContainText(
+    "每条来源记录单独生成实例",
+  );
   await page.getByRole("button", { name: "恢复之前方案", exact: true }).click();
   await expect(page.locator(".rule-card")).toContainText("按 id 识别");
   await defaults.click();

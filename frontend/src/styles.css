@@ -172,3 +172,25 @@ footer {
     padding: 16px;
   }
 }
+
+.workspace-page {
+  width: min(1520px, 100%);
+  margin: 0 auto;
+  padding: 30px 40px 70px;
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .workspace-page {
+    padding: 22px 16px 40px;
+  }
+}
+.review-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 16px 0;
+}
+.review-version {
+  overflow-wrap: anywhere;
+}

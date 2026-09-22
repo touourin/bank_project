@@ -2,6 +2,7 @@ export interface RiskNode {
   id: string;
   name: string;
   has_why: boolean;
+  semantic_type?: string;
 }
 
 export interface RiskPredicate {
@@ -20,6 +21,11 @@ export interface RiskCatalog {
   snapshot_sha256: string;
   nodes: RiskNode[];
   predicates: RiskPredicate[];
+  source?: {
+    kind: "remote" | "local";
+    node_count: number;
+    why_node_count: number;
+  };
 }
 
 export interface PropagationJob {

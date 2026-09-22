@@ -87,7 +87,7 @@ class Browser:
     def version(self, session, version):
         if version not in self.versions:
             raise AlignmentError("图谱版本不存在或尚未发布", 404)
-        return SimpleNamespace(revision="ontology-v1")
+        return SimpleNamespace(revision="ontology-v1", ontology_id=None)
 
     def query(self, session, text, **params):
         self.queries.append((text, params))
@@ -360,3 +360,30 @@ def test_query_hash_is_canonical_and_binds_mapping_window_and_policies():
     assert first["query_policy_version"] == QUERY_POLICY_VERSION
     assert len(first["query_hash"]) == 64 and first["query_hash"] == same["query_hash"]
     assert len({first["query_hash"], other_mapping["query_hash"], other_window["query_hash"]}) == 3
+
+
+def test_execution_and_field_mapping_reject_different_ontology_ids(monkeypatch):
+    worker = executor([node("1")])
+    monkeypatch.setattr(
+        worker.graph.browser,
+        "version",
+        lambda *args: SimpleNamespace(revision="ontology-v1", ontology_id="another-ontology"),
+    )
+    with pytest.raises(AlignmentError, match="不同本体"):
+        worker.execute(
+            rule(),
+            "published",
+            MAPPING,
+            START,
+            END,
+            expected_revision="ontology-v1",
+            expected_ontology_id="selected-ontology",
+        )
+    with pytest.raises(AlignmentError, match="不同本体"):
+        worker.fields(
+            "published",
+            ["现金存入"],
+            expected_revision="ontology-v1",
+            expected_ontology_id="selected-ontology",
+        )
+    assert not worker.graph.browser.queries

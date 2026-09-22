@@ -27,6 +27,7 @@ playwright-report/
 test-results/
 
 outputs/
+output/
 
 # Large generated fixture; retain locally and reproduce from source mock scripts.
 /examples/mock/交易流水.xlsx

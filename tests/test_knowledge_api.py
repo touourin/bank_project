@@ -20,6 +20,20 @@ def test_matching_api_auth_review_and_complete_graph(tmp_path):
         assert client.get(root + "/sources").status_code == 401
         headers = {"Authorization": "Bearer knowledge-test-token-1234567890"}
         assert client.get(root + "/sources", headers=headers).json()[0]["id"] == "dataset"
+        source = {"source_kind": "graphrag", "source_id": "dataset"}
+        assert client.get(root + "/graph", params=source).status_code == 401
+        original = client.get(root + "/graph", params=source, headers=headers)
+        assert original.status_code == 200
+        assert original.json()["nodes"][0]["properties"]["unknown"]["code"] == "001"
+        assert client.get(root + "/matches", headers=headers).json() == []
+        assert (
+            client.get(
+                root + "/graph",
+                params={"source_kind": "database", "source_id": "raw-db"},
+                headers=headers,
+            ).status_code
+            == 422
+        )
         response = client.post(
             root + "/matches",
             json={"source_kind": "graphrag", "source_id": "dataset"},
@@ -36,6 +50,11 @@ def test_matching_api_auth_review_and_complete_graph(tmp_path):
         graph = client.get(f"{root}/matches/{run_id}/graph", headers=headers).json()
         assert graph["nodes"][0]["properties"]["unknown"]["code"] == "001"
         assert graph["nodes"][0]["boid"] == "customer"
+        source["source_id"] = f"match:{run_id}:1"
+        assert (
+            client.get(root + "/graph", params=source, headers=headers).json()["nodes"]
+            == graph["nodes"]
+        )
         decision = {"target": "node", "target_id": "a", "boid": "account", "expected_revision": 1}
         assert (
             client.post(
@@ -48,6 +67,12 @@ def test_matching_api_auth_review_and_complete_graph(tmp_path):
         revised = client.post(f"{root}/matches/{run_id}/decisions", json=decision, headers=headers)
         assert revised.status_code == 200
         assert revised.json()["revision"] == 2
+        assert client.get(root + "/graph", params=source, headers=headers).status_code == 409
+        source["source_id"] = f"match:{run_id}:2"
+        assert (
+            client.get(root + "/graph", params=source, headers=headers).json()["nodes"][0]["boid"]
+            == "account"
+        )
         assert (
             client.post(
                 f"{root}/matches/{run_id}/decisions", json=decision, headers=headers

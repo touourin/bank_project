@@ -1,5 +1,6 @@
-import { useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Modal } from "antd";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import { ErrorNotice } from "./Feedback";
 
 /** Mount for one pending action. Failed actions stay open and can be retried. */
@@ -20,23 +21,9 @@ export function ConfirmDialog({
   danger?: boolean;
   disabled?: boolean;
 }) {
-  const inFlight = useRef(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const { busy, error, execute } = useAsyncAction();
   async function confirm() {
-    if (inFlight.current || disabled) return;
-    inFlight.current = true;
-    setBusy(true);
-    setError("");
-    try {
-      await onConfirm();
-      onClose();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "操作失败，请重试");
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
-    }
+    if (!disabled) await execute("confirm", onConfirm, { onSuccess: onClose });
   }
   return (
     <Modal
@@ -57,7 +44,7 @@ export function ConfirmDialog({
       keyboard={!busy}
       mask={{ closable: !busy }}
       onCancel={() => {
-        if (!inFlight.current) onClose();
+        if (!busy) onClose();
       }}
       onOk={confirm}
     >

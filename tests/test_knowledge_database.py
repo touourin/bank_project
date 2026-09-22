@@ -41,7 +41,13 @@ class Browser:
             }
             for i in range(1, 1201)
         ]
-        self.summary = SimpleNamespace(node_count=1201, edge_count=1200, created_at="2026-09-20")
+        self.summary = SimpleNamespace(
+            node_count=1201,
+            edge_count=1200,
+            created_at="2026-09-20",
+            ontology_id="ontology-1",
+            revision="r1",
+        )
 
     @contextmanager
     def session(self):
@@ -63,6 +69,7 @@ def test_exports_complete_version_including_cross_page_links_and_unknown_fields(
     result = adapter.load(str(uuid4()))
     assert len(result["nodes"]) == 1201
     assert len(result["edges"]) == 1200
+    assert result["ontology_id"] == "ontology-1" and result["ontology_revision"] == "r1"
     assert result["edges"][-1]["target"] == "n1200"
     assert result["nodes"][-1]["properties"]["extra"] == {"null": None}
     assert result["nodes"][-1]["storage_properties"] == browser.nodes[-1]["stored"]
@@ -75,3 +82,37 @@ def test_count_mismatch_refuses_partial_snapshot():
     browser.summary.edge_count += 1
     with pytest.raises(AlignmentError, match="不完整图谱"):
         DatabaseGraphs(SimpleNamespace(browser=browser)).load(str(uuid4()))
+
+
+def test_graph_sources_list_latest_publications_first_and_preserve_ontology_metadata(monkeypatch):
+    browser = Browser()
+    rows = [
+        {
+            "id": "z-old",
+            "summary": json.dumps(
+                {
+                    "node_count": 3,
+                    "edge_count": 0,
+                    "created_at": "2026-09-20T10:00:00+00:00",
+                    "revision": "r0",
+                }
+            ),
+        },
+        {
+            "id": "a-new",
+            "summary": json.dumps(
+                {
+                    "node_count": 1000,
+                    "edge_count": 100,
+                    "created_at": "2026-09-22T10:00:00+00:00",
+                    "revision": "r1",
+                    "ontology_id": "ontology-1",
+                }
+            ),
+        },
+    ]
+    monkeypatch.setattr(browser, "query", lambda *args, **kwargs: rows)
+    sources = DatabaseGraphs(SimpleNamespace(configured=True, browser=browser)).sources()
+    assert [source["id"] for source in sources] == ["a-new", "z-old"]
+    assert sources[0]["ontology_id"] == "ontology-1" and sources[0]["ontology_revision"] == "r1"
+    assert sources[1]["ontology_id"] is None

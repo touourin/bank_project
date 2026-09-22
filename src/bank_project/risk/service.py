@@ -10,6 +10,7 @@ from uuid import uuid4
 from bank_project.alignment.model_client import JsonModel
 from bank_project.alignment.models import AlignmentError
 from bank_project.knowledge.database import DatabaseGraphs
+from bank_project.ontology.service import OntologyService
 
 from .catalog import RiskCatalog
 from .compiler import COMPILER_POLICY_VERSION, MAX_BO_SCOPE, RuleCompiler, supported_predicates
@@ -25,10 +26,11 @@ MAX_PROMPT_CHARS = 40000
 
 
 class RiskService:
-    def __init__(self, settings, graph, *, model=None):
+    def __init__(self, settings, graph, *, model=None, ontology=None):
         self.settings, self.graph = settings, graph
+        self.ontology = ontology or OntologyService(settings)
         self.store = RiskStore(settings.data_dir / "risk" / "runs.sqlite3")
-        self.snapshots = settings.data_dir / "risk" / "snapshots"
+        self.snapshots = self.ontology.snapshots.directory
         self.snapshots.mkdir(parents=True, exist_ok=True)
         self.model = model or JsonModel(settings)
         self.compiler = RuleCompiler()
@@ -37,13 +39,14 @@ class RiskService:
         self.slots = asyncio.Semaphore(settings.alignment_model_concurrency)
 
     def catalog(self, query="", limit=50):
-        catalog = RiskCatalog.load(self.settings.ontology_snapshot, self.settings.ontology_revision)
-        nodes = catalog.search(query, limit)
+        catalog = self.ontology.current()
+        nodes = [node.model_dump() for node in catalog.search(query, limit)]
         return {
             "revision": catalog.revision,
             "snapshot_sha256": catalog.sha256,
             "nodes": nodes,
             "predicates": supported_predicates(),
+            "source": self.ontology.info(catalog),
         }
 
     def sources(self):
@@ -51,22 +54,14 @@ class RiskService:
 
     async def start(self, request):
         catalog = await asyncio.to_thread(
-            RiskCatalog.load,
-            self.settings.ontology_snapshot,
-            request.dataset_revision or self.settings.ontology_revision,
+            self.ontology.for_risk,
+            request.dataset_revision,
         )
         for anchor in request.anchor_node_ids:
             if anchor not in catalog.names:
                 raise AlignmentError("所选节点不在固定的本体版本中")
         # Keep the exact source bytes: later ontology refreshes must not change old reviews.
-        snapshot = self.snapshots / f"{catalog.sha256}.json"
-        if not snapshot.exists():
-            temporary = self.snapshots / f".{uuid4()}.tmp"
-            try:
-                await asyncio.to_thread(temporary.write_bytes, catalog.content)
-                temporary.replace(snapshot)
-            finally:
-                temporary.unlink(missing_ok=True)
+        await asyncio.to_thread(self.ontology.snapshots.save, catalog)
         job = {
             "id": str(uuid4()),
             "status": "running",
@@ -76,6 +71,7 @@ class RiskService:
             "updated_at": now(),
             "request": request.model_dump(),
             "dataset_revision": catalog.revision,
+            "ontology_id": catalog.ontology_id,
             "snapshot_sha256": catalog.sha256,
             "prompt_version": PROMPT_VERSION,
             "model": self.settings.model_name or "qwen3.7-plus",
@@ -294,6 +290,7 @@ class RiskService:
         base = next((p for p in ("高", "中", "低") if p in priorities), None)
         binding = {
             "dataset_revision": catalog.revision,
+            "ontology_id": catalog.ontology_id,
             "snapshot_sha256": catalog.sha256,
             "compiler_policy_version": COMPILER_POLICY_VERSION,
             "source_policy_version": SOURCE_POLICY_VERSION,
@@ -370,11 +367,14 @@ class RiskService:
         # Filename is only ever a server-created sha256; verify before accessing disk too.
         if len(snapshot_hash) != 64 or any(c not in "0123456789abcdef" for c in snapshot_hash):
             raise AlignmentError("本体快照哈希无效", 409)
-        catalog = RiskCatalog.load(
-            self.snapshots / f"{snapshot_hash}.json", binding["dataset_revision"]
-        )
+        snapshot = self.snapshots / f"{snapshot_hash}.json"
+        if not snapshot.exists():
+            snapshot = self.settings.data_dir / "risk" / "snapshots" / f"{snapshot_hash}.json"
+        catalog = RiskCatalog.load(snapshot, binding["dataset_revision"])
         if catalog.sha256 != snapshot_hash:
             raise AlignmentError("本体快照内容已变化，审核依据失效", 409)
+        if binding.get("ontology_id") and binding["ontology_id"] != catalog.ontology_id:
+            raise AlignmentError("规则与固定本体 ID 不一致", 409)
         anchor, source = binding["anchor_node_id"], binding["source_node_id"]
         scope = derive_bo_scope(catalog.graph, anchor, max_size=MAX_SCOPE)
         pinned = binding["propagation"]
@@ -407,6 +407,7 @@ class RiskService:
             graph_version,
             case["source_binding"]["propagation"]["bo_scope"],
             expected_revision=case["source_binding"]["dataset_revision"],
+            expected_ontology_id=case["source_binding"].get("ontology_id"),
         )
 
     async def execute(self, identifier, request):
@@ -448,6 +449,7 @@ class RiskService:
                 request.start,
                 request.end,
                 expected_revision=execution["source_binding"]["dataset_revision"],
+                expected_ontology_id=execution["source_binding"].get("ontology_id"),
             )
             execution["status"] = "succeeded"
         except asyncio.CancelledError:

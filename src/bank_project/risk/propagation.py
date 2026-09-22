@@ -6,13 +6,13 @@ rule flow, from the source back to the anchor. IS_A may have multiple parents.
 
 import hashlib
 import heapq
-import json
 from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
 
 from bank_project.alignment.models import AlignmentError
+from bank_project.ontology.serialization import canonical_json as canonical_json
 
 PROPAGATION_POLICY_VERSION = "bank.risk.propagation-policy.v2"
 _STRENGTH_RANK = {"deductive": 0, "strong": 1, "weak": 2}
@@ -30,12 +30,6 @@ RELATION_RULE_FLOW: dict[str, dict[str, str | None]] = {
     "derives_from": {"forward": None, "reverse": "strong"},
     "adjacent_to": {"forward": None, "reverse": None},
 }
-
-
-def canonical_json(value: Any) -> str:
-    return json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
-    )
 
 
 @dataclass(frozen=True)

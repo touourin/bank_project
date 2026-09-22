@@ -57,7 +57,7 @@ def _read_json(path: Path) -> Any:
         raise AlignmentError("无法读取有效的 WHY 离线 JSON 文件") from exc
 
 
-def _response(value: Any, node_id: str, revision: str) -> tuple[Any, str | None]:
+def verify_why_response(value: Any, node_id: str, revision: str) -> tuple[Any, str | None]:
     if (
         not isinstance(value, dict)
         or value.get("node_id") != node_id
@@ -79,7 +79,7 @@ def _response(value: Any, node_id: str, revision: str) -> tuple[Any, str | None]
     return deepcopy(why), digest
 
 
-async def _fetch(
+async def fetch_why(
     client: httpx.AsyncClient, base_url: str, node_id: str, revision: str, timeout: float
 ):
     try:
@@ -196,7 +196,7 @@ async def import_why(
             if not isinstance(key, str) or key not in catalog.names or key in seen:
                 raise AlignmentError("WHY 离线响应存在重复节点或版本外节点")
             seen.add(key)
-            verified = _response(response, key, catalog.revision)
+            verified = verify_why_response(response, key, catalog.revision)
             if key in selected:
                 imported[key] = verified
         if set(imported) != set(selected):
@@ -210,8 +210,8 @@ async def import_why(
             transport=transport,
         ) as client:
             for key in selected:
-                response = await _fetch(client, root, key, catalog.revision, timeout)
-                imported[key] = _response(response, key, catalog.revision)
+                response = await fetch_why(client, root, key, catalog.revision, timeout)
+                imported[key] = verify_why_response(response, key, catalog.revision)
 
     document = json.loads(catalog.content)
     for key, (_, digest) in imported.items():
@@ -257,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--revision", required=True, help="明确选择的 ready 版本")
     parser.add_argument("--output", required=True, type=Path, help="新输出文件（不能存在）")
     sources = parser.add_mutually_exclusive_group()
-    sources.add_argument("--base-url", help="本体 API 根地址；缺省使用 BANK_RETRIEVE_BASE_URL")
+    sources.add_argument("--base-url", help="本体 API 根地址；缺省使用 BANK_ONTOLOGY_BASE_URL")
     sources.add_argument(
         "--dimensions-file", type=Path, help="同版本 concept/dimensions 响应 JSON 数组"
     )
@@ -269,7 +269,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         base_url = args.base_url
         if not args.dimensions_file and not base_url:
-            base_url = Settings().retrieve_base_url
+            base_url = Settings().ontology_base_url
         summary = asyncio.run(
             import_why(
                 args.snapshot,

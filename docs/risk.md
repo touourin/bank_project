@@ -13,6 +13,7 @@
 | 文件 | 职责 |
 | --- | --- |
 | `src/bank_project/risk/catalog.py` | 复用 alignment Catalog 的版本选择、搜索与文件读取限制，读取原始 WHY 和版本内关系 |
+| `src/bank_project/ontology/service.py` | 所有流程共用本体目录、版本和维度验证；生成时补齐 WHY 并归档 |
 | `src/bank_project/risk/propagation.py` | 无 I/O 的方向策略、多父 IS_A 遍历、路径强度与完整实例作用域 |
 | `src/bank_project/risk/compiler.py`、`sources.py` | 白名单 RulePack、参数类型、WHY 逐字引用校验 |
 | `src/bank_project/risk/service.py` | 复用 JsonModel，编排后台生成、固定证据、审核与执行 |
@@ -21,9 +22,17 @@
 | `src/bank_project/api/risk.py` | 复用 Bearer、Origin 和请求体限额的 HTTP 边界 |
 | `frontend/src/features/risk/` | 复用公共 Panel、Feedback、请求层、Ant Design 和主题的第五步页面 |
 
-`main.py` 集中装配与关闭服务。生成复用现有模型配置，使用 API 内后台任务及 SQLite 持久化，与当前单 API 部署一致；不迁入原平台的 JobManager、ProviderRegistry 或独立数据库。重启后未完成任务标记失败，已保存规则与审核记录保留。数据在 `BANK_DATA_DIR/risk/`，随现有数据卷备份。
+`main.py` 集中装配与关闭服务。生成复用现有模型配置，使用 API 内后台任务及 SQLite 持久化，与当前单 API 部署一致；不迁入原平台的 JobManager、ProviderRegistry 或独立数据库。重启后未完成任务标记失败，已保存规则与审核记录保留。任务和审计在 `BANK_DATA_DIR/risk/`，公共本体依据在 `BANK_DATA_DIR/ontology/snapshots/`，两者随数据卷一并备份；旧 `risk/snapshots/` 仍可读取。
 
-## WHY 快照前提
+## 远端本体接入
+
+设置 `BANK_ONTOLOGY_BASE_URL` 为本体 API 根地址（例如 `http://your-ontology-host:30080/v2/ontologies/your-ontology-id`），保持 `BANK_ONTOLOGY_REVISION` 与第二步使用的版本一致。第五步调用 `/ready` 核对版本，通过 `/evaluation-snapshot` 读取完整节点和关系，再从 `/concept/dimensions` 读取目录标记为非空的 WHY。每个响应校验本体 ID、版本、节点 ID、原文哈希及目录中的维度哈希；目录声明为空的维度无需逐节点请求。
+
+目录搜索只读取目录与维度摘要，不抓取全部 WHY；首次生成规则时按 `BANK_RETRIEVE_CONCURRENCY` 限制并发，整个读取受 `BANK_RETRIEVE_TIMEOUT_SECONDS` 约束。全部验证通过后缓存该版本，每次搜索和生成前仍核对远端就绪版本。远端失败或版本变化时明确报错，不回退到缺少 WHY 的本地目录。页面显示来源、概念数量、WHY 数量及节点类型。
+
+远端目录由表格、TXT、本体浏览和风险流程共同使用，不改写已有任务和业务图谱。每次生成仍保存完整已验证快照作为审核证据；历史规则审核读取当时保存的内容，不受服务后续变更影响。未配置远端地址时继续使用下述离线方式。
+
+## 离线 WHY 快照前提
 
 当前仓库的 `data/ontology/snapshot.json` 只包含概念目录与关系，没有 WHY 原文。目录可以搜索，但无可达 WHY 的锚点不会调用模型、不会生成规则。页面明确显示无候选；不能用名称推测 WHY。
 
@@ -41,9 +50,9 @@
   --output data/ontology/with-why.json
 ```
 
-改用 `--base-url <本体API根路径>` 可直接读取同版本服务；不传两个来源参数时读取 `.env` 的 `BANK_RETRIEVE_BASE_URL`。导入不会自动启用输出文件。
+改用 `--base-url <本体API根路径>` 可直接读取同版本服务；不传两个来源参数时读取 `.env` 的 `BANK_ONTOLOGY_BASE_URL`。导入不会自动启用输出文件。
 
-将验证过的新快照配置到 `BANK_ONTOLOGY_SNAPSHOT`，保持 `BANK_ONTOLOGY_REVISION` 与 retrieve 服务一致。Docker 默认只读挂载 `./data/ontology` 到 `/app/ontology`，因此新快照宜放在此目录，并使用容器内路径配置。原有生成任务保存独立的快照副本，后续配置或快照更新不会改变已保存的审核依据。第二步已有分析记录仍按其快照哈希校验，切换快照后需要重新分析才能编辑旧匹配。
+将验证过的新快照配置到 `BANK_ONTOLOGY_SNAPSHOT`，保持 `BANK_ONTOLOGY_REVISION` 与 retrieve 服务一致。Docker 默认只读挂载 `./data/ontology` 到 `/app/ontology`，因此新快照宜放在此目录，并使用容器内路径配置。原有生成任务保存独立的快照副本，后续配置或快照更新不会改变已保存的审核依据。第二步已有分析记录使用迁移时归档的原始快照，可继续编辑；重新分析才会使用当前本体。
 
 ## 传导与作用域
 

@@ -10,6 +10,7 @@ from itertools import combinations
 from uuid import uuid4
 
 from bank_project.alignment.models import AlignmentError
+from bank_project.conversion.versions import require_revision
 
 from .adapter import annotate_run, brief, conflicts, quote_location, source_records
 from .engine.contracts import digest
@@ -237,8 +238,11 @@ class ResolutionStore:
             run, packed = self._read(db, run_id)
             if run.status != "ready" or packed is None:
                 raise AlignmentError("请等待候选分析完成后再进行人工校验", 409)
-            if run.revision != request.expected_revision:
-                raise AlignmentError("审核版本已变化，请刷新后重新确认，避免覆盖他人决定", 409)
+            require_revision(
+                run.revision,
+                request.expected_revision,
+                "审核版本已变化，请刷新后重新确认，避免覆盖他人决定",
+            )
             graph = json.loads(zlib.decompress(packed))
             by_id = {node["id"]: node for node in graph["nodes"]}
             if manual:

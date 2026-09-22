@@ -486,6 +486,57 @@ test("missing WHY parameters block approval and allow a reasoned rejection", asy
   ).toHaveCount(0);
 });
 
+test("returning to risk refreshes published graphs without losing execution inputs", async ({
+  page,
+}) => {
+  await mockRisk(page);
+  let available = [
+    { kind: "database", id: graphVersion, name: "现金交易图谱" },
+  ];
+  await page.route("**/api/v1/risk/sources", (route) =>
+    route.fulfill({ json: available }),
+  );
+  await page
+    .getByRole("checkbox", {
+      name: "我已核对 WHY 原文、参数引用、传导适用性及实例作用域",
+    })
+    .check();
+  await page.getByRole("button", { name: "批准规则" }).click();
+  await select(page, "风险执行图谱", "现金交易图谱");
+  await select(page, "映射 account_id", "客户账号");
+  await page
+    .getByRole("textbox", { name: "风险开始时间" })
+    .fill("2026-09-01T00:00:00+08:00");
+  await page.getByRole("tab", { name: "01 数据接入" }).click();
+  available.push({ kind: "database", id: secondGraph, name: "刚发布的图谱" });
+  await page.getByRole("tab", { name: "05 风险规则" }).click();
+  await expect(page.getByRole("textbox", { name: "风险开始时间" })).toHaveValue(
+    "2026-09-01T00:00:00+08:00",
+  );
+  await page.getByRole("combobox", { name: "风险执行图谱" }).click();
+  await expect(
+    page.locator(".ant-select-item-option").filter({ hasText: "刚发布的图谱" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.locator(".risk-field").filter({
+      has: page.getByRole("combobox", {
+        name: "映射 account_id",
+        exact: true,
+      }),
+    }),
+  ).toContainText("客户账号");
+  available = [
+    { kind: "database", id: graphVersion, name: "现金交易图谱（已刷新）" },
+  ];
+  await page.getByRole("button", { name: "刷新图谱列表" }).click();
+  await expect(
+    page.locator(".risk-field").filter({
+      has: page.getByRole("combobox", { name: "风险执行图谱", exact: true }),
+    }),
+  ).toContainText("现金交易图谱（已刷新）");
+});
+
 test("review conflict refreshes the current status without replaying approval", async ({
   page,
 }) => {
@@ -523,12 +574,15 @@ test("all five workflow tabs remain clickable and keyboard accessible on mobile"
   await page.setViewportSize({ width: 390, height: 844 });
   await mockRisk(page);
   const risk = page.getByRole("tab", { name: "05 风险规则" });
-  const resolution = page.getByRole("tab", { name: "04 实体消歧" });
+  const analysis = page.getByRole("tab", { name: "04 图谱浏览与分析" });
+  const resolution = page.getByRole("tab", { name: "03 实体消歧" });
   await expect(risk).toHaveAttribute("aria-selected", "true");
   await risk.press("Home");
   await expect(page.getByRole("tab", { name: "01 数据接入" })).toBeFocused();
   await page.keyboard.press("End");
   await expect(risk).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(analysis).toBeFocused();
   await page.keyboard.press("ArrowLeft");
   await expect(resolution).toBeFocused();
   await page.keyboard.press("Enter");

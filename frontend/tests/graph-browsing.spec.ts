@@ -92,7 +92,7 @@ async function openGraph(page: Page, relations = false) {
     });
   });
   await page.goto("/");
-  await page.getByRole("tab", { name: "02 本体对齐与图谱生成" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
   await expect(page.locator(".graph-page-status")).toContainText(
     "第 1–100 条 / 共 237 条",
   );

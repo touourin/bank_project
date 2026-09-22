@@ -79,6 +79,17 @@ const liveKnowledgeApi = {
     }),
   sources: (token: string, signal?: AbortSignal) =>
     request<KnowledgeSource[]>(`${root}/knowledge/sources`, token, { signal }),
+  sourceGraph: (
+    token: string,
+    kind: SourceKind,
+    source: string,
+    signal?: AbortSignal,
+  ) =>
+    request<KnowledgeGraph>(
+      `${root}/knowledge/graph?${new URLSearchParams({ source_kind: kind, source_id: source })}`,
+      token,
+      { signal },
+    ),
   resolutions: (token: string, signal?: AbortSignal) =>
     request<ResolutionRun[]>(`${root}/resolution/runs`, token, { signal }),
   resolution: (token: string, runId: string, signal?: AbortSignal) =>

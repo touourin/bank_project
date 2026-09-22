@@ -45,17 +45,22 @@ class GraphBrowser:
             raise AlignmentError("图谱版本不存在或尚未发布，请刷新图谱", 404)
         return GraphSummary.model_validate_json(rows[0]["summary"])
 
-    def overview(self):
+    def overview(self, version: str | None = None):
         if not self.graph.configured:
+            if version is not None:
+                raise AlignmentError("业务图谱未配置，无法读取指定版本", 503)
             return GraphOverview()
         with self.session() as session:
-            rows = self.query(
-                session,
-                "MATCH (s:BankAlignmentState {name:'current'}) MATCH (v:BankAlignmentVersion {id:s.version,status:'ready'}) RETURN v.summary AS summary",
-            )
-            if not rows:
-                return GraphOverview()
-            summary = GraphSummary.model_validate_json(rows[0]["summary"])
+            if version is not None:
+                summary = self.version(session, version)
+            else:
+                rows = self.query(
+                    session,
+                    "MATCH (s:BankAlignmentState {name:'current'}) MATCH (v:BankAlignmentVersion {id:s.version,status:'ready'}) RETURN v.summary AS summary",
+                )
+                if not rows:
+                    return GraphOverview()
+                summary = GraphSummary.model_validate_json(rows[0]["summary"])
             groups = self.query(
                 session,
                 """MATCH (n:BankAlignedInstance {version:$version})

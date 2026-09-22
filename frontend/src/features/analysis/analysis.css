@@ -1,0 +1,29 @@
+.analysis-results {
+  margin-top: 22px;
+  min-width: 0;
+}
+.analysis-source-picker {
+  width: min(640px, 100%);
+}
+.analysis-page .hint {
+  overflow-wrap: anywhere;
+}
+.analysis-mode-tabs > .ant-tabs-nav {
+  padding-inline: clamp(16px, 3vw, 48px);
+  margin-bottom: 0;
+}
+.ontology-concept-details {
+  display: grid;
+  gap: 12px;
+  margin-block: 20px;
+}
+.ontology-detail-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.ontology-detail-controls > .ant-select {
+  flex: 1 1 360px;
+  min-width: 0;
+}

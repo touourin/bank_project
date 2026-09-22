@@ -40,7 +40,9 @@ class Settings(BaseSettings):
     neo4j_database: NonEmpty = "neo4j"
     ontology_snapshot: Path = Path("data/ontology/snapshot.json")
     ontology_revision: str | None = None
+    ontology_base_url: str | None = None
     retrieve_base_url: str | None = None
+    risk_ontology_base_url: str | None = None
     retrieve_timeout_seconds: float = Field(default=60, gt=0, le=120, allow_inf_nan=False)
     retrieve_concurrency: int = Field(default=3, ge=1, le=8)
     alignment_min_confidence: float = Field(default=0.75, ge=0, le=1, allow_inf_nan=False)
@@ -68,9 +70,9 @@ class Settings(BaseSettings):
     graphrag_chunk_size: int = Field(default=1200, ge=100, le=16000)
     graphrag_chunk_overlap: int = Field(default=100, ge=0, le=15999)
 
-    @field_validator("retrieve_base_url")
+    @field_validator("ontology_base_url", "retrieve_base_url", "risk_ontology_base_url")
     @classmethod
-    def validate_retrieve_url(cls, value: str | None) -> str | None:
+    def validate_ontology_url(cls, value: str | None) -> str | None:
         if not value or not value.strip():
             return None
         value = value.strip().rstrip("/")
@@ -85,7 +87,7 @@ class Settings(BaseSettings):
             or parts.path.endswith("/retrieve")
         ):
             raise ValueError(
-                "retrieve 地址需要 HTTP(S) 本体根路径，不能包含凭据、查询参数或末尾 /retrieve"
+                "本体地址需要 HTTP(S) 本体根路径，不能包含凭据、查询参数或末尾 /retrieve"
             )
         return value
 
@@ -107,7 +109,24 @@ class Settings(BaseSettings):
         )
 
     @model_validator(mode="after")
-    def validate_api_token(self) -> Self:
+    def validate_configuration(self) -> Self:
+        roots = {
+            value
+            for value in (
+                self.ontology_base_url,
+                self.retrieve_base_url,
+                self.risk_ontology_base_url,
+            )
+            if value
+        }
+        if len(roots) > 1:
+            raise ValueError(
+                "表格、TXT 与风险规则必须使用同一本体地址，请统一 BANK_ONTOLOGY_BASE_URL 及旧配置"
+            )
+        if roots:
+            self.ontology_base_url = self.retrieve_base_url = self.risk_ontology_base_url = (
+                roots.pop()
+            )
         if self.graphrag_chunk_overlap >= self.graphrag_chunk_size:
             raise ValueError("GraphRAG 分块重叠必须小于分块大小")
         if self.api_token is not None and len(self.api_token.get_secret_value()) < 24:

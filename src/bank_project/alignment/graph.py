@@ -141,6 +141,7 @@ class VersionedGraph:
             version=version,
             run_id=run.id,
             revision=result.revision,
+            ontology_id=result.ontology_id,
             node_count=0,
             edge_count=0,
             created_at=datetime.now(UTC).isoformat(),

@@ -8,6 +8,10 @@ export interface AlignmentConfig {
   catalog_error: string | null;
   revision: string | null;
   concept_count: number;
+  ontology_source?: {
+    kind: "remote" | "local";
+    ontology_id: string | null;
+  } | null;
   verification_mode: string;
   matching_mode?: string;
   retrieve_configured?: boolean;
@@ -28,6 +32,8 @@ export interface ConceptRef {
 }
 export interface ConceptDetail extends ConceptRef {
   parents: ConceptRef[];
+  semantic_type?: string | null;
+  has_why?: boolean;
   score?: number | null;
 }
 export interface RetrievalTrace {
@@ -65,6 +71,9 @@ export interface MatchTrace {
   confidence_threshold: number;
 }
 export interface MappingEdit {
+  version?: string | null;
+  id?: string | null;
+  reviewer?: string;
   created_at: string;
   column: string | null;
   before: ConceptRef | null;
@@ -72,6 +81,7 @@ export interface MappingEdit {
   reason: string;
 }
 export interface MappingEditRequest {
+  reviewer?: string;
   table_id: string;
   column: string | null;
   concept_id: string | null;

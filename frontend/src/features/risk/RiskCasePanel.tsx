@@ -12,11 +12,13 @@ import type { RiskCase, RiskPredicate } from "./types";
 
 export function RiskCasePanel({
   token,
+  active,
   caseId,
   predicates,
   onChanged,
 }: {
   token: string;
+  active: boolean;
   caseId: string;
   predicates: RiskPredicate[];
   onChanged: () => void;
@@ -38,6 +40,10 @@ export function RiskCasePanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const inFlight = useRef(false);
+  const refresh = resource.refresh;
+  useEffect(() => {
+    if (active) refresh();
+  }, [active, refresh]);
   useEffect(() => {
     setConfirmed(false);
     setReason("");
@@ -260,6 +266,7 @@ export function RiskCasePanel({
       <RiskExecutionPanel
         key={`${value.id}:${value.version}`}
         token={token}
+        active={active}
         value={value}
         predicates={predicates}
         onStale={resource.refresh}

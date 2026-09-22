@@ -8,6 +8,8 @@ export interface KnowledgeSource {
   error?: string;
   root_source_id?: string;
 }
+export type GraphSourceRef = Pick<KnowledgeSource, "kind" | "id">;
+
 export interface KnowledgeNode {
   id: string;
   name: string;
@@ -22,13 +24,15 @@ export interface KnowledgeEdge {
   properties: Record<string, unknown>;
   edge_type?: string | null;
 }
-export interface KnowledgeGraph {
+export interface GraphData {
   id: string;
   name: string;
-  source_kind: SourceKind;
-  source_id: string;
   nodes: KnowledgeNode[];
   edges: KnowledgeEdge[];
+}
+export interface KnowledgeGraph extends GraphData {
+  source_kind: SourceKind;
+  source_id: string;
 }
 export interface Dataset {
   key: string;

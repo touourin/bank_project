@@ -15,9 +15,9 @@ test("staged data becomes a mapping, graph publication is separate, and reload r
   await expect(
     page.getByRole("heading", { name: "对齐客户.csv", exact: true }),
   ).toBeVisible();
-  await page.getByRole("tab", { name: "02 本体对齐与图谱生成" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
   await expect(
-    page.getByRole("heading", { name: "本体对齐与图谱生成", exact: true }),
+    page.getByRole("heading", { name: "数据转换", exact: true }),
   ).toBeVisible();
   await page
     .locator(".alignment-batch-name")
@@ -30,7 +30,7 @@ test("staged data becomes a mapping, graph publication is separate, and reload r
   ).toBeVisible();
   await expect(page.getByText("可生成实例", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("retrieve 接口匹配＋本地版本校验", { exact: false }).last(),
+    page.getByText("retrieve 接口匹配＋固定版本校验", { exact: false }).last(),
   ).toBeVisible();
   await expect(page.getByText("尚未生成图谱", { exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "匹配过程", exact: true }).click();
@@ -86,6 +86,9 @@ test("staged data becomes a mapping, graph publication is separate, and reload r
     .getByRole("textbox", { name: "修改依据", exact: true })
     .fill("测试人工调整为账户");
   await editor
+    .getByRole("textbox", { name: "审核人", exact: true })
+    .fill("表格审核员");
+  await editor
     .getByRole("button", { name: "保存为新版本", exact: true })
     .click();
   await expect(editor).not.toBeVisible();
@@ -103,6 +106,7 @@ test("staged data becomes a mapping, graph publication is separate, and reload r
   await expect(page.locator(".manual-edits")).toContainText(
     "测试人工调整为账户",
   );
+  await expect(page.locator(".manual-edits")).toContainText("表格审核员");
   await page.getByRole("tab", { name: "字段映射", exact: true }).click();
   await page
     .getByRole("button", { name: "修改 name 的节点", exact: true })
@@ -136,7 +140,7 @@ test("staged data becomes a mapping, graph publication is separate, and reload r
     animations: "disabled",
   });
   await page.reload();
-  await page.getByRole("tab", { name: "02 本体对齐与图谱生成" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
   await expect(
     page.getByRole("heading", { name: "匹配结果", exact: true }),
   ).toBeVisible();
@@ -189,7 +193,7 @@ test("low confidence remains visible and cannot generate a graph", async ({
     route.fulfill({ json: run }),
   );
   await page.goto("/");
-  await page.getByRole("tab", { name: "02 本体对齐与图谱生成" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
   await expect(page.getByText("匹配建议", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "采纳方案并生成", exact: true }),
@@ -278,7 +282,7 @@ test("live stages are visible and interrupted jobs cannot pretend to finish", as
     route.fulfill({ json: run }),
   );
   await page.goto("/");
-  await page.getByRole("tab", { name: "02 本体对齐与图谱生成" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
   await expect(
     page.getByText("每行代表一个客户", { exact: true }),
   ).toBeVisible();
@@ -381,7 +385,7 @@ test("retrieve scores and low-confidence candidates remain reviewable", async ({
     route.fulfill({ json: run }),
   );
   await page.goto("/");
-  await page.getByRole("tab", { name: "02 本体对齐与图谱生成" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
   await page.getByRole("tab", { name: "匹配过程", exact: true }).click();
   const records = page.getByRole("region", {
     name: "retrieve 匹配记录",

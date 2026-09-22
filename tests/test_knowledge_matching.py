@@ -173,8 +173,7 @@ def test_changing_node_revalidates_incident_edges_and_catalog_is_pinned(tmp_path
             MatchDecision(target="edge", target_id="e1", edge_type="OWNS", expected_revision=2),
         )
     svc.settings.ontology_snapshot.write_bytes(catalog_bytes())
-    with pytest.raises(AlignmentError, match="快照已变化"):
-        svc.concepts(value["id"], "客户")
+    assert svc.concepts(value["id"], "客户")[0].name == "客户"
 
 
 def test_no_incomplete_graph_is_accepted(tmp_path):
@@ -268,11 +267,11 @@ def test_bulk_accept_keeps_manually_cleared_edges_and_supports_legacy_suggestion
     assert accepted["revision"] == 3
 
 
-def test_bulk_accept_rejects_catalog_change_without_partial_writes(tmp_path):
+def test_bulk_accept_rejects_corrupted_evidence_without_partial_writes(tmp_path):
     svc = service(tmp_path, score=0.2)
     value = finish(svc)
-    svc.settings.ontology_snapshot.write_bytes(catalog_bytes())
-    with pytest.raises(AlignmentError, match="快照已变化"):
+    svc.ontology.snapshots.path(value["snapshot_sha256"]).write_bytes(catalog_bytes())
+    with pytest.raises(AlignmentError, match="校验失败"):
         svc.accept_proposals(value["id"], AcceptMatchProposals(expected_revision=1))
     assert svc.store.get(value["id"]) == value
 

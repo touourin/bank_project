@@ -95,7 +95,7 @@ test("one-step generation includes unsaved edits and preserves them after failur
     },
   );
   await page.goto("/");
-  await page.getByRole("tab", { name: "02 本体对齐与图谱生成" }).click();
+  await page.getByRole("tab", { name: "02 数据转换" }).click();
   const generate = page.getByRole("button", {
     name: "采纳方案并生成",
     exact: true,

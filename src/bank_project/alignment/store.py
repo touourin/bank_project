@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+from bank_project.conversion.review import require_reviewable
+
 from .models import AlignmentError, Run, SourceTable
 
 LEASE_SECONDS = 60
@@ -175,8 +177,7 @@ class RunStore:
 
     def _revise(self, db, original, result):
         # Used by both saving and atomic adopt-and-generate. Failed job claims roll back the fork.
-        if original.status != "ready" or original.graph_status == "building":
-            raise AlignmentError("请等待当前任务完成后再修改匹配", 409)
+        require_reviewable(original.status, blocked=original.graph_status == "building")
         run = Run(
             id=str(uuid4()),
             created_at=datetime.now(UTC).isoformat(),
@@ -185,6 +186,15 @@ class RunStore:
             result=result,
             based_on_run_id=original.id,
         )
+        previous_edits = (
+            {edit.id for table in original.result.tables for edit in table.manual_edits if edit.id}
+            if original.result
+            else set()
+        )
+        for table in run.result.tables if run.result else []:
+            for edit in table.manual_edits:
+                if edit.id and edit.id not in previous_edits and edit.version is None:
+                    edit.version = run.id
         db.execute(
             "INSERT INTO runs SELECT ?,?, ?,sources FROM runs WHERE id=?",
             (run.id, run.created_at, run.model_dump_json(), original.id),

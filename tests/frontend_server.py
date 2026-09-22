@@ -22,6 +22,7 @@ from bank_project.alignment.models import (
     GraphSummary,
 )
 from bank_project.main import create_app
+from bank_project.ontology.service import OntologyService
 from bank_project.settings import Settings
 
 
@@ -143,6 +144,18 @@ def app_factory():
     @asynccontextmanager
     async def lifespan(app):
         async with original(app):
+            local = app.state.settings.model_copy(
+                update={
+                    "ontology_base_url": None,
+                    "retrieve_base_url": None,
+                    "risk_ontology_base_url": None,
+                }
+            )
+            ontology = OntologyService(local)
+            app.state.ontology = ontology
+            app.state.alignment.ontology = app.state.knowledge.ontology = (
+                app.state.risk.ontology
+            ) = ontology
             app.state.alignment.analyzer.model = BrowserModel()
             app.state.alignment.analyzer.retriever = BrowserRetriever()
             app.state.alignment.graph = BrowserGraph()

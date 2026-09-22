@@ -9,8 +9,9 @@ import {
   Sun,
 } from "lucide-react";
 import { IntakePage } from "./features/intake/IntakePage";
-import { AlignmentPage } from "./features/alignment/AlignmentPage";
-import { GraphRagPage } from "./features/knowledge/GraphRagPage";
+import { ConversionPage } from "./features/conversion/ConversionPage";
+import { AnalysisPage } from "./features/analysis/AnalysisPage";
+import type { GraphSourceRef } from "./features/knowledge/types";
 import { ResolutionPage } from "./features/knowledge/ResolutionPage";
 import { RiskPage } from "./features/risk/RiskPage";
 import { getHealth } from "./api/client";
@@ -28,6 +29,7 @@ export function App() {
   const [activeStep, setActiveStep] = useState(
     isDemoMode ? demoStartStep : "intake",
   );
+  const [selectedGraph, setSelectedGraph] = useState<GraphSourceRef>();
   const [token, setToken] = useState("");
   const [draftToken, setDraftToken] = useState("");
   const [showToken, setShowToken] = useState(false);
@@ -36,10 +38,21 @@ export function App() {
     setActiveStep(key);
     if (isDemoMode) {
       const url = new URL(window.location.href);
-      url.searchParams.set("step", key === "resolution" ? "4" : "3");
+      url.searchParams.delete("step");
+      url.searchParams.set("workspace", key);
       window.history.replaceState(null, "", url);
     }
   }
+  function openAnalysis(source: GraphSourceRef) {
+    setSelectedGraph(source);
+    changeStep("analysis");
+  }
+  const nextStep =
+    activeStep === "conversion"
+      ? { key: "resolution", label: "下一步：实体消歧" }
+      : activeStep === "resolution"
+        ? { key: "analysis", label: "下一步：图谱分析" }
+        : { key: "conversion", label: "返回数据转换" };
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -90,6 +103,7 @@ export function App() {
           layout="inline"
           onFinish={() => {
             setToken(draftToken.trim());
+            setSelectedGraph(undefined);
             setShowToken(false);
           }}
         >
@@ -119,7 +133,7 @@ export function App() {
           <div>
             <div className="demo-banner-title">
               <Tag color="green">演示模式</Tag>
-              <strong>图谱生成 → 实体消歧</strong>
+              <strong>数据转换 → 实体消歧 → 图谱分析</strong>
             </div>
             <p>
               已载入示例数据，可浏览图谱、体验问答和合并核验。操作仅在当前页面生效，刷新即可还原。
@@ -135,15 +149,9 @@ export function App() {
             <Button
               type="primary"
               icon={<ArrowRight size={15} />}
-              onClick={() =>
-                changeStep(
-                  activeStep === "graphrag" ? "resolution" : "graphrag",
-                )
-              }
+              onClick={() => changeStep(nextStep.key)}
             >
-              {activeStep === "graphrag"
-                ? "下一步：实体消歧"
-                : "返回图谱与问答"}
+              {nextStep.label}
             </Button>
             <Button type="text" href="?">
               退出演示
@@ -164,29 +172,52 @@ export function App() {
             children: isDemoMode ? null : <IntakePage token={token} />,
           },
           {
-            key: "alignment",
-            label: "02 本体对齐与图谱生成",
-            disabled: isDemoMode,
-            children: isDemoMode ? null : (
-              <AlignmentPage key={token} token={token} />
+            key: "conversion",
+            label: "02 数据转换",
+            children: (
+              <ConversionPage
+                key={token}
+                token={token}
+                active={activeStep === "conversion"}
+                onAnalyze={openAnalysis}
+              />
             ),
           },
           {
-            key: "graphrag",
-            label: "03 GraphRAG 图谱与问答",
-            children: <GraphRagPage key={token} token={token} />,
+            key: "resolution",
+            label: "03 实体消歧",
+            children: (
+              <ResolutionPage
+                key={token}
+                token={token}
+                active={activeStep === "resolution"}
+                onAnalyze={openAnalysis}
+              />
+            ),
           },
           {
-            key: "resolution",
-            label: "04 实体消歧",
-            children: <ResolutionPage key={token} token={token} />,
+            key: "analysis",
+            label: "04 图谱浏览与分析",
+            children: (
+              <AnalysisPage
+                key={token}
+                token={token}
+                active={activeStep === "analysis"}
+                selected={selectedGraph}
+                onSelect={setSelectedGraph}
+              />
+            ),
           },
           {
             key: "risk",
             label: "05 风险规则",
             disabled: isDemoMode,
             children: isDemoMode ? null : (
-              <RiskPage key={token} token={token} />
+              <RiskPage
+                key={token}
+                token={token}
+                active={activeStep === "risk"}
+              />
             ),
           },
         ]}

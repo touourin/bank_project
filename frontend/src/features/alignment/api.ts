@@ -44,6 +44,12 @@ export const alignmentApi = {
     request<Run>(`${base}/runs/${id}/mapping`, token, jsonBody(edit)),
   graph: (token: string, signal: AbortSignal) =>
     request<GraphOverview>(`${base}/graph/overview`, token, { signal }),
+  graphVersion: (token: string, version: string, signal: AbortSignal) =>
+    request<GraphOverview>(
+      `${base}/graph/${encodeURIComponent(version)}/overview`,
+      token,
+      { signal },
+    ),
   graphPage: (
     token: string,
     version: string,

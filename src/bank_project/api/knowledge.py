@@ -57,6 +57,20 @@ def sources(knowledge: Service):
     return knowledge.sources()
 
 
+@router.get("/graph")
+def source_graph(
+    knowledge: Service,
+    source_kind: Literal["graphrag", "database"],
+    source_id: str = Query(min_length=1, max_length=200),
+):
+    # Raw database versions use the bounded alignment browsing API.
+    if source_kind == "database" and not source_id.startswith(("match:", "resolution:")):
+        from bank_project.alignment.models import AlignmentError
+
+        raise AlignmentError("表格原始图谱请使用按版本分页浏览接口")
+    return knowledge.load_graph(source_kind, source_id)
+
+
 @router.get("/matches")
 def matches(knowledge: Service):
     return knowledge.store.list()
