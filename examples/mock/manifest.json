@@ -10,7 +10,7 @@
       "filename": "CCM_C_CUST_FLAG_INFO.csv",
       "rows": 1000,
       "columns": 155,
-      "sha256": "73bfd521d40586dee2416b5e30bc1312943b7f841d8fdbb2c30bc30da6ace89d"
+      "sha256": "88894e03f67ac1de4a3319701befb54826d65db50ba3a138a4f2c961ca6a3b1c"
     },
     "E_CRM_C_CUST_TOUR_EVT_SUM": {
       "filename": "E_CRM_C_CUST_TOUR_EVT_SUM.csv",
@@ -801,6 +801,474 @@
       },
       "collation": "utf8mb4_bin",
       "customer_snapshot_join_verified": true
+    }
+  },
+  "identity_relation_revision": {
+    "revision": "person-relations-20260922-v1",
+    "synthetic": true,
+    "coverage": {
+      "companies": 1000,
+      "people": 1000,
+      "distinct_person_names": 980,
+      "homonym_pairs": 20,
+      "shared_legal_representatives": 71,
+      "shared_controllers": 53,
+      "different_legal_and_controller": 401,
+      "group_members": 236,
+      "groups": 59,
+      "scenarios": {
+        "shared_representative_separate_controllers": 48,
+        "group_common_controller": 236,
+        "representative_differs_from_controller": 200,
+        "independent_company": 516
+      }
+    },
+    "files": {
+      "客户标签.xlsx": {
+        "rows": {
+          "数据": 1000
+        },
+        "changed_cells": {
+          "数据": {
+            "legal_rep_nm": 1000,
+            "act_ctrl_psn_nm": 1000,
+            "legal_rep_cust_id": 71,
+            "act_ctrl_psn_cust_id": 377
+          }
+        },
+        "sha256": "1aa31553f34bc676af3b32d60c786392a7c5de773199abfd5e27f66932f2d256",
+        "projection_before": {
+          "rows": 1000,
+          "sum_sha256": "fce8d278e4036b545948808f682b6309a3dc7e75c12a15bf834a31885193e842",
+          "xor_sha256": "43fee19e7d2ef9f2545241992fcc3a469f930260cfd039df421c34d20901b304"
+        },
+        "projection_after": {
+          "rows": 1000,
+          "sum_sha256": "53e6818324e21aa3c4ca1c01ec84b6e6e1c6c3ab5e656e0f94493dc596e0c714",
+          "xor_sha256": "ffe9abb7de6da7059eb0e5c1106f77b2530150d7893cbfc51b2edd26e890572a"
+        }
+      },
+      "工商.xlsx": {
+        "rows": {
+          "数据": 1002
+        },
+        "changed_cells": {
+          "数据": {
+            "legal_rep_nm": 1000
+          }
+        },
+        "sha256": "633217b8a1a5c7195ad5fe258122e98f494af8b5957db9f93be16117adef35a1",
+        "projection_before": {
+          "rows": 1002,
+          "sum_sha256": "1d8a07d836a8092e006261f0fb13f08fbd19bc270d9413f31879df00ad859054",
+          "xor_sha256": "726b069ab2e422742bf766fc43b3df46866b781585e82bf7e32580d1d38697a2"
+        },
+        "projection_after": {
+          "rows": 1002,
+          "sum_sha256": "9135417a26b8837a4bffd571c538f572b03b3fa79d82aa74298eae17d97f7619",
+          "xor_sha256": "9b601181d756b80713dbcfbd1139052c2d4aad65dbef68bb223e1c4792d6b4cb"
+        }
+      },
+      "征信.xlsx": {
+        "rows": {
+          "数据": 1110
+        },
+        "changed_cells": {
+          "数据": {
+            "subject_name": 100
+          }
+        },
+        "sha256": "74e55efa98508e58b31047bbe80d4df8527f93c69bfd990cebf166e7803f2fef",
+        "projection_before": {
+          "rows": 1110,
+          "sum_sha256": "873d6e4f64241a31fad53bb63d3f972bbbfbc924110a0b3e81c490866ad11f9a",
+          "xor_sha256": "0739097cab25df209993a7371a2622aed89b50de3c6475b7d0c6cd6e6429df30"
+        },
+        "projection_after": {
+          "rows": 1110,
+          "sum_sha256": "18658b2d521cd516f0616455db65d1843797483a6ad264902b3fcf55d43373c3",
+          "xor_sha256": "e2889ea72f706bfb538eef63f4a26481e98f9047a5bac837dcd78950e73cc08f"
+        }
+      },
+      "来源明细/工商明细.xlsx": {
+        "rows": {
+          "VW_GSGR_PUNISHBREAK": 100,
+          "VW_GSGR_PERSONCASEINFO": 100,
+          "VW_GSGR_PUNISHED": 100,
+          "VW_GSGR_RYPOSFR": 100,
+          "VW_GSGR_RYPOSPER": 100,
+          "VW_GSGR_RYPOSSHA": 100,
+          "T_SAIC_ALTER": 100,
+          "T_SAIC_TRADEMARK": 100,
+          "T_SAIC_STOCKPAWNREV": 100,
+          "T_SAIC_STOCKPAWNALT": 100,
+          "T_SAIC_STOCKPAWN": 100,
+          "T_SAIC_SHARESFROST": 100,
+          "T_SAIC_SHAREHOLDER": 1014,
+          "T_SAIC_PUNISHED": 100,
+          "T_SAIC_PUNISHBREAK": 100,
+          "T_SAIC_ORGBASIC": 1002,
+          "T_SAIC_ORGDETAIL": 1002,
+          "T_SAIC_PERSON": 1002,
+          "T_SAIC_MORTGAGEREG": 100,
+          "T_SAIC_MORTGAGEPER": 100,
+          "T_SAIC_MORTGAGEPAWN": 100,
+          "T_SAIC_MORTGAGEDEBT": 100,
+          "T_SAIC_MORTGAGECAN": 100,
+          "T_SAIC_MORTGAGEBASIC": 100,
+          "T_SAIC_MORTGAGEALT": 100,
+          "T_SAIC_LIQUIDATION": 2,
+          "T_SAIC_FRPOSITION": 100,
+          "T_SAIC_FRINV": 100,
+          "T_SAIC_FILIATION": 100,
+          "T_SAIC_EXCEPTIONLIST": 100,
+          "T_SAIC_ENTINV": 100,
+          "T_SAIC_ENTCASEBASEINFO": 100,
+          "T_SAIC_BREAKLAW": 100,
+          "T_SAIC_BASIC": 1002,
+          "ENT_RISK_WARNING_SIGNAL": 100,
+          "T_SAIC_JUDICIALAID": 100,
+          "T_SAIC_JUDICIALAIDALTER": 100,
+          "T_SAIC_JUDICIALAIDDETAIL": 100,
+          "T_SAIC_LISTEDSHAREHOLDER": 100
+        },
+        "changed_cells": {
+          "VW_GSGR_PUNISHBREAK": {
+            "BUSINESSENTITY": 100,
+            "INAMECLEAN": 100
+          },
+          "VW_GSGR_PERSONCASEINFO": {
+            "NAME": 100
+          },
+          "VW_GSGR_PUNISHED": {
+            "INAMECLEAN": 100
+          },
+          "VW_GSGR_RYPOSFR": {
+            "RYNAME": 100,
+            "IDNT_CERT_ID": 24
+          },
+          "VW_GSGR_RYPOSPER": {
+            "RYNAME": 100,
+            "IDNT_CERT_ID": 24
+          },
+          "VW_GSGR_RYPOSSHA": {
+            "RYNAME": 100,
+            "IDNT_CERT_ID": 35
+          },
+          "T_SAIC_ALTER": {},
+          "T_SAIC_TRADEMARK": {},
+          "T_SAIC_STOCKPAWNREV": {},
+          "T_SAIC_STOCKPAWNALT": {},
+          "T_SAIC_STOCKPAWN": {
+            "STK_PAWN_CZPER": 100,
+            "STK_PAWN_CZCERNO": 35
+          },
+          "T_SAIC_SHARESFROST": {},
+          "T_SAIC_SHAREHOLDER": {
+            "SHANAME": 1000
+          },
+          "T_SAIC_PUNISHED": {
+            "INAMECLEAN": 100
+          },
+          "T_SAIC_PUNISHBREAK": {
+            "BUSINESSENTITY": 100,
+            "INAMECLEAN": 100
+          },
+          "T_SAIC_ORGBASIC": {},
+          "T_SAIC_ORGDETAIL": {
+            "legal_rep_nm": 1000
+          },
+          "T_SAIC_PERSON": {
+            "PERNAME": 1000,
+            "SEX": 44
+          },
+          "T_SAIC_MORTGAGEREG": {},
+          "T_SAIC_MORTGAGEPER": {},
+          "T_SAIC_MORTGAGEPAWN": {},
+          "T_SAIC_MORTGAGEDEBT": {},
+          "T_SAIC_MORTGAGECAN": {},
+          "T_SAIC_MORTGAGEBASIC": {},
+          "T_SAIC_MORTGAGEALT": {},
+          "T_SAIC_LIQUIDATION": {},
+          "T_SAIC_FRPOSITION": {
+            "NAME": 100
+          },
+          "T_SAIC_FRINV": {
+            "NAME": 100
+          },
+          "T_SAIC_FILIATION": {},
+          "T_SAIC_EXCEPTIONLIST": {},
+          "T_SAIC_ENTINV": {
+            "NAME": 100
+          },
+          "T_SAIC_ENTCASEBASEINFO": {},
+          "T_SAIC_BREAKLAW": {},
+          "T_SAIC_BASIC": {
+            "legal_rep_nm": 1000
+          },
+          "ENT_RISK_WARNING_SIGNAL": {},
+          "T_SAIC_JUDICIALAID": {
+            "INAME": 100
+          },
+          "T_SAIC_JUDICIALAIDALTER": {
+            "INAME": 100
+          },
+          "T_SAIC_JUDICIALAIDDETAIL": {
+            "INAME": 100
+          },
+          "T_SAIC_LISTEDSHAREHOLDER": {}
+        },
+        "sha256": "81459729ead1aff1641abe4f65d1222839f73a351ac12c84b9c22b236f6069c6"
+      },
+      "来源明细/征信明细.xlsx": {
+        "rows": {
+          "PBCPC_PA01AB_REPORTHEADER": 100,
+          "PBCPC_PA01C_OTHERID": 100,
+          "PBCPC_PA01DE_ATTENTION": 100,
+          "PBCPC_PB01A_BASICIDENTITY": 100,
+          "PBCPC_PB01B_MOBILE": 100,
+          "PBCPC_PB02_SPOUSE": 100,
+          "PBCPC_PB03_RESIDENCE": 100,
+          "PBCPC_PB04_PROFESSIONAL": 100,
+          "PBCPC_PC01_CREDITSCORE": 100,
+          "PBCPC_PC02A_CREDITSUMMARYCUE": 100,
+          "PBCPC_PC02B_ASSUREERREPAYSUM": 100,
+          "PBCPC_PC02C_FELLBACKDEBTSUM": 100,
+          "PBCPC_PC02D_OVERDUESUM": 100,
+          "PBCPC_PC02E_NONREVOLINGSUM": 100,
+          "PBCPC_PC02F_REVOLINGSUBSUM": 100,
+          "PBCPC_PC02G_REVOLINGSUM": 100,
+          "PBCPC_PC02H_LOANCARDSUM": 100,
+          "PBCPC_PC02I_STANDARDSUM": 100,
+          "PBCPC_PC02K_GUARANTEESUM": 100,
+          "PBCPC_PC03_TELPAYMENTSUM": 100,
+          "PBCPC_PC04_PUBLICINFOSUM": 100,
+          "PBCPC_PC05AB_QUERYRECOREDSUM": 100,
+          "PBCPC_PD02AZ_FACILITYAGTSUM": 100,
+          "PBCPC_PD01ABC_PERFORMANC": 100,
+          "PBCPC_PD01D_LATEST24MONTH": 100,
+          "PBCPC_PD01E_LATEST5YEAR": 100,
+          "PBCPC_PD01F_SPECIALTRADE": 100,
+          "PBCPC_PD01G_SPECIALEVENT": 100,
+          "PBCPC_PD01H_LARGESTAGE": 100,
+          "PBCPC_PD01Z_DISSENTINFO": 100,
+          "PBCPC_PD03AZ_GUARANTEE": 100,
+          "PBCPC_PE01AZ_TELPAYMENT": 100,
+          "PBCPC_PF01AZ_TAXARREAR": 100,
+          "PBCPC_PF02AZ_CIVILJUDGEMENT": 100,
+          "PBCPC_PF03AZ_FORCEEXECUTION": 100,
+          "PBCPC_PF04AZ_ADMINPUNISHMENT": 100,
+          "PBCPC_PF05AZ_ACCFUND": 100,
+          "PBCPC_PF06AZ_SALVATION": 100,
+          "PBCPC_PF07AZ_COMPETENCE": 100,
+          "PBCPC_PF08AZ_ADMINAWARD": 100,
+          "PBCPC_PG01_DISSENTINFO": 100,
+          "PBCPC_PH01_RECORDDETAIL": 100,
+          "PBCEC_EA01AB_REPORTHEADER": 1010,
+          "PBCEC_EA01C_IDENTITYINFO": 1010,
+          "PBCEC_EA01DE_DISSENTANDRATE": 1010,
+          "PBCEC_EB01A_CREDITCUE": 1010,
+          "PBCEC_EB01B_NONCREDITCUE": 100,
+          "PBCEC_EB02A_SUMUNSETTLED": 100,
+          "PBCEC_EB02B_SUMSETTLED": 100,
+          "PBCEC_EB02C_DEBTHISTORY": 100,
+          "PBCEC_EB03A_SUMUNSETTLED": 100,
+          "PBCEC_EB03B_SUMSETTLED": 100,
+          "PBCEC_EB04_FACILITYAGTSUM": 1010,
+          "PBCEC_EB05A_CREDITSUM": 100,
+          "PBCEC_EB05B_GUARANTEESUM": 100,
+          "PBCEC_EC01_BASICIDENTITY": 1010,
+          "PBCEC_EC02_CONTRIBUTIVE": 1002,
+          "PBCEC_EC03_SENIOREXECUTIVE": 1010,
+          "PBCEC_EC04_SUPERORG": 100,
+          "PBCEC_EC05_ACTUALCONTROLLER": 1002,
+          "PBCEC_ED01A_BASICLOANACCT": 1469,
+          "PBCEC_ED01B_REPAYMENT": 1469,
+          "PBCEC_ED01C_SPECIALTRADE": 53,
+          "PBCEC_ED02_DISCOUNT": 100,
+          "PBCEC_ED03_DEBITINTEREST": 100,
+          "PBCEC_ED04AB_GUARANTEEDETAIL": 53,
+          "PBCEC_ED05_GUARANTEESUBORG": 100,
+          "PBCEC_ED06_FACILITYAGREEMENT": 1469,
+          "PBCEC_ED07_REPAYMENTLOANACCT": 100,
+          "PBCEC_ED08_REPAYMENTDISCOUNT": 100,
+          "PBCEC_ED09_GUARANTEE": 100,
+          "PBCEC_EE01AB_UTILITIESFEES": 100,
+          "PBCEC_EF01_TAXINFO": 100,
+          "PBCEC_EF02_CIVILJUDGEMENT": 100,
+          "PBCEC_EF03_FORCEEXECUTION": 100,
+          "PBCEC_EF04_ADMINPUNISHMENT": 100,
+          "PBCEC_EF05AB_ACCFUND": 100,
+          "PBCEC_EF06_PERMITINFO": 100,
+          "PBCEC_EF07_APPROVEINFO": 100,
+          "PBCEC_EF08_QUALIFICATIONS": 100,
+          "PBCEC_EF09_REWARDINFO": 100,
+          "PBCEC_EF10_PATENTINFO": 100,
+          "PBCEC_EF11_QUARANTINE": 100,
+          "PBCEC_EF12_EXEMPTION": 100,
+          "PBCEC_EF13_SUPERVISION": 100,
+          "PBCEC_EF14_FINANCEINFO": 100,
+          "PBCEC_EG01AB_DEBTINFO2002": 100,
+          "PBCEC_EG02AB_DEBTINFO2007": 100,
+          "PBCEC_EG03AB_PROFITINFO2002": 100,
+          "PBCEC_EG04AB_PROFITINFO2007": 100,
+          "PBCEC_EG05AB_CASHINFO2002": 100,
+          "PBCEC_EG06AB_CASHINFO2007": 100,
+          "PBCEC_EG07AB_DEBTSYINFO1997": 8,
+          "PBCEC_EG08AB_DEBTSYINFO2013": 8,
+          "PBCEC_EG09AB_INEX1997": 8,
+          "PBCEC_EG10AB_INEX2013": 8,
+          "PBCEC_EH01_RATINGINFO": 100,
+          "PBCEC_EI01_DISSENTINFO": 100
+        },
+        "changed_cells": {
+          "PBCPC_PA01AB_REPORTHEADER": {
+            "PA01BQ01": 100
+          },
+          "PBCPC_PA01C_OTHERID": {},
+          "PBCPC_PA01DE_ATTENTION": {},
+          "PBCPC_PB01A_BASICIDENTITY": {},
+          "PBCPC_PB01B_MOBILE": {},
+          "PBCPC_PB02_SPOUSE": {},
+          "PBCPC_PB03_RESIDENCE": {},
+          "PBCPC_PB04_PROFESSIONAL": {},
+          "PBCPC_PC01_CREDITSCORE": {},
+          "PBCPC_PC02A_CREDITSUMMARYCUE": {},
+          "PBCPC_PC02B_ASSUREERREPAYSUM": {},
+          "PBCPC_PC02C_FELLBACKDEBTSUM": {},
+          "PBCPC_PC02D_OVERDUESUM": {},
+          "PBCPC_PC02E_NONREVOLINGSUM": {},
+          "PBCPC_PC02F_REVOLINGSUBSUM": {},
+          "PBCPC_PC02G_REVOLINGSUM": {},
+          "PBCPC_PC02H_LOANCARDSUM": {},
+          "PBCPC_PC02I_STANDARDSUM": {},
+          "PBCPC_PC02K_GUARANTEESUM": {},
+          "PBCPC_PC03_TELPAYMENTSUM": {},
+          "PBCPC_PC04_PUBLICINFOSUM": {},
+          "PBCPC_PC05AB_QUERYRECOREDSUM": {},
+          "PBCPC_PD02AZ_FACILITYAGTSUM": {},
+          "PBCPC_PD01ABC_PERFORMANC": {},
+          "PBCPC_PD01D_LATEST24MONTH": {},
+          "PBCPC_PD01E_LATEST5YEAR": {},
+          "PBCPC_PD01F_SPECIALTRADE": {},
+          "PBCPC_PD01G_SPECIALEVENT": {},
+          "PBCPC_PD01H_LARGESTAGE": {},
+          "PBCPC_PD01Z_DISSENTINFO": {},
+          "PBCPC_PD03AZ_GUARANTEE": {},
+          "PBCPC_PE01AZ_TELPAYMENT": {},
+          "PBCPC_PF01AZ_TAXARREAR": {},
+          "PBCPC_PF02AZ_CIVILJUDGEMENT": {},
+          "PBCPC_PF03AZ_FORCEEXECUTION": {},
+          "PBCPC_PF04AZ_ADMINPUNISHMENT": {},
+          "PBCPC_PF05AZ_ACCFUND": {},
+          "PBCPC_PF06AZ_SALVATION": {},
+          "PBCPC_PF07AZ_COMPETENCE": {},
+          "PBCPC_PF08AZ_ADMINAWARD": {},
+          "PBCPC_PG01_DISSENTINFO": {},
+          "PBCPC_PH01_RECORDDETAIL": {},
+          "PBCEC_EA01AB_REPORTHEADER": {},
+          "PBCEC_EA01C_IDENTITYINFO": {},
+          "PBCEC_EA01DE_DISSENTANDRATE": {},
+          "PBCEC_EB01A_CREDITCUE": {},
+          "PBCEC_EB01B_NONCREDITCUE": {},
+          "PBCEC_EB02A_SUMUNSETTLED": {},
+          "PBCEC_EB02B_SUMSETTLED": {},
+          "PBCEC_EB02C_DEBTHISTORY": {},
+          "PBCEC_EB03A_SUMUNSETTLED": {},
+          "PBCEC_EB03B_SUMSETTLED": {},
+          "PBCEC_EB04_FACILITYAGTSUM": {},
+          "PBCEC_EB05A_CREDITSUM": {},
+          "PBCEC_EB05B_GUARANTEESUM": {},
+          "PBCEC_EC01_BASICIDENTITY": {},
+          "PBCEC_EC02_CONTRIBUTIVE": {
+            "EC020Q01": 1000,
+            "EC020I01": 377
+          },
+          "PBCEC_EC03_SENIOREXECUTIVE": {
+            "EC030Q01": 1000,
+            "EC030I01": 71
+          },
+          "PBCEC_EC04_SUPERORG": {},
+          "PBCEC_EC05_ACTUALCONTROLLER": {
+            "act_ctrl_psn_nm": 1000,
+            "EC050I01": 377
+          },
+          "PBCEC_ED01A_BASICLOANACCT": {},
+          "PBCEC_ED01B_REPAYMENT": {},
+          "PBCEC_ED01C_SPECIALTRADE": {},
+          "PBCEC_ED02_DISCOUNT": {},
+          "PBCEC_ED03_DEBITINTEREST": {},
+          "PBCEC_ED04AB_GUARANTEEDETAIL": {},
+          "PBCEC_ED05_GUARANTEESUBORG": {},
+          "PBCEC_ED06_FACILITYAGREEMENT": {},
+          "PBCEC_ED07_REPAYMENTLOANACCT": {},
+          "PBCEC_ED08_REPAYMENTDISCOUNT": {},
+          "PBCEC_ED09_GUARANTEE": {},
+          "PBCEC_EE01AB_UTILITIESFEES": {},
+          "PBCEC_EF01_TAXINFO": {},
+          "PBCEC_EF02_CIVILJUDGEMENT": {},
+          "PBCEC_EF03_FORCEEXECUTION": {},
+          "PBCEC_EF04_ADMINPUNISHMENT": {},
+          "PBCEC_EF05AB_ACCFUND": {},
+          "PBCEC_EF06_PERMITINFO": {},
+          "PBCEC_EF07_APPROVEINFO": {},
+          "PBCEC_EF08_QUALIFICATIONS": {},
+          "PBCEC_EF09_REWARDINFO": {},
+          "PBCEC_EF10_PATENTINFO": {},
+          "PBCEC_EF11_QUARANTINE": {},
+          "PBCEC_EF12_EXEMPTION": {},
+          "PBCEC_EF13_SUPERVISION": {},
+          "PBCEC_EF14_FINANCEINFO": {},
+          "PBCEC_EG01AB_DEBTINFO2002": {},
+          "PBCEC_EG02AB_DEBTINFO2007": {},
+          "PBCEC_EG03AB_PROFITINFO2002": {},
+          "PBCEC_EG04AB_PROFITINFO2007": {},
+          "PBCEC_EG05AB_CASHINFO2002": {},
+          "PBCEC_EG06AB_CASHINFO2007": {},
+          "PBCEC_EG07AB_DEBTSYINFO1997": {},
+          "PBCEC_EG08AB_DEBTSYINFO2013": {},
+          "PBCEC_EG09AB_INEX1997": {},
+          "PBCEC_EG10AB_INEX2013": {},
+          "PBCEC_EH01_RATINGINFO": {},
+          "PBCEC_EI01_DISSENTINFO": {}
+        },
+        "sha256": "09b2acc4facc4f07fd79bdd9e8a1b957422e3cd212e546ae156edaad70f856c6"
+      },
+      "交易流水.xlsx": {
+        "rows": {
+          "数据": 539534
+        },
+        "changed_cells": {
+          "数据": {
+            "cntrprt_txn_accno_nm": 3633,
+            "cntrprtbookentracnonm": 3633,
+            "agnc_psn_nm": 18777
+          }
+        },
+        "sha256": "5370fb6e51690a4ee7525b0222442d3f18f7c1b003256164e22a822fc5d03ace",
+        "projection_before": {
+          "rows": 539534,
+          "sum_sha256": "ba4f33538580ab12356c76d89d4509e4cea81adc64742fc069ed2e1af115e852",
+          "xor_sha256": "80da922f650b75ac8ea0d9b02362d1ed73899ef10164ae6c641aaf288cc701f2"
+        },
+        "projection_after": {
+          "rows": 539534,
+          "sum_sha256": "0c7dbdbd4408a5125ac340dface33f9964a55981d8f28e07fe6bf633520db57b",
+          "xor_sha256": "904c9dea8e59c9d89fd2e6201df6b8f3c9daeb63e01ab1445c104d33e2cc306f"
+        }
+      }
+    },
+    "historical_import_batches_modified": false,
+    "source_database": {
+      "host": "192.168.130.250",
+      "database": "shanghai_proj",
+      "dataset": "desktop",
+      "verified_rows": {
+        "客户标签": 1000,
+        "工商": 1002,
+        "征信": 1110,
+        "交易流水": 757830
+      }
     }
   }
 }
